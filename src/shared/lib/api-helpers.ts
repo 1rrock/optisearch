@@ -9,36 +9,45 @@ export { recordUsage };
  * Always returns the profile UUID — never the raw auth provider string.
  */
 export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
-  // Dev bypass
+  // Dev bypass — ensure dev profile exists in DB
   if (process.env.DEV_AUTH_BYPASS === "true") {
-    return { userId: "dev-test-user-001", plan: "pro" as PlanId };
+    const { DEV_USER } = await import("@/shared/lib/dev-auth");
+    try {
+      const { createServerClient } = await import("@/shared/lib/supabase");
+      const supabase = await createServerClient();
+      await supabase.from("user_profiles").upsert(
+        {
+          id: DEV_USER.id,
+          auth_user_id: DEV_USER.id,
+          name: DEV_USER.name,
+          email: DEV_USER.email,
+          plan: "pro",
+        },
+        { onConflict: "id" }
+      );
+    } catch {
+      // DB upsert failed — still return valid UUID so non-DB operations work
+    }
+    return { userId: DEV_USER.id, plan: "pro" as PlanId };
   }
 
   const session = await auth();
   const authUserId = session?.user?.id;
-  if (!authUserId) {
-    console.error("[getAuthenticatedUser] No session or user.id. Session:", JSON.stringify(session));
-    return null;
-  }
+  if (!authUserId) return null;
 
   try {
     const { createServerClient } = await import("@/shared/lib/supabase");
     const supabase = await createServerClient();
 
     // Try to find existing profile
-    let { data: profile, error: profileError } = await supabase
+    let { data: profile } = await supabase
       .from("user_profiles")
       .select("id, plan")
       .eq("auth_user_id", authUserId)
       .single();
 
-    if (profileError) {
-      console.log("[getAuthenticatedUser] Profile lookup failed for authUserId:", authUserId, "Error:", profileError.message);
-    }
-
     // Auto-create if not found
     if (!profile) {
-      console.log("[getAuthenticatedUser] No profile found, auto-creating for authUserId:", authUserId);
       const { getCurrentUserProfileId } = await import("@/services/user-service");
       const profileId = await getCurrentUserProfileId();
       if (profileId) {
@@ -48,20 +57,14 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
           .eq("id", profileId)
           .single();
         profile = newProfile;
-      } else {
-        console.error("[getAuthenticatedUser] getCurrentUserProfileId returned null for authUserId:", authUserId);
       }
     }
 
-    if (!profile) {
-      console.error("[getAuthenticatedUser] Could not find or create profile for authUserId:", authUserId);
-      return null;
-    }
+    if (!profile) return null;
 
     return { userId: profile.id, plan: (profile.plan as PlanId) ?? "free" };
-  } catch (err) {
-    console.error("[getAuthenticatedUser] Exception:", err);
-    return null; // DB error — do not fall back to auth string
+  } catch {
+    return null;
   }
 }
 
@@ -77,7 +80,7 @@ export async function enforceUsageLimit(
   const { allowed, used, limit } = await checkUsageLimit(userId, plan, feature);
   if (!allowed) {
     return Response.json(
-      { error: `일일 사용 한도를 초과했습니다. (${used}/${limit})`, code: "USAGE_LIMIT_EXCEEDED" },
+      { error: `일일 사용 한도를 초과했습니다. (${used}/${limit})`, code: "USAGE_LIMIT_EXCEEDED", used, limit },
       { status: 429 }
     );
   }

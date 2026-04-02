@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 
 const EMPTY_DASHBOARD = {
@@ -11,51 +11,20 @@ const EMPTY_DASHBOARD = {
 
 export async function GET() {
   try {
-    const session = await auth();
-    const authUserId = session?.user?.id;
-    if (!authUserId) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
 
+    const { userId, plan } = user;
     const supabase = await createServerClient();
-
-    // Find or create user profile
-    let profileId: string;
-    const { data: existing } = await supabase
-      .from("user_profiles")
-      .select("id, plan")
-      .eq("auth_user_id", authUserId)
-      .single();
-
-    if (existing) {
-      profileId = existing.id;
-    } else {
-      // Auto-create profile on first dashboard visit
-      const { data: created, error: createErr } = await supabase
-        .from("user_profiles")
-        .insert({
-          auth_user_id: authUserId,
-          name: session.user?.name ?? null,
-          email: session.user?.email ?? null,
-        })
-        .select("id")
-        .single();
-
-      if (createErr || !created) {
-        // DB not ready — return empty dashboard instead of error
-        return Response.json(EMPTY_DASHBOARD);
-      }
-      profileId = created.id;
-    }
-
-    const plan = existing?.plan ?? "free";
 
     // Get today's usage counts
     const today = new Date().toISOString().split("T")[0];
     const { data: usageData } = await supabase
       .from("ai_usage")
       .select("feature")
-      .eq("user_id", profileId)
+      .eq("user_id", userId)
       .gte("created_at", `${today}T00:00:00`);
 
     const usage = { search: 0, title: 0, draft: 0, score: 0 };
@@ -69,7 +38,7 @@ export async function GET() {
     const { data: recentSearches } = await supabase
       .from("keyword_searches")
       .select("keyword, keyword_grade, pc_search_volume, mobile_search_volume, created_at")
-      .eq("user_id", profileId)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false })
       .limit(5);
 
@@ -77,13 +46,13 @@ export async function GET() {
     const { count: savedCount } = await supabase
       .from("saved_keywords")
       .select("*", { count: "exact", head: true })
-      .eq("user_id", profileId);
+      .eq("user_id", userId);
 
     // Get total searches count
     const { count: totalSearches } = await supabase
       .from("keyword_searches")
       .select("*", { count: "exact", head: true })
-      .eq("user_id", profileId);
+      .eq("user_id", userId);
 
     return Response.json({
       plan,

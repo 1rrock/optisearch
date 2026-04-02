@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import {
   Sparkles,
   Edit3,
@@ -14,12 +15,14 @@ import {
   Zap,
   Clock,
   LayoutTemplate,
-  PieChart
+  PieChart,
+  Lock
 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { PageHeader } from "@/shared/ui/page-header";
 import { copyToClipboard } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
+import { PLAN_LIMITS, type PlanId } from "@/shared/config/constants";
 
 type TabId = "title" | "draft" | "score";
 
@@ -101,6 +104,21 @@ export default function AIToolsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("title");
   const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>(null);
 
+  const queryClient = useQueryClient();
+  const { data: dashboardData } = useQuery<{ plan: PlanId; usage: { search: number; title: number; draft: number; score: number } }>({
+    queryKey: ["dashboard"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard");
+      if (!res.ok) return { plan: "free" as PlanId, usage: { search: 0, title: 0, draft: 0, score: 0 } };
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const plan = (dashboardData?.plan ?? "free") as PlanId;
+  const usage = dashboardData?.usage ?? { search: 0, title: 0, draft: 0, score: 0 };
+  const limits = PLAN_LIMITS[plan];
+
   return (
     <div className="space-y-8">
       <UpgradeModal
@@ -141,11 +159,96 @@ export default function AIToolsPage() {
 
       {/* 3. Screen Switching Area */}
       <div className="w-full">
-        {activeTab === "title" && <TitleTool onGoToDraft={() => setActiveTab("draft")} onUsageLimitExceeded={setUpgradeModal} />}
-        {activeTab === "draft" && <DraftTool onUsageLimitExceeded={setUpgradeModal} />}
-        {activeTab === "score" && <ScoreTool onUsageLimitExceeded={setUpgradeModal} />}
+        {activeTab === "title" && (
+          <TitleTool
+            onGoToDraft={() => setActiveTab("draft")}
+            onUsageLimitExceeded={setUpgradeModal}
+            used={usage.title}
+            limit={limits.dailyTitle}
+            onMutationSuccess={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
+          />
+        )}
+        {activeTab === "draft" && (
+          <DraftTool
+            onUsageLimitExceeded={setUpgradeModal}
+            used={usage.draft}
+            limit={limits.dailyDraft}
+            onMutationSuccess={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
+          />
+        )}
+        {activeTab === "score" && (
+          <ScoreTool
+            onUsageLimitExceeded={setUpgradeModal}
+            used={usage.score}
+            limit={limits.dailyScore}
+            onMutationSuccess={() => queryClient.invalidateQueries({ queryKey: ["dashboard"] })}
+          />
+        )}
       </div>
 
+    </div>
+  );
+}
+
+// ─── UsageBar ─────────────────────────────────────────────────────────────────
+
+function UsageBar({ used, limit }: { used: number; limit: number }) {
+  // limit === -1 means unlimited
+  if (limit === -1) {
+    return (
+      <div className="mt-6 p-4 bg-muted/30 rounded-xl flex items-center justify-between">
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">일일 사용량</span>
+        <span className="text-xs font-bold text-emerald-500">무제한</span>
+      </div>
+    );
+  }
+  // limit === 0 means feature not available
+  if (limit === 0) {
+    return (
+      <div className="mt-6 p-4 bg-muted/30 rounded-xl flex items-center justify-between">
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">일일 사용량</span>
+        <span className="text-xs font-bold text-muted-foreground">미지원 (업그레이드 필요)</span>
+      </div>
+    );
+  }
+  const pct = Math.min((used / limit) * 100, 100);
+  const isMaxed = used >= limit;
+  return (
+    <div className="mt-6 p-4 bg-muted/30 rounded-xl flex items-center justify-between">
+      <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">일일 사용량</span>
+      <div className="flex items-center gap-3 w-1/2">
+        <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${isMaxed ? "bg-rose-500" : "bg-primary"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className={`text-xs font-bold ${isMaxed ? "text-rose-500" : "text-primary"}`}>
+          {used}/{limit}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── PlanLockOverlay ──────────────────────────────────────────────────────────
+
+function PlanLockOverlay({ featureName, onUpgrade }: { featureName: string; onUpgrade: () => void }) {
+  return (
+    <div className="absolute inset-0 z-20 bg-background/80 backdrop-blur-sm rounded-2xl flex flex-col items-center justify-center gap-4">
+      <div className="w-14 h-14 rounded-full bg-muted/50 flex items-center justify-center">
+        <Lock className="size-6 text-muted-foreground" />
+      </div>
+      <h3 className="text-lg font-bold text-foreground">베이직 플랜부터 사용 가능</h3>
+      <p className="text-sm text-muted-foreground text-center max-w-xs">
+        {featureName} 기능은 베이직 플랜 이상에서 이용할 수 있습니다.
+      </p>
+      <button
+        onClick={onUpgrade}
+        className="px-6 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-bold hover:opacity-90 transition-opacity"
+      >
+        요금제 업그레이드
+      </button>
     </div>
   );
 }
@@ -169,7 +272,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
 
 // ─── Screen 1: AI Title Suggestions ──────────────────────────────────────────
 
-function TitleTool({ onGoToDraft, onUsageLimitExceeded }: { onGoToDraft: () => void; onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
+function TitleTool({ onGoToDraft, onUsageLimitExceeded, used, limit, onMutationSuccess }: { onGoToDraft: () => void; onUsageLimitExceeded: (state: UpgradeModalState) => void; used: number; limit: number; onMutationSuccess: () => void }) {
   const [keyword, setKeyword] = useState("");
   const [context, setContext] = useState("");
 
@@ -193,6 +296,7 @@ function TitleTool({ onGoToDraft, onUsageLimitExceeded }: { onGoToDraft: () => v
         onUsageLimitExceeded({ feature: "AI 제목 추천", used: err.used, limit: err.limit });
       }
     },
+    onSuccess: onMutationSuccess,
   });
 
   const handleGenerate = () => {
@@ -257,15 +361,7 @@ function TitleTool({ onGoToDraft, onUsageLimitExceeded }: { onGoToDraft: () => v
               <p className="mt-3 text-sm text-rose-500 font-semibold">{mutation.error.message}</p>
             )}
 
-            <div className="mt-6 p-4 bg-muted/30 rounded-xl flex items-center justify-between">
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">일일 사용량</span>
-              <div className="flex items-center gap-3 w-1/2">
-                <div className="h-1.5 flex-1 bg-muted rounded-full overflow-hidden">
-                  <div className="bg-primary h-full w-[15%]"></div>
-                </div>
-                <span className="text-xs font-bold text-primary">3/20</span>
-              </div>
-            </div>
+            <UsageBar used={used} limit={limit} />
           </div>
         </div>
       </section>
@@ -383,7 +479,8 @@ function TitleResultCard({ rank, title, reason }: { rank: number; title: string;
 type PostType = "정보성" | "리뷰" | "리스트형" | "비교분석";
 type DraftLength = "1000" | "1500" | "2500";
 
-function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
+function DraftTool({ onUsageLimitExceeded, used, limit, onMutationSuccess }: { onUsageLimitExceeded: (state: UpgradeModalState) => void; used: number; limit: number; onMutationSuccess: () => void }) {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("다이어트 식단");
   const [postType, setPostType] = useState<PostType>("정보성");
   const [length, setLength] = useState<DraftLength>("1500");
@@ -408,6 +505,7 @@ function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
         onUsageLimitExceeded({ feature: "AI 글 초안", used: err.used, limit: err.limit });
       }
     },
+    onSuccess: onMutationSuccess,
   });
 
   const handleGenerate = () => {
@@ -439,7 +537,10 @@ function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in slide-in-from-bottom-4 duration-500">
+    <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in slide-in-from-bottom-4 duration-500">
+      {limit === 0 && (
+        <PlanLockOverlay featureName="AI 글 초안" onUpgrade={() => router.push("/pricing")} />
+      )}
       {/* Left Input Sidebar */}
       <section className="col-span-1 lg:col-span-4 space-y-6">
         <div className="bg-card p-6 rounded-2xl shadow-sm border border-muted/50">
@@ -504,6 +605,8 @@ function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
             {mutation.isError && (
               <p className="text-sm text-rose-500 font-semibold">{mutation.error.message}</p>
             )}
+
+            <UsageBar used={used} limit={limit} />
           </div>
         </div>
 
@@ -606,7 +709,8 @@ function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
 
 // ─── Screen 3: Content Score ──────────────────────────────────────────────────
 
-function ScoreTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
+function ScoreTool({ onUsageLimitExceeded, used, limit, onMutationSuccess }: { onUsageLimitExceeded: (state: UpgradeModalState) => void; used: number; limit: number; onMutationSuccess: () => void }) {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("");
   const [content, setContent] = useState("");
 
@@ -630,6 +734,7 @@ function ScoreTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
         onUsageLimitExceeded({ feature: "콘텐츠 점수", used: err.used, limit: err.limit });
       }
     },
+    onSuccess: onMutationSuccess,
   });
 
   const handleAnalyze = () => {
@@ -650,7 +755,10 @@ function ScoreTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in slide-in-from-bottom-4 duration-500">
+    <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in slide-in-from-bottom-4 duration-500">
+      {limit === 0 && (
+        <PlanLockOverlay featureName="콘텐츠 점수" onUpgrade={() => router.push("/pricing")} />
+      )}
       {/* Left Input */}
       <section className="col-span-1 lg:col-span-7 space-y-6">
         <div className="bg-card rounded-2xl p-8 shadow-sm border border-muted/50">
@@ -701,6 +809,8 @@ function ScoreTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: Upg
                 <p className="text-sm text-rose-500 font-semibold">{mutation.error.message}</p>
               )}
             </div>
+
+            <UsageBar used={used} limit={limit} />
           </div>
         </div>
       </section>

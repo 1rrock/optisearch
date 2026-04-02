@@ -26,10 +26,6 @@ export async function POST(request: Request) {
 
   const user = await getAuthenticatedUser();
   if (!user) {
-    // Debug: log session state for troubleshooting
-    const { auth } = await import("@/auth");
-    const session = await auth();
-    console.error("[analyze] Auth failed. Session exists:", !!session, "User:", JSON.stringify(session?.user));
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
