@@ -22,6 +22,7 @@ import {
 import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/model/types";
+import type { TrendPoint } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
 
@@ -111,14 +112,130 @@ function competitionDescription(competition: string) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function TrendBar({ h1, h2, fill, border }: { h1: string; h2: string; fill?: boolean; border?: boolean }) {
-  const cls1 = fill ? "bg-blue-600" : border ? "bg-blue-600/70" : "bg-blue-600/30";
-  const cls2 = fill ? "bg-emerald-500" : border ? "bg-emerald-500/70" : "bg-emerald-500/30";
+function KeywordTrendChart({ data, error }: { data: TrendPoint[] | null; error: boolean }) {
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
+        트렌드 데이터를 불러올 수 없습니다
+      </div>
+    );
+  }
+
+  if (data === null) {
+    return (
+      <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
+    );
+  }
+
+  const sorted = [...data].sort((a, b) => a.period.localeCompare(b.period));
+
+  if (sorted.length < 2) {
+    return (
+      <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
+        트렌드 데이터가 없습니다
+      </div>
+    );
+  }
+
+  const W = 700;
+  const H = 240;
+  const PAD = { top: 16, right: 20, bottom: 40, left: 40 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+  const xStep = chartW / Math.max(sorted.length - 1, 1);
+
+  const xOf = (i: number) => PAD.left + i * xStep;
+  const yOf = (ratio: number) => PAD.top + chartH - (ratio / 100) * chartH;
+
+  const yTicks = [0, 25, 50, 75, 100];
+  const tickStep = Math.max(1, Math.floor(sorted.length / 6));
+  const xTicks = sorted.filter((_, i) => i % tickStep === 0);
+
+  const linePath = sorted
+    .map((pt, i) => `${i === 0 ? "M" : "L"} ${xOf(i)} ${yOf(pt.ratio)}`)
+    .join(" ");
+
+  const areaPath =
+    `M ${xOf(0)} ${yOf(sorted[0].ratio)} ` +
+    sorted.slice(1).map((pt, i) => `L ${xOf(i + 1)} ${yOf(pt.ratio)}`).join(" ") +
+    ` L ${xOf(sorted.length - 1)} ${PAD.top + chartH} L ${xOf(0)} ${PAD.top + chartH} Z`;
 
   return (
-    <div className="flex-1 flex flex-col justify-end gap-1">
-      <div className={`w-full rounded-t-sm ${cls1} h-${h1}`}></div>
-      <div className={`w-full rounded-t-sm ${cls2} h-${h2}`}></div>
+    <div className="w-full overflow-x-auto">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full min-w-[320px]"
+        style={{ height: H }}
+        aria-label="검색량 트렌드 차트"
+      >
+        <defs>
+          <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.18} />
+            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.01} />
+          </linearGradient>
+        </defs>
+
+        {yTicks.map((v) => (
+          <line
+            key={v}
+            x1={PAD.left}
+            x2={W - PAD.right}
+            y1={yOf(v)}
+            y2={yOf(v)}
+            stroke="currentColor"
+            strokeOpacity={0.08}
+            strokeWidth={1}
+          />
+        ))}
+
+        {yTicks.map((v) => (
+          <text
+            key={v}
+            x={PAD.left - 8}
+            y={yOf(v) + 4}
+            textAnchor="end"
+            fontSize={11}
+            fill="currentColor"
+            fillOpacity={0.45}
+          >
+            {v}
+          </text>
+        ))}
+
+        {xTicks.map((pt) => (
+          <text
+            key={pt.period}
+            x={xOf(sorted.indexOf(pt))}
+            y={H - 8}
+            textAnchor="middle"
+            fontSize={10}
+            fill="currentColor"
+            fillOpacity={0.45}
+          >
+            {pt.period.slice(0, 7)}
+          </text>
+        ))}
+
+        <path d={areaPath} fill="url(#trendGradient)" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke="#3b82f6"
+          strokeWidth={2.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {sorted.map((pt, i) => (
+          <circle
+            key={pt.period}
+            cx={xOf(i)}
+            cy={yOf(pt.ratio)}
+            r={3}
+            fill="#3b82f6"
+          />
+        ))}
+      </svg>
     </div>
   );
 }
@@ -247,6 +364,8 @@ export default function AnalyzePage() {
   const [inputValue, setInputValue] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
   const [tagCopied, setTagCopied] = useState(false);
+  const [trendData, setTrendData] = useState<TrendPoint[] | null>(null);
+  const [trendError, setTrendError] = useState(false);
   const [allTagsCopied, setAllTagsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
@@ -280,11 +399,38 @@ export default function AnalyzePage() {
     fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => {});
   }, [data?.analysis?.keyword]);
 
+  // Fetch trend data whenever analysis result changes
+  useEffect(() => {
+    if (!data?.analysis?.keyword) return;
+    fetchTrendData(data.analysis.keyword);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.analysis?.keyword]);
+
+  async function fetchTrendData(keyword: string) {
+    setTrendData(null);
+    setTrendError(false);
+    try {
+      const res = await fetch("/api/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywords: [keyword], months: 12 }),
+      });
+      if (!res.ok) throw new Error();
+      const json = await res.json();
+      const points: TrendPoint[] = json.trends?.[0]?.data ?? [];
+      setTrendData(points);
+    } catch {
+      setTrendError(true);
+    }
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const keyword = inputValue.trim();
     if (!keyword) return;
     setSubmittedKeyword(keyword);
+    setTrendData(null);
+    setTrendError(false);
     reset();
     mutate(keyword);
   }
@@ -296,6 +442,8 @@ export default function AnalyzePage() {
   function handleRelatedKeywordClick(keyword: string) {
     setInputValue(keyword);
     setSubmittedKeyword(keyword);
+    setTrendData(null);
+    setTrendError(false);
     reset();
     mutate(keyword);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -577,39 +725,10 @@ export default function AnalyzePage() {
 
           {/* Row 2: Charts & Tables */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-            {/* Trend Chart — TODO: W4에서 데이터랩 API 연결 */}
+            {/* Trend Chart */}
             <div className="lg:col-span-2 bg-card p-8 rounded-xl shadow-sm border border-muted/50">
-              <div className="flex justify-between items-center mb-8">
-                <h3 className="text-lg font-bold">검색량 트렌드</h3>
-                <div className="flex gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                    <span className="text-xs font-medium text-muted-foreground">PC</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="text-xs font-medium text-muted-foreground">Mobile</span>
-                  </div>
-                </div>
-              </div>
-              {/* Simulated trend bars — TODO: W4에서 데이터랩 API 연결 */}
-              <div className="h-64 flex items-end justify-between gap-2 px-2">
-                <TrendBar h1="12" h2="24" />
-                <TrendBar h1="14" h2="28" />
-                <TrendBar h1="16" h2="32" />
-                <TrendBar h1="20" h2="36" />
-                <TrendBar h1="24" h2="40" />
-                <TrendBar h1="28" h2="44" />
-                <TrendBar h1="32" h2="48" />
-                <TrendBar h1="36" h2="52" />
-                <TrendBar h1="40" h2="56" fill />
-                <TrendBar h1="44" h2="60" border />
-                <TrendBar h1="38" h2="54" border />
-                <TrendBar h1="34" h2="50" border />
-              </div>
-              <div className="flex justify-between mt-4 px-2 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
-                <span>1월</span><span>2월</span><span>3월</span><span>4월</span><span>5월</span><span>6월</span><span>7월</span><span>8월</span><span>9월</span><span>10월</span><span>11월</span><span>12월</span>
-              </div>
+              <h3 className="text-lg font-bold mb-6">검색량 트렌드</h3>
+              <KeywordTrendChart data={trendData} error={trendError} />
             </div>
 
             {/* Related Keywords Table */}
