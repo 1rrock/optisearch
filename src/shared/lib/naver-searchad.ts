@@ -5,6 +5,7 @@
  */
 
 import { createHmac } from "crypto";
+import { withRetry } from "./retry";
 
 // ---------------------------------------------------------------------------
 // Raw API response types
@@ -136,18 +137,20 @@ export async function getKeywordStats(
     const signaturePath = "/keywordstool";
     const queryString = `?hintKeywords=${encodeURIComponent(batch.join(","))}&showDetail=1`;
 
-    const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
-      method: "GET",
-      headers: buildHeaders("GET", signaturePath),
-    });
-
-    if (!response.ok) {
-      throw new Error(
-        `Naver SearchAd API error: ${response.status} ${response.statusText}`
+    const data = await withRetry(async () => {
+      const response = await fetch(
+        `${BASE_URL}${signaturePath}${queryString}`,
+        { method: "GET", headers: buildHeaders("GET", signaturePath) }
       );
-    }
-
-    const data: KeywordToolResponse = await response.json();
+      if (!response.ok) {
+        const err = new Error(
+          `Naver SearchAd API error: ${response.status} ${response.statusText}`
+        ) as Error & { status: number };
+        err.status = response.status;
+        throw err;
+      }
+      return response.json() as Promise<KeywordToolResponse>;
+    });
     results.push(...data.keywordList.map(normalise));
   }
 
@@ -166,17 +169,19 @@ export async function getRelatedKeywords(
   const signaturePath = "/keywordstool";
   const queryString = `?hintKeywords=${encodeURIComponent(keyword)}&showDetail=1`;
 
-  const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
-    method: "GET",
-    headers: buildHeaders("GET", signaturePath),
+  const data = await withRetry(async () => {
+    const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
+      method: "GET",
+      headers: buildHeaders("GET", signaturePath),
+    });
+    if (!response.ok) {
+      const err = new Error(
+        `Naver SearchAd API error: ${response.status} ${response.statusText}`
+      ) as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+    return response.json() as Promise<KeywordToolResponse>;
   });
-
-  if (!response.ok) {
-    throw new Error(
-      `Naver SearchAd API error: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data: KeywordToolResponse = await response.json();
   return data.keywordList.map(normalise);
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Search, Bookmark, Verified, TrendingUp, Star, Minus, Flame, Zap, Plus, Sparkles, Settings } from "lucide-react";
+import { Search, Bookmark, Verified, TrendingUp, Star, Minus, Flame, Zap, Plus, Sparkles, Settings, Download } from "lucide-react";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { exportToExcel } from "@/shared/lib/excel";
+import { useState } from "react";
 
 interface DashboardData {
   plan: PlanId;
@@ -93,6 +95,39 @@ export default function DashboardPage() {
   const limits = PLAN_LIMITS[plan];
   const searchLimit = limits.dailySearch;
   const titleLimit = limits.dailyTitle;
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  async function handleExportHistory() {
+    setIsExporting(true);
+    try {
+      const res = await fetch("/api/history");
+      if (!res.ok) throw new Error("Failed to fetch history");
+      const { history } = await res.json();
+      const rows = (history as Array<{
+        keyword: string;
+        pcSearchVolume: number;
+        mobileSearchVolume: number;
+        totalSearchVolume: number;
+        competition: string;
+        saturationIndex: number | null;
+        keywordGrade: string;
+        createdAt: string;
+      }>).map((item) => ({
+        키워드: item.keyword,
+        PC검색량: item.pcSearchVolume,
+        모바일검색량: item.mobileSearchVolume,
+        총검색량: item.totalSearchVolume,
+        경쟁도: item.competition,
+        포화지수: item.saturationIndex ?? "",
+        등급: item.keywordGrade ?? "",
+        검색일시: new Date(item.createdAt).toLocaleString("ko-KR"),
+      }));
+      exportToExcel(rows, `검색기록_${new Date().toISOString().slice(0, 10)}`);
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   // AI usage = title + draft + score combined for the "AI 사용" card
   const aiUsed = data.usage.title + data.usage.draft + data.usage.score;
@@ -204,7 +239,19 @@ export default function DashboardPage() {
         <section className="lg:col-span-7 bg-card rounded-xl shadow-sm overflow-hidden border border-muted/50">
           <div className="px-6 py-5 border-b border-muted/50 flex justify-between items-center bg-muted/10">
             <h3 className="text-lg font-bold tracking-tight">최근 검색 키워드</h3>
-            <a href="/history" className="text-primary text-sm font-semibold hover:underline">전체보기</a>
+            <div className="flex items-center gap-3">
+              {limits.historyExcelEnabled && (
+                <button
+                  onClick={handleExportHistory}
+                  disabled={isExporting}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Download className="size-3.5" />
+                  {isExporting ? "내보내는 중..." : "엑셀 내보내기"}
+                </button>
+              )}
+              <a href="/history" className="text-primary text-sm font-semibold hover:underline">전체보기</a>
+            </div>
           </div>
           {data.recentSearches.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">

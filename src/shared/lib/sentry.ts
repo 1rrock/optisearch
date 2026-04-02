@@ -1,21 +1,17 @@
-// Lightweight Sentry integration via CDN / manual init
-// Replace with @sentry/nextjs when package is installed
+import * as Sentry from "@sentry/nextjs";
 
-const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
-
-export function initSentry() {
-  // Will be initialized when @sentry/nextjs is installed
-  // For now, capture errors to console
-  if (typeof window !== "undefined" && !SENTRY_DSN) {
-    return;
+export function captureException(error: unknown, context?: Record<string, unknown>) {
+  if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    Sentry.captureException(error, { extra: context });
+  } else {
+    console.error("[Sentry]", error, context);
   }
 }
 
-export function captureException(error: unknown, context?: Record<string, unknown>) {
-  console.error("[Sentry]", error, context);
-  // When @sentry/nextjs is installed, this will call Sentry.captureException
-}
-
 export function captureMessage(message: string, level: "info" | "warning" | "error" = "info") {
-  console.log(`[Sentry:${level}]`, message);
+  if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+    Sentry.captureMessage(message, level);
+  } else {
+    console.log(`[Sentry:${level}]`, message);
+  }
 }

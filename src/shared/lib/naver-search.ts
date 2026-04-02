@@ -6,6 +6,8 @@
  * Env vars: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
  */
 
+import { withRetry } from "./retry";
+
 const BASE_URL = "https://openapi.naver.com/v1/search";
 
 function getAuthHeaders(): HeadersInit {
@@ -26,16 +28,18 @@ function getAuthHeaders(): HeadersInit {
 
 async function fetchSearch<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, { headers: getAuthHeaders() });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `Naver Search API error ${response.status} ${response.statusText}: ${text}`
-    );
-  }
-
-  return response.json() as Promise<T>;
+  return withRetry(async () => {
+    const response = await fetch(url, { headers: getAuthHeaders() });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      const err = new Error(
+        `Naver Search API error ${response.status} ${response.statusText}: ${text}`
+      ) as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+    return response.json() as Promise<T>;
+  });
 }
 
 // ---------------------------------------------------------------------------

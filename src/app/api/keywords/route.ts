@@ -3,6 +3,7 @@ import { analyzeKeyword } from "@/services/keyword-service";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -28,6 +29,20 @@ export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": "60",
+          "X-RateLimit-Remaining": String(rateLimitResult.remaining),
+        },
+      }
+    );
   }
 
   const limitError = await enforceUsageLimit(user.userId, user.plan, "search");

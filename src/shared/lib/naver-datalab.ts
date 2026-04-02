@@ -6,6 +6,8 @@
  * Env vars: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET
  */
 
+import { withRetry } from "./retry";
+
 const BASE_URL = "https://openapi.naver.com/v1/datalab";
 
 function getAuthHeaders(): HeadersInit {
@@ -27,20 +29,22 @@ function getAuthHeaders(): HeadersInit {
 
 async function postDatalab<T>(path: string, body: unknown): Promise<T> {
   const url = `${BASE_URL}${path}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(body),
+  return withRetry(async () => {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      const err = new Error(
+        `Naver DataLab API error ${response.status} ${response.statusText}: ${text}`
+      ) as Error & { status: number };
+      err.status = response.status;
+      throw err;
+    }
+    return response.json() as Promise<T>;
   });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(
-      `Naver DataLab API error ${response.status} ${response.statusText}: ${text}`
-    );
-  }
-
-  return response.json() as Promise<T>;
 }
 
 // ---------------------------------------------------------------------------

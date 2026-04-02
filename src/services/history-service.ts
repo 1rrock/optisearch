@@ -39,14 +39,17 @@ export async function getSearchHistory(
   id: string;
   keyword: string;
   keywordGrade: string;
+  pcSearchVolume: number;
+  mobileSearchVolume: number;
   totalSearchVolume: number;
   competition: string;
+  saturationIndex: number | null;
   createdAt: string;
 }>> {
   const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("keyword_searches")
-    .select("id, keyword, keyword_grade, pc_search_volume, mobile_search_volume, competition, created_at")
+    .select("id, keyword, keyword_grade, pc_search_volume, mobile_search_volume, competition, saturation_index, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -59,8 +62,11 @@ export async function getSearchHistory(
     id: row.id,
     keyword: row.keyword,
     keywordGrade: row.keyword_grade,
+    pcSearchVolume: row.pc_search_volume ?? 0,
+    mobileSearchVolume: row.mobile_search_volume ?? 0,
     totalSearchVolume: (row.pc_search_volume ?? 0) + (row.mobile_search_volume ?? 0),
     competition: row.competition,
+    saturationIndex: row.saturation_index ?? null,
     createdAt: row.created_at,
   }));
 }

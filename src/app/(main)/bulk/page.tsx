@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import {
   Database,
   Upload,
@@ -16,6 +16,7 @@ import {
   Check,
 } from "lucide-react";
 import { copyToClipboard, formatKeywordsAsTags } from "@/shared/lib/clipboard";
+import { parseKeywordsFromFile, exportToExcel } from "@/shared/lib/excel";
 import { Button } from "@/shared/ui/button";
 import { PageHeader } from "@/shared/ui/page-header";
 import type { KeywordSearchResult, KeywordGrade } from "@/entities/keyword/model/types";
@@ -73,6 +74,7 @@ function competitionBadgeClass(comp: string): string {
 export default function BulkAnalysisPage() {
   const [tab, setTab] = useState<"text" | "csv">("text");
   const [inputText, setInputText] = useState("");
+  const [csvParsedCount, setCsvParsedCount] = useState<number | null>(null);
   const [results, setResults] = useState<KeywordSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -82,6 +84,8 @@ export default function BulkAnalysisPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [bulkTagsCopied, setBulkTagsCopied] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const keywords = useMemo(() => parseKeywords(inputText), [inputText]);
 
@@ -122,6 +126,32 @@ export default function BulkAnalysisPage() {
       setBulkTagsCopied(true);
       setTimeout(() => setBulkTagsCopied(false), 2000);
     }
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const buffer = await file.arrayBuffer();
+    const keywords = parseKeywordsFromFile(buffer, file.name);
+    const limited = keywords.slice(0, 50);
+    setInputText(limited.join("\n"));
+    setCsvParsedCount(limited.length);
+    setTab("text");
+    // Reset so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleExportExcel() {
+    const data = results.map((r) => ({
+      키워드: r.keyword,
+      PC검색량: r.pcSearchVolume,
+      모바일검색량: r.mobileSearchVolume,
+      총검색량: r.totalSearchVolume,
+      경쟁도: r.competition,
+      포화지수: r.saturationIndex.label,
+      등급: r.keywordGrade,
+    }));
+    exportToExcel(data, `키워드분석_${new Date().toISOString().slice(0, 10)}`);
   }
 
   async function handleAnalyze() {
@@ -184,11 +214,18 @@ export default function BulkAnalysisPage() {
             직접 입력
           </button>
           <button
-            disabled
-            className="px-8 py-4 text-sm font-semibold text-muted-foreground flex items-center gap-2 opacity-50 cursor-not-allowed"
+            onClick={() => fileInputRef.current?.click()}
+            className="px-8 py-4 text-sm font-semibold text-muted-foreground flex items-center gap-2 hover:bg-muted/30 transition-colors"
           >
-            <Upload className="size-4" /> CSV 업로드 <span className="text-[11px] font-normal">(준비 중)</span>
+            <Upload className="size-4" /> CSV 업로드
           </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.xlsx,.xls"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
 
         <div className="p-8">
@@ -204,6 +241,11 @@ export default function BulkAnalysisPage() {
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg">
               <Info className="size-4 text-blue-500" />
               <span>현재 {keywords.length}개 / 최대 50개</span>
+              {csvParsedCount !== null && (
+                <span className="ml-2 text-emerald-600 font-medium">
+                  (파일에서 {csvParsedCount}개 불러옴)
+                </span>
+              )}
             </div>
             <Button
               size="lg"
@@ -269,9 +311,14 @@ export default function BulkAnalysisPage() {
                 <Save className="size-4 mr-2" />
                 선택 저장 <span className="ml-1 text-[11px] font-normal">(준비 중)</span>
               </Button>
-              <Button variant="outline" className="rounded-xl font-semibold text-muted-foreground hover:text-foreground opacity-50 cursor-not-allowed" disabled>
+              <Button
+                variant="outline"
+                className="rounded-xl font-semibold"
+                onClick={handleExportExcel}
+                disabled={results.length === 0}
+              >
                 <Download className="size-4 mr-2" />
-                CSV 추출 <span className="ml-1 text-[11px] font-normal">(준비 중)</span>
+                엑셀 다운로드
               </Button>
               <Button variant="default" className="rounded-xl font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 border-none shadow-none opacity-50 cursor-not-allowed" disabled>
                 <Sparkles className="size-4 mr-2" />
