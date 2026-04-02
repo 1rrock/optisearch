@@ -9,37 +9,48 @@ export { recordUsage };
  * Always returns the profile UUID — never the raw auth provider string.
  */
 export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
-  // Dev bypass — ensure dev profile exists in DB
+  // Dev bypass — use pre-created dev profile from DB
   if (process.env.DEV_AUTH_BYPASS === "true") {
     const { DEV_USER } = await import("@/shared/lib/dev-auth");
     try {
       const { createServerClient } = await import("@/shared/lib/supabase");
       const supabase = await createServerClient();
 
-      // Check if dev profile already exists
-      const { data: existing } = await supabase
-        .from("user_profiles")
+      // Ensure public.users row exists (FK target for user_profiles.auth_user_id)
+      const { data: existingUser } = await supabase
+        .from("users")
         .select("id")
-        .eq("id", DEV_USER.id)
+        .eq("id", DEV_USER.authId)
         .single();
 
-      if (!existing) {
-        // Insert dev profile — use insert to handle all constraint types
-        const { error } = await supabase.from("user_profiles").insert({
-          id: DEV_USER.id,
-          auth_user_id: DEV_USER.id,
+      if (!existingUser) {
+        await supabase.from("users").insert({
+          id: DEV_USER.authId,
+          name: DEV_USER.name,
+          email: DEV_USER.email,
+        });
+      }
+
+      // Ensure user_profiles row exists
+      const { data: existingProfile } = await supabase
+        .from("user_profiles")
+        .select("id, plan")
+        .eq("id", DEV_USER.profileId)
+        .single();
+
+      if (!existingProfile) {
+        await supabase.from("user_profiles").insert({
+          id: DEV_USER.profileId,
+          auth_user_id: DEV_USER.authId,
           name: DEV_USER.name,
           email: DEV_USER.email,
           plan: "pro",
         });
-        if (error) {
-          console.error("[dev-auth] Failed to create dev profile:", error.message);
-        }
       }
-    } catch (err) {
-      console.error("[dev-auth] Dev profile setup error:", err);
+    } catch {
+      // DB setup failed — still return the profile ID
     }
-    return { userId: DEV_USER.id, plan: "pro" as PlanId };
+    return { userId: DEV_USER.profileId, plan: "pro" as PlanId };
   }
 
   const session = await auth();
