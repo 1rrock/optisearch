@@ -6,7 +6,7 @@ export { recordUsage };
 
 /**
  * Get the authenticated user's ID and plan. Returns null if not authenticated.
- * Falls back gracefully if Supabase tables don't exist yet.
+ * Always returns the profile UUID — never the raw auth provider string.
  */
 export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
   // Dev bypass
@@ -18,20 +18,36 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
   const authUserId = session?.user?.id;
   if (!authUserId) return null;
 
-  // Try to get plan from user_profiles, but fall back to "free" if DB isn't set up
   try {
     const { createServerClient } = await import("@/shared/lib/supabase");
     const supabase = await createServerClient();
-    const { data: profile } = await supabase
+
+    // Try to find existing profile
+    let { data: profile } = await supabase
       .from("user_profiles")
       .select("id, plan")
       .eq("auth_user_id", authUserId)
       .single();
 
-    return { userId: profile?.id ?? authUserId, plan: (profile?.plan as PlanId) ?? "free" };
+    // Auto-create if not found
+    if (!profile) {
+      const { getCurrentUserProfileId } = await import("@/services/user-service");
+      const profileId = await getCurrentUserProfileId();
+      if (profileId) {
+        const { data: newProfile } = await supabase
+          .from("user_profiles")
+          .select("id, plan")
+          .eq("id", profileId)
+          .single();
+        profile = newProfile;
+      }
+    }
+
+    if (!profile) return null; // Cannot create profile — treat as unauthenticated
+
+    return { userId: profile.id, plan: (profile.plan as PlanId) ?? "free" };
   } catch {
-    // DB not available — use auth user ID directly with free plan
-    return { userId: authUserId, plan: "free" };
+    return null; // DB error — do not fall back to auth string
   }
 }
 

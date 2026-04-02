@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { getShoppingTrend, getShoppingKeywordTrend } from "@/shared/lib/naver-datalab";
+import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { PLAN_LIMITS } from "@/shared/config/constants";
 
 const bodySchema = z.object({
   category: z.string().min(1),
@@ -23,6 +25,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "Validation failed", details: parsed.error.flatten() }, { status: 422 });
   }
 
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  if (!PLAN_LIMITS[user.plan].shoppingInsightEnabled) {
+    return Response.json(
+      { error: "쇼핑 인사이트는 베이직 이상 플랜에서 이용 가능합니다.", code: "PLAN_UPGRADE_REQUIRED" },
+      { status: 403 }
+    );
+  }
+
+  const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
+  if (limitError) return limitError;
+
   try {
     const { category, keyword, months, device, gender, ages } = parsed.data;
     const endDate = new Date();
@@ -43,9 +60,11 @@ export async function POST(request: Request) {
     if (keyword) {
       params.keyword = keyword;
       const result = await getShoppingKeywordTrend(params);
+      await recordUsage(user.userId, "search", keyword);
       return Response.json(result);
     } else {
       const result = await getShoppingTrend(params);
+      await recordUsage(user.userId, "search", category);
       return Response.json(result);
     }
   } catch (err) {

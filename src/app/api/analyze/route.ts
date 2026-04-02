@@ -2,6 +2,7 @@ import { z } from "zod";
 import { analyzeKeyword, getRelatedKeywords } from "@/services/keyword-service";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { saveSearchHistory } from "@/services/history-service";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -54,6 +55,8 @@ export async function POST(request: Request) {
       getRelatedKeywords(effectiveKeyword),
     ]);
     await recordUsage(user.userId, "search", effectiveKeyword);
+    // Save search history (non-blocking)
+    saveSearchHistory(user.userId, analysis).catch(() => {});
     return Response.json({ analysis, relatedKeywords, correctedKeyword });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";

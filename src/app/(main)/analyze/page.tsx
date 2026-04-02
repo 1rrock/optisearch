@@ -23,6 +23,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/model/types";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
+import { UpgradeModal } from "@/shared/components/UpgradeModal";
 
 // ---------------------------------------------------------------------------
 // API types
@@ -38,6 +39,17 @@ interface AnalyzeResponse {
 // Inline fetch function (W4에서 feature hook으로 이전 예정)
 // ---------------------------------------------------------------------------
 
+class UsageLimitError extends Error {
+  used: number;
+  limit: number;
+  constructor(message: string, used: number, limit: number) {
+    super(message);
+    this.name = "UsageLimitError";
+    this.used = used;
+    this.limit = limit;
+  }
+}
+
 async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
   const res = await fetch("/api/analyze", {
     method: "POST",
@@ -47,6 +59,12 @@ async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
+    if (res.status === 429 && data.code === "USAGE_LIMIT_EXCEEDED") {
+      const match = /\((\d+)\/(\d+)\)/.exec(data.error ?? "");
+      const used = match ? parseInt(match[1], 10) : 0;
+      const limit = match ? parseInt(match[2], 10) : 0;
+      throw new UsageLimitError(data.error ?? "일일 사용 한도를 초과했습니다.", used, limit);
+    }
     throw new Error(data.error ?? `분석 실패 (${res.status})`);
   }
 
@@ -232,9 +250,15 @@ export default function AnalyzePage() {
   const [allTagsCopied, setAllTagsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
+  const [upgradeModal, setUpgradeModal] = useState<{ used: number; limit: number } | null>(null);
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
     mutationFn: analyzeKeyword,
+    onError: (err) => {
+      if (err instanceof UsageLimitError) {
+        setUpgradeModal({ used: err.used, limit: err.limit });
+      }
+    },
   });
 
   const bookmarkMutation = useMutation({
@@ -312,6 +336,14 @@ export default function AnalyzePage() {
 
   return (
     <div className="space-y-12">
+      <UpgradeModal
+        isOpen={upgradeModal !== null}
+        onClose={() => setUpgradeModal(null)}
+        feature="키워드 검색"
+        used={upgradeModal?.used ?? 0}
+        limit={upgradeModal?.limit ?? 0}
+      />
+
       <PageHeader
         icon={<Search className="size-8 text-primary" />}
         title="단일 키워드 분석"
@@ -374,7 +406,7 @@ export default function AnalyzePage() {
       {!isPending && analysis && (
         <>
           {/* Results Header with Tag Copy and Bookmark */}
-          <div className="flex items-center justify-between -mb-6">
+          <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-muted-foreground">
               <span className="text-foreground">&apos;{submittedKeyword}&apos;</span> 분석 결과
             </h2>

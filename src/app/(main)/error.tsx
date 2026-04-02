@@ -1,6 +1,5 @@
 "use client";
 
-import { captureException } from "@/shared/lib/sentry";
 import { useEffect } from "react";
 import { Button } from "@/shared/ui/button";
 
@@ -12,7 +11,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    captureException(error);
+    console.error(error);
   }, [error]);
 
   return (

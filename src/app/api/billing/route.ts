@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { getCurrentUserProfileId } from "@/services/user-service";
 import { createSubscription } from "@/services/subscription-service";
+import { issueBillingKey, chargeBillingKey } from "@/shared/lib/toss-payments";
+import { PLAN_PRICING } from "@/shared/config/constants";
 
 const bodySchema = z.object({
-  billingKey: z.string().min(1),
+  authKey: z.string().min(1),
   customerKey: z.string().min(1),
   plan: z.enum(["basic", "pro"]),
 });
@@ -27,11 +29,28 @@ export async function POST(request: Request) {
       return Response.json({ error: "Validation failed" }, { status: 422 });
     }
 
+    const { authKey, customerKey, plan } = parsed.data;
+
+    // Issue billing key from authKey (Toss server-to-server call)
+    const { billingKey } = await issueBillingKey({ authKey, customerKey });
+
+    // Charge the first payment immediately
+    const pricing = PLAN_PRICING[plan];
+    const orderId = `order_${userId}_${Date.now()}`;
+    await chargeBillingKey({
+      billingKey,
+      customerKey,
+      amount: pricing.monthly,
+      orderId,
+      orderName: `옵티써치 ${pricing.label} 구독`,
+    });
+
+    // Persist subscription in Supabase
     await createSubscription({
       userId,
-      plan: parsed.data.plan,
-      billingKey: parsed.data.billingKey,
-      customerKey: parsed.data.customerKey,
+      plan,
+      billingKey,
+      customerKey,
     });
 
     return Response.json({ success: true });

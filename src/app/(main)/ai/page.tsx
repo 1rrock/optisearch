@@ -19,8 +19,36 @@ import {
 import { Button } from "@/shared/ui/button";
 import { PageHeader } from "@/shared/ui/page-header";
 import { copyToClipboard } from "@/shared/lib/clipboard";
+import { UpgradeModal } from "@/shared/components/UpgradeModal";
 
 type TabId = "title" | "draft" | "score";
+
+// ---------------------------------------------------------------------------
+// Usage limit error
+// ---------------------------------------------------------------------------
+
+class UsageLimitError extends Error {
+  used: number;
+  limit: number;
+  constructor(message: string, used: number, limit: number) {
+    super(message);
+    this.name = "UsageLimitError";
+    this.used = used;
+    this.limit = limit;
+  }
+}
+
+function parseUsageLimitError(status: number, data: Record<string, unknown>): UsageLimitError | null {
+  if (status === 429 && data.code === "USAGE_LIMIT_EXCEEDED") {
+    const match = /\((\d+)\/(\d+)\)/.exec((data.error as string) ?? "");
+    const used = match ? parseInt(match[1], 10) : 0;
+    const limit = match ? parseInt(match[2], 10) : 0;
+    return new UsageLimitError((data.error as string) ?? "일일 사용 한도를 초과했습니다.", used, limit);
+  }
+  return null;
+}
+
+type UpgradeModalState = { feature: string; used: number; limit: number } | null;
 
 // ─── API response types ────────────────────────────────────────────────────────
 
@@ -71,9 +99,17 @@ interface ScoreResponse {
 
 export default function AIToolsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("title");
+  const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>(null);
 
   return (
     <div className="space-y-8">
+      <UpgradeModal
+        isOpen={upgradeModal !== null}
+        onClose={() => setUpgradeModal(null)}
+        feature={upgradeModal?.feature ?? "AI 기능"}
+        used={upgradeModal?.used ?? 0}
+        limit={upgradeModal?.limit ?? 0}
+      />
 
       {/* 1. Page Header */}
       <PageHeader
@@ -105,9 +141,9 @@ export default function AIToolsPage() {
 
       {/* 3. Screen Switching Area */}
       <div className="w-full">
-        {activeTab === "title" && <TitleTool onGoToDraft={() => setActiveTab("draft")} />}
-        {activeTab === "draft" && <DraftTool />}
-        {activeTab === "score" && <ScoreTool />}
+        {activeTab === "title" && <TitleTool onGoToDraft={() => setActiveTab("draft")} onUsageLimitExceeded={setUpgradeModal} />}
+        {activeTab === "draft" && <DraftTool onUsageLimitExceeded={setUpgradeModal} />}
+        {activeTab === "score" && <ScoreTool onUsageLimitExceeded={setUpgradeModal} />}
       </div>
 
     </div>
@@ -133,7 +169,7 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
 
 // ─── Screen 1: AI Title Suggestions ──────────────────────────────────────────
 
-function TitleTool({ onGoToDraft }: { onGoToDraft: () => void }) {
+function TitleTool({ onGoToDraft, onUsageLimitExceeded }: { onGoToDraft: () => void; onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
   const [keyword, setKeyword] = useState("");
   const [context, setContext] = useState("");
 
@@ -144,8 +180,18 @@ function TitleTool({ onGoToDraft }: { onGoToDraft: () => void }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("제목 추천 요청에 실패했습니다.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const limitErr = parseUsageLimitError(res.status, data);
+        if (limitErr) throw limitErr;
+        throw new Error(data.error ?? "제목 추천 요청에 실패했습니다.");
+      }
       return res.json() as Promise<TitleResponse>;
+    },
+    onError: (err) => {
+      if (err instanceof UsageLimitError) {
+        onUsageLimitExceeded({ feature: "AI 제목 추천", used: err.used, limit: err.limit });
+      }
     },
   });
 
@@ -337,7 +383,7 @@ function TitleResultCard({ rank, title, reason }: { rank: number; title: string;
 type PostType = "정보성" | "리뷰" | "리스트형" | "비교분석";
 type DraftLength = "1000" | "1500" | "2500";
 
-function DraftTool() {
+function DraftTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
   const [keyword, setKeyword] = useState("다이어트 식단");
   const [postType, setPostType] = useState<PostType>("정보성");
   const [length, setLength] = useState<DraftLength>("1500");
@@ -349,8 +395,18 @@ function DraftTool() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("초안 생성 요청에 실패했습니다.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const limitErr = parseUsageLimitError(res.status, data);
+        if (limitErr) throw limitErr;
+        throw new Error(data.error ?? "초안 생성 요청에 실패했습니다.");
+      }
       return res.json() as Promise<DraftResponse>;
+    },
+    onError: (err) => {
+      if (err instanceof UsageLimitError) {
+        onUsageLimitExceeded({ feature: "AI 글 초안", used: err.used, limit: err.limit });
+      }
     },
   });
 
@@ -550,7 +606,7 @@ function DraftTool() {
 
 // ─── Screen 3: Content Score ──────────────────────────────────────────────────
 
-function ScoreTool() {
+function ScoreTool({ onUsageLimitExceeded }: { onUsageLimitExceeded: (state: UpgradeModalState) => void }) {
   const [keyword, setKeyword] = useState("");
   const [content, setContent] = useState("");
 
@@ -561,8 +617,18 @@ function ScoreTool() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("점수 분석 요청에 실패했습니다.");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const limitErr = parseUsageLimitError(res.status, data);
+        if (limitErr) throw limitErr;
+        throw new Error(data.error ?? "점수 분석 요청에 실패했습니다.");
+      }
       return res.json() as Promise<ScoreResponse>;
+    },
+    onError: (err) => {
+      if (err instanceof UsageLimitError) {
+        onUsageLimitExceeded({ feature: "콘텐츠 점수", used: err.used, limit: err.limit });
+      }
     },
   });
 

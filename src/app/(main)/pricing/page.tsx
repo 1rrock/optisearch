@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { useState } from "react";
 
 interface DashboardData {
   plan: PlanId;
@@ -54,9 +55,11 @@ interface PlanCardProps {
   planId: PlanId;
   currentPlan: PlanId | null;
   isPopular?: boolean;
+  onSubscribe: (planId: PlanId) => Promise<void>;
+  isLoading?: boolean;
 }
 
-function PlanCard({ planId, currentPlan, isPopular }: PlanCardProps) {
+function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
   const isCurrent = currentPlan === planId;
 
@@ -131,7 +134,7 @@ function PlanCard({ planId, currentPlan, isPopular }: PlanCardProps) {
         <Button
           size="lg"
           variant={planId === "free" ? "outline" : "default"}
-          disabled={isCurrent && planId === "free"}
+          disabled={(isCurrent && planId === "free") || isLoading}
           className={[
             "w-full rounded-xl font-bold h-12 mt-2",
             isPopular
@@ -140,7 +143,7 @@ function PlanCard({ planId, currentPlan, isPopular }: PlanCardProps) {
           ].join(" ")}
           onClick={() => {
             if (planId !== "free") {
-              alert("결제 기능은 준비 중입니다.");
+              void onSubscribe(planId);
             }
           }}
         >
@@ -154,6 +157,7 @@ function PlanCard({ planId, currentPlan, isPopular }: PlanCardProps) {
 export default function PricingPage() {
   const { status } = useSession();
   const isAuthenticated = status === "authenticated";
+  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
 
   const { data } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
@@ -167,6 +171,37 @@ export default function PricingPage() {
 
   const currentPlan: PlanId | null = data?.plan ?? (isAuthenticated ? "free" : null);
 
+  const handleSubscribe = async (planId: PlanId) => {
+    if (planId === "free") return;
+    setLoadingPlan(planId);
+    try {
+      const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
+      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+      if (!clientKey) {
+        alert("결제 설정이 올바르지 않습니다.");
+        return;
+      }
+
+      const tossPayments = await loadTossPayments(clientKey);
+      // Use a stable customer key derived from the current timestamp.
+      // Toss will return it back as a query param on redirect.
+      const customerKey = `user_${Date.now()}`;
+      const payment = tossPayments.payment({ customerKey });
+
+      await payment.requestBillingAuth({
+        method: "CARD",
+        successUrl: `${window.location.origin}/billing/success?plan=${planId}`,
+        failUrl: `${window.location.origin}/pricing?error=payment_failed`,
+      });
+      // requestBillingAuth redirects the page, so nothing runs after this.
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "결제 시작 중 오류가 발생했습니다.";
+      alert(message);
+    } finally {
+      setLoadingPlan(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-10 w-full">
       {/* Page header */}
@@ -179,9 +214,9 @@ export default function PricingPage() {
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto w-full items-start">
-        <PlanCard planId="free" currentPlan={currentPlan} />
-        <PlanCard planId="basic" currentPlan={currentPlan} isPopular />
-        <PlanCard planId="pro" currentPlan={currentPlan} />
+        <PlanCard planId="free" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={loadingPlan === "free"} />
+        <PlanCard planId="basic" currentPlan={currentPlan} isPopular onSubscribe={handleSubscribe} isLoading={loadingPlan === "basic"} />
+        <PlanCard planId="pro" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={loadingPlan === "pro"} />
       </div>
 
       {/* Feature comparison table (desktop) */}

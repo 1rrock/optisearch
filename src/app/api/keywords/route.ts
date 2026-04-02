@@ -2,6 +2,7 @@ import { z } from "zod";
 import { analyzeKeyword } from "@/services/keyword-service";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { saveSearchHistory } from "@/services/history-service";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 
@@ -80,6 +81,8 @@ export async function POST(request: Request) {
 
     const result = await analyzeKeyword(effectiveKeyword);
     await recordUsage(user.userId, "search", effectiveKeyword);
+    // Save search history (non-blocking)
+    saveSearchHistory(user.userId, result).catch(() => {});
     return Response.json({ ...result, correctedKeyword });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";

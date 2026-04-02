@@ -54,6 +54,22 @@ export async function chargeBillingKey(params: {
 }
 
 /**
+ * Issue a billing key from an authKey returned by Toss redirect (카드 빌링키 발급).
+ */
+export async function issueBillingKey(params: {
+  authKey: string;
+  customerKey: string;
+}): Promise<{ billingKey: string; customerKey: string }> {
+  return tossRequest(`/billing/authorizations/issue`, {
+    method: "POST",
+    body: JSON.stringify({
+      authKey: params.authKey,
+      customerKey: params.customerKey,
+    }),
+  });
+}
+
+/**
  * Get billing key info.
  */
 export async function getBillingKeyInfo(billingKey: string): Promise<any> {
