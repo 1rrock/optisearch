@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   Home,
   Search,
@@ -27,6 +28,18 @@ export function Sidebar() {
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch user's actual plan from dashboard API
+  const { data: dashboardData } = useQuery<{ plan: PlanId }>({
+    queryKey: ["dashboard"],
+    queryFn: async () => {
+      const res = await fetch("/api/dashboard");
+      if (!res.ok) return { plan: "free" as PlanId };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+  const userPlan = (dashboardData?.plan ?? "free") as PlanId;
 
   // Close menu on outside click
   useEffect(() => {
@@ -104,8 +117,11 @@ export function Sidebar() {
           </div>
           <div className="flex flex-col overflow-hidden text-left">
             <span className="text-sm font-semibold truncate">{userName}</span>
-            <span className="text-xs text-emerald-500 font-medium truncate">
-              {PLAN_PRICING.free.label} 플랜
+            <span className={cn(
+              "text-xs font-medium truncate",
+              userPlan === "pro" ? "text-violet-500" : userPlan === "basic" ? "text-blue-500" : "text-emerald-500"
+            )}>
+              {PLAN_PRICING[userPlan].label} 플랜
             </span>
           </div>
           <ChevronUp className={cn("size-4 ml-auto text-muted-foreground transition-transform shrink-0", menuOpen && "rotate-180")} />

@@ -15,18 +15,29 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
     try {
       const { createServerClient } = await import("@/shared/lib/supabase");
       const supabase = await createServerClient();
-      await supabase.from("user_profiles").upsert(
-        {
+
+      // Check if dev profile already exists
+      const { data: existing } = await supabase
+        .from("user_profiles")
+        .select("id")
+        .eq("id", DEV_USER.id)
+        .single();
+
+      if (!existing) {
+        // Insert dev profile — use insert to handle all constraint types
+        const { error } = await supabase.from("user_profiles").insert({
           id: DEV_USER.id,
           auth_user_id: DEV_USER.id,
           name: DEV_USER.name,
           email: DEV_USER.email,
           plan: "pro",
-        },
-        { onConflict: "id" }
-      );
-    } catch {
-      // DB upsert failed — still return valid UUID so non-DB operations work
+        });
+        if (error) {
+          console.error("[dev-auth] Failed to create dev profile:", error.message);
+        }
+      }
+    } catch (err) {
+      console.error("[dev-auth] Dev profile setup error:", err);
     }
     return { userId: DEV_USER.id, plan: "pro" as PlanId };
   }
