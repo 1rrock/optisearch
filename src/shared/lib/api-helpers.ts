@@ -16,21 +16,29 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
 
   const session = await auth();
   const authUserId = session?.user?.id;
-  if (!authUserId) return null;
+  if (!authUserId) {
+    console.error("[getAuthenticatedUser] No session or user.id. Session:", JSON.stringify(session));
+    return null;
+  }
 
   try {
     const { createServerClient } = await import("@/shared/lib/supabase");
     const supabase = await createServerClient();
 
     // Try to find existing profile
-    let { data: profile } = await supabase
+    let { data: profile, error: profileError } = await supabase
       .from("user_profiles")
       .select("id, plan")
       .eq("auth_user_id", authUserId)
       .single();
 
+    if (profileError) {
+      console.log("[getAuthenticatedUser] Profile lookup failed for authUserId:", authUserId, "Error:", profileError.message);
+    }
+
     // Auto-create if not found
     if (!profile) {
+      console.log("[getAuthenticatedUser] No profile found, auto-creating for authUserId:", authUserId);
       const { getCurrentUserProfileId } = await import("@/services/user-service");
       const profileId = await getCurrentUserProfileId();
       if (profileId) {
@@ -40,13 +48,19 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
           .eq("id", profileId)
           .single();
         profile = newProfile;
+      } else {
+        console.error("[getAuthenticatedUser] getCurrentUserProfileId returned null for authUserId:", authUserId);
       }
     }
 
-    if (!profile) return null; // Cannot create profile — treat as unauthenticated
+    if (!profile) {
+      console.error("[getAuthenticatedUser] Could not find or create profile for authUserId:", authUserId);
+      return null;
+    }
 
     return { userId: profile.id, plan: (profile.plan as PlanId) ?? "free" };
-  } catch {
+  } catch (err) {
+    console.error("[getAuthenticatedUser] Exception:", err);
     return null; // DB error — do not fall back to auth string
   }
 }
