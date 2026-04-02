@@ -109,6 +109,8 @@ export async function processRecurringBilling(subscription: Subscription): Promi
 
   const orderId = `sub_${subscription.id}_${Date.now()}`;
 
+  const supabase = await createServerClient();
+
   try {
     await chargeBillingKey({
       billingKey: subscription.tossBillingKey,
@@ -118,21 +120,31 @@ export async function processRecurringBilling(subscription: Subscription): Promi
       orderName: `옵티써치 ${pricing.label} 정기결제`,
     });
 
-    // Extend period
-    const supabase = await createServerClient();
-    const newEnd = new Date();
-    newEnd.setMonth(newEnd.getMonth() + 1);
+    // Extend period by 30 days from now
+    const now = new Date();
+    const newEnd = new Date(now);
+    newEnd.setDate(newEnd.getDate() + 30);
 
     await supabase
       .from("subscriptions")
       .update({
-        current_period_start: new Date().toISOString(),
+        current_period_start: now.toISOString(),
         current_period_end: newEnd.toISOString(),
       })
       .eq("id", subscription.id);
 
     return true;
-  } catch {
+  } catch (err) {
+    console.error(
+      `[billing] Failed to charge subscription ${subscription.id} (user: ${subscription.userId}):`,
+      err instanceof Error ? err.message : err,
+    );
+
+    await supabase
+      .from("subscriptions")
+      .update({ status: "payment_failed" })
+      .eq("id", subscription.id);
+
     return false;
   }
 }

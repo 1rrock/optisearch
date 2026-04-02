@@ -1,25 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Search,
   TrendingUp,
-  TrendingDown,
   ArrowRight,
   Sparkles,
   FileText,
   Gauge,
-  Plus,
   AlertCircle,
   Info,
   ExternalLink,
   BookOpen,
   LayoutGrid,
+  Copy,
+  Check,
+  Tag,
+  Star,
 } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/model/types";
+import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 
 // ---------------------------------------------------------------------------
 // API types
@@ -102,19 +105,27 @@ function TrendBar({ h1, h2, fill, border }: { h1: string; h2: string; fill?: boo
   );
 }
 
-function RelatedRow({ word, vol, comp }: { word: string; vol: string; comp: string }) {
+function RelatedRow({ word, vol, comp, onClick }: { word: string; vol: string; comp: string; onClick: () => void }) {
   const badgeCls = competitionBadgeClass(comp);
 
   return (
-    <tr className="hover:bg-muted/30 transition-colors">
-      <td className="px-6 py-4 text-sm font-semibold text-foreground/80">{word}</td>
+    <tr
+      className="hover:bg-muted/30 transition-colors cursor-pointer"
+      onClick={onClick}
+      title={`'${word}' 분석하기`}
+    >
+      <td className="px-6 py-4 text-sm font-semibold text-foreground/80 hover:text-primary transition-colors">{word}</td>
       <td className="px-4 py-4 text-sm text-right font-medium text-muted-foreground">{vol}</td>
       <td className="px-4 py-4 text-center">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${badgeCls}`}>{comp}</span>
       </td>
       <td className="px-6 py-4 text-right">
-        <button className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-background shadow-sm border border-muted transition-colors">
-          <Plus className="size-4" />
+        <button
+          className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-background shadow-sm border border-muted transition-colors"
+          onClick={(e) => { e.stopPropagation(); onClick(); }}
+          title="분석하기"
+        >
+          <ArrowRight className="size-4" />
         </button>
       </td>
     </tr>
@@ -181,13 +192,69 @@ function EmptyState() {
 // Page
 // ---------------------------------------------------------------------------
 
+async function toggleSavedKeyword(keyword: string, currentlySaved: boolean): Promise<boolean> {
+  if (currentlySaved) {
+    const res = await fetch("/api/keywords/saved", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "삭제 실패");
+    }
+    return false;
+  } else {
+    const res = await fetch("/api/keywords/saved", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ keyword }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error ?? "저장 실패");
+    }
+    return true;
+  }
+}
+
+async function fetchIsKeywordSaved(keyword: string): Promise<boolean> {
+  const res = await fetch(`/api/keywords/saved?limit=200`);
+  if (!res.ok) return false;
+  const data = await res.json();
+  return (data.keywords as Array<{ keyword: string }>).some((k) => k.keyword === keyword);
+}
+
 export default function AnalyzePage() {
   const [inputValue, setInputValue] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
+  const [tagCopied, setTagCopied] = useState(false);
+  const [allTagsCopied, setAllTagsCopied] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [bookmarkError, setBookmarkError] = useState<string | null>(null);
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
     mutationFn: analyzeKeyword,
   });
+
+  const bookmarkMutation = useMutation({
+    mutationFn: ({ keyword, saved }: { keyword: string; saved: boolean }) =>
+      toggleSavedKeyword(keyword, saved),
+    onSuccess: (nextSaved) => {
+      setIsSaved(nextSaved);
+      setBookmarkError(null);
+    },
+    onError: (err: Error) => {
+      setBookmarkError(err.message);
+    },
+  });
+
+  // Check saved state whenever analysis result changes
+  useEffect(() => {
+    if (!data?.analysis?.keyword) return;
+    setIsSaved(false);
+    fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => {});
+  }, [data?.analysis?.keyword]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -201,6 +268,36 @@ export default function AnalyzePage() {
   const analysis = data?.analysis ?? null;
   const relatedKeywords = data?.relatedKeywords ?? [];
   const correctedKeyword = data?.correctedKeyword ?? null;
+
+  function handleRelatedKeywordClick(keyword: string) {
+    setInputValue(keyword);
+    setSubmittedKeyword(keyword);
+    reset();
+    mutate(keyword);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleCopyHashtags() {
+    const allKeywords = analysis
+      ? [analysis.keyword, ...relatedKeywords.map((rk) => rk.keyword)]
+      : relatedKeywords.map((rk) => rk.keyword);
+    const text = formatKeywordsAsHashtags(allKeywords);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setTagCopied(true);
+      setTimeout(() => setTagCopied(false), 2000);
+    }
+  }
+
+  async function handleCopyAllRelatedTags() {
+    const keywords = relatedKeywords.map((rk) => rk.keyword);
+    const text = formatKeywordsAsTags(keywords);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setAllTagsCopied(true);
+      setTimeout(() => setAllTagsCopied(false), 2000);
+    }
+  }
 
   const pcRatio = analysis
     ? Math.round((analysis.pcSearchVolume / Math.max(analysis.totalSearchVolume, 1)) * 100)
@@ -276,6 +373,58 @@ export default function AnalyzePage() {
       {/* Results */}
       {!isPending && analysis && (
         <>
+          {/* Results Header with Tag Copy and Bookmark */}
+          <div className="flex items-center justify-between -mb-6">
+            <h2 className="text-base font-bold text-muted-foreground">
+              <span className="text-foreground">&apos;{submittedKeyword}&apos;</span> 분석 결과
+            </h2>
+            <div className="flex items-center gap-2">
+              {/* Bookmark button */}
+              <button
+                onClick={() =>
+                  analysis &&
+                  bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
+                }
+                disabled={bookmarkMutation.isPending}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors disabled:opacity-60 ${
+                  isSaved
+                    ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+                    : "border-muted/60 bg-card hover:bg-muted/30 text-muted-foreground hover:text-foreground"
+                }`}
+                title={isSaved ? "저장 해제" : "키워드 저장"}
+              >
+                <Star
+                  className={`size-4 transition-all ${isSaved ? "fill-amber-400 text-amber-400" : ""}`}
+                />
+                {isSaved ? "저장됨" : "저장"}
+              </button>
+              {/* Tag copy button */}
+              <button
+                onClick={handleCopyHashtags}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border border-muted/60 bg-card hover:bg-muted/30 transition-colors"
+                title="주요 키워드 + 연관 키워드를 해시태그로 복사"
+              >
+                {tagCopied ? (
+                  <>
+                    <Check className="size-4 text-emerald-500" />
+                    <span className="text-emerald-600">복사 완료!</span>
+                  </>
+                ) : (
+                  <>
+                    <Tag className="size-4 text-muted-foreground" />
+                    태그 복사
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          {/* Bookmark error */}
+          {bookmarkError && (
+            <div className="max-w-2xl mx-auto mt-2">
+              <p className="text-xs text-rose-500 font-medium text-right">{bookmarkError}</p>
+            </div>
+          )}
+
           {/* Row 1: Key Metrics */}
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {/* Monthly Volume */}
@@ -433,8 +582,27 @@ export default function AnalyzePage() {
 
             {/* Related Keywords Table */}
             <div className="bg-card rounded-xl shadow-sm border border-muted/50 flex flex-col overflow-hidden">
-              <div className="p-6">
+              <div className="p-6 flex items-center justify-between">
                 <h3 className="text-lg font-bold">연관 키워드</h3>
+                {relatedKeywords.length > 0 && (
+                  <button
+                    onClick={handleCopyAllRelatedTags}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-muted/60 bg-muted/20 hover:bg-muted/50 transition-colors"
+                    title="연관 키워드 전체를 쉼표 구분으로 복사"
+                  >
+                    {allTagsCopied ? (
+                      <>
+                        <Check className="size-3 text-emerald-500" />
+                        <span className="text-emerald-600">복사 완료!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3 text-muted-foreground" />
+                        전체 태그 복사
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
               <div className="flex-1 overflow-auto">
                 {relatedKeywords.length > 0 ? (
@@ -454,6 +622,7 @@ export default function AnalyzePage() {
                           word={rk.keyword}
                           vol={(rk.pcSearchVolume + rk.mobileSearchVolume).toLocaleString("ko-KR")}
                           comp={rk.competition}
+                          onClick={() => handleRelatedKeywordClick(rk.keyword)}
                         />
                       ))}
                     </tbody>
@@ -567,14 +736,24 @@ export default function AnalyzePage() {
             </div>
           </section>
 
-          {/* Bottom Actions — W7에서 연결 예정 */}
+          {/* Bottom Actions */}
           <footer className="flex justify-center gap-4 border-t border-muted/50 pt-10">
             <button
-              disabled
-              title="준비 중"
-              className="px-10 py-4 bg-primary text-primary-foreground rounded-xl font-bold shadow-lg shadow-primary/20 opacity-50 cursor-not-allowed"
+              onClick={() =>
+                analysis &&
+                bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
+              }
+              disabled={bookmarkMutation.isPending}
+              className={`px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${
+                isSaved
+                  ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
+                  : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+              }`}
             >
-              키워드 저장
+              <span className="flex items-center gap-2">
+                <Star className={`size-5 ${isSaved ? "fill-white" : ""}`} />
+                {bookmarkMutation.isPending ? "처리 중…" : isSaved ? "저장됨" : "키워드 저장"}
+              </span>
             </button>
             <button
               disabled

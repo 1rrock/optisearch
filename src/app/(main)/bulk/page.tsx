@@ -12,7 +12,10 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  Copy,
+  Check,
 } from "lucide-react";
+import { copyToClipboard, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { Button } from "@/shared/ui/button";
 import { PageHeader } from "@/shared/ui/page-header";
 import type { KeywordSearchResult, KeywordGrade } from "@/entities/keyword/model/types";
@@ -78,6 +81,7 @@ export default function BulkAnalysisPage() {
   const [sortKey, setSortKey] = useState<SortKey>("totalSearchVolume");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
+  const [bulkTagsCopied, setBulkTagsCopied] = useState(false);
 
   const keywords = useMemo(() => parseKeywords(inputText), [inputText]);
 
@@ -108,6 +112,16 @@ export default function BulkAnalysisPage() {
       setSortDir("desc");
     }
     setPage(1);
+  }
+
+  async function handleCopyAllTags() {
+    const keywords = results.map((r) => r.keyword);
+    const text = formatKeywordsAsTags(keywords);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setBulkTagsCopied(true);
+      setTimeout(() => setBulkTagsCopied(false), 2000);
+    }
   }
 
   async function handleAnalyze() {
@@ -233,6 +247,24 @@ export default function BulkAnalysisPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="rounded-xl font-semibold"
+                onClick={handleCopyAllTags}
+                disabled={results.length === 0}
+              >
+                {bulkTagsCopied ? (
+                  <>
+                    <Check className="size-4 mr-2 text-emerald-500" />
+                    <span className="text-emerald-600">복사 완료!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="size-4 mr-2" />
+                    전체 태그 복사
+                  </>
+                )}
+              </Button>
               <Button variant="outline" className="rounded-xl font-semibold text-muted-foreground hover:text-foreground opacity-50 cursor-not-allowed" disabled>
                 <Save className="size-4 mr-2" />
                 선택 저장 <span className="ml-1 text-[11px] font-normal">(준비 중)</span>

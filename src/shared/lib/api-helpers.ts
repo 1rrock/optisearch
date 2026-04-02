@@ -9,6 +9,11 @@ export { recordUsage };
  * Falls back gracefully if Supabase tables don't exist yet.
  */
 export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
+  // Dev bypass
+  if (process.env.DEV_AUTH_BYPASS === "true") {
+    return { userId: "dev-test-user-001", plan: "pro" as PlanId };
+  }
+
   const session = await auth();
   const authUserId = session?.user?.id;
   if (!authUserId) return null;

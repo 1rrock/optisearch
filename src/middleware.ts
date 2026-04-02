@@ -17,6 +17,11 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export default auth((req: NextRequest & { auth: unknown }) => {
+  // Dev bypass - skip auth redirect
+  if (process.env.DEV_AUTH_BYPASS === "true") {
+    return NextResponse.next()
+  }
+
   const { pathname } = req.nextUrl
 
   if (isPublicPath(pathname)) {
