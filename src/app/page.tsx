@@ -356,8 +356,8 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-8 text-sm font-bold text-muted-foreground">
-            <a href="#" className="hover:text-foreground transition-colors">이용약관</a>
-            <a href="#" className="hover:text-foreground transition-colors">개인정보처리방침</a>
+            <a href="/terms" className="hover:text-foreground transition-colors">이용약관</a>
+            <a href="/privacy" className="hover:text-foreground transition-colors">개인정보처리방침</a>
             <a href="#" className="hover:text-foreground transition-colors">고객센터</a>
           </div>
         </div>

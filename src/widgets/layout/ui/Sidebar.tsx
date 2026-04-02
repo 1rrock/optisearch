@@ -17,6 +17,7 @@ import {
   Settings,
   ChevronUp,
   Bookmark,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
@@ -68,6 +69,9 @@ export function Sidebar() {
           <NavItem href="/bulk" icon={<Layers className="size-4" />} label="대량 분석" active={pathname === "/bulk"} />
           <NavItem href="/compare" icon={<ListPlus className="size-4" />} label="키워드 비교" active={pathname === "/compare"} />
           <NavItem href="/ai" icon={<Sparkles className="size-4" />} label="AI 도구" active={pathname === "/ai"} />
+
+          <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4">계정</div>
+          <NavItem href="/pricing" icon={<CreditCard className="size-4" />} label="요금제" active={pathname === "/pricing"} />
         </nav>
       </div>
       <div className="mt-auto p-4 border-t bg-card/50 relative" ref={menuRef}>

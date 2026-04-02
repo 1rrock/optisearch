@@ -38,7 +38,7 @@ export default function LoginPage() {
 
         <div className="mt-10 pt-6 border-t border-muted/50 text-center">
           <p className="text-xs text-muted-foreground leading-relaxed">
-            계속 진행하면 <Link href="#" className="underline font-medium hover:text-foreground">이용약관</Link> 및 <Link href="#" className="underline font-medium hover:text-foreground">개인정보처리방침</Link>에<br />동의하는 것으로 간주합니다.
+            계속 진행하면 <Link href="/terms" className="underline font-medium hover:text-foreground">이용약관</Link> 및 <Link href="/privacy" className="underline font-medium hover:text-foreground">개인정보처리방침</Link>에<br />동의하는 것으로 간주합니다.
           </p>
         </div>
       </Card>
