@@ -3,7 +3,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Routes that do not require authentication.
-const PUBLIC_PATHS = new Set(["/", "/login"])
+const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/terms"])
 
 // API route prefixes that handle their own auth (webhooks, cron, etc.)
 const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/webhooks/", "/api/cron/"]
