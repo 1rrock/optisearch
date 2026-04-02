@@ -1,0 +1,73 @@
+import NextAuth from "next-auth"
+import Naver from "next-auth/providers/naver"
+import type { NextAuthConfig } from "next-auth"
+import type { JWT } from "@auth/core/jwt"
+import type { Session } from "@auth/core/types"
+
+// ---------------------------------------------------------------------------
+// Module augmentation
+// ---------------------------------------------------------------------------
+declare module "@auth/core/jwt" {
+  interface JWT {
+    naverId?: string
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Auth.js v5 configuration — pure JWT, no DB adapter
+// User profiles are managed separately in user_profiles table.
+// ---------------------------------------------------------------------------
+const config: NextAuthConfig = {
+  providers: [
+    Naver({
+      clientId: process.env.AUTH_NAVER_ID!,
+      clientSecret: process.env.AUTH_NAVER_SECRET!,
+    }),
+  ],
+
+  // No adapter — Auth.js stores sessions in JWT only.
+  // Our app manages user data in user_profiles table via user-service.ts.
+
+  pages: {
+    signIn: "/login",
+  },
+
+  session: {
+    strategy: "jwt",
+  },
+
+  callbacks: {
+    /**
+     * Persist Naver profile info into the JWT on sign-in.
+     */
+    async jwt({ token, user, account, profile }): Promise<JWT> {
+      // On initial sign-in, persist provider account id and profile data
+      if (account && profile) {
+        // Naver profile is nested under response
+        const naverProfile = (profile as any).response ?? profile
+        token.naverId = naverProfile.id ?? account.providerAccountId
+        token.name = naverProfile.name ?? naverProfile.nickname ?? token.name
+        token.email = naverProfile.email ?? token.email
+        token.picture = naverProfile.profile_image ?? token.picture
+      }
+
+      return token
+    },
+
+    /**
+     * Expose user info and Supabase token on the session object.
+     */
+    async session({ session, token }): Promise<Session> {
+      const jwt = token as JWT
+      if (session.user) {
+        session.user.id = (jwt.naverId as string) ?? jwt.sub ?? ""
+        session.user.name = (jwt.name as string) ?? ""
+        session.user.email = (jwt.email as string) ?? ""
+        session.user.image = (jwt.picture as string) ?? ""
+      }
+      return session
+    },
+  },
+}
+
+export const { handlers, auth, signIn, signOut } = NextAuth(config)

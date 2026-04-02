@@ -1,0 +1,120 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  /* ... 기존 테마 변수들 유지 ... */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  /* (중략 - 기존 상단 @theme 설정 그대로 유지) */
+}
+
+:root {
+  /* 라이트 모드: 깨끗한 화이트 & 딥 그레이 */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  /* Primary - 트렌디한 사이버 틸(청록색) */
+  --primary: oklch(0.55 0.13 180);
+  --primary-foreground: oklch(0.985 0 0);
+  /* 흰색 글씨 */
+
+  --secondary: oklch(0.96 0.02 180);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.96 0.02 180);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.96 0.02 180);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: #ffffff;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+
+  /* 포커스 링도 틸 색상으로 */
+  --ring: oklch(0.55 0.13 180);
+
+  --radius: 0.625rem;
+
+  /* 차트 색상 - 청록색/파란색 톤온톤으로 맞춰 데이터가 깔끔해 보임 */
+  --chart-1: oklch(0.55 0.13 180);
+  /* 메인 틸 */
+  --chart-2: oklch(0.60 0.12 210);
+  /* 밝은 블루 */
+  --chart-3: oklch(0.45 0.10 240);
+  /* 딥 네이비 */
+  --chart-4: oklch(0.75 0.15 160);
+  /* 네온 그린 */
+  --chart-5: oklch(0.85 0.05 200);
+  /* 아이스 블루 */
+}
+
+.dark {
+  /* 다크 모드: 시크한 블랙 배경에 형광 민트 포인트 */
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+
+  /* Primary - 다크모드에서 시선을 사로잡는 형광 민트/틸 */
+  --primary: oklch(0.75 0.15 175);
+  --primary-foreground: oklch(0.145 0 0);
+  /* 검은색 글씨 */
+
+  --secondary: oklch(0.269 0.02 180);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0.02 180);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0.02 180);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: #ffffff;
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+
+  --ring: oklch(0.75 0.15 175);
+
+  /* 차트 색상 - 다크모드 대시보드용 형광 테마 */
+  --chart-1: oklch(0.75 0.15 175);
+  /* 네온 틸 */
+  --chart-2: oklch(0.70 0.14 210);
+  /* 네온 딥블루 */
+  --chart-3: oklch(0.85 0.15 150);
+  /* 라임 그린 */
+  --chart-4: oklch(0.65 0.12 250);
+  /* 퍼플 포인트 */
+  --chart-5: oklch(0.85 0.08 190);
+  /* 소다 블루 */
+}
+
+@layer base {
+
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply antialiased font-sans bg-background text-foreground;
+  }
+
+  * {
+    border-color: var(--border);
+    outline-color: oklch(from var(--ring) l c h / 50%);
+  }
+
+  html {
+    @apply font-sans;
+  }
+}
