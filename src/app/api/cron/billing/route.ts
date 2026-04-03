@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       .from("subscriptions")
       .select("*")
       .eq("status", "active")
-      .not("toss_billing_key", "is", null)
+      .not("billing_key", "is", null)
       .lte("current_period_end", now);
 
     if (!dueSubscriptions?.length) {
@@ -45,8 +45,7 @@ export async function GET(request: Request) {
         userId: sub.user_id,
         plan: sub.plan,
         status: sub.status,
-        tossBillingKey: sub.toss_billing_key,
-        tossCustomerKey: sub.toss_customer_key,
+        billingKey: sub.billing_key,
         currentPeriodStart: sub.current_period_start,
         currentPeriodEnd: sub.current_period_end,
       });

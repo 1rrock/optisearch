@@ -175,25 +175,43 @@ export default function PricingPage() {
     if (planId === "free") return;
     setLoadingPlan(planId);
     try {
-      const { loadTossPayments } = await import("@tosspayments/tosspayments-sdk");
-      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
-      if (!clientKey) {
+      const PortOne = await import("@portone/browser-sdk/v2");
+
+      const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
+      const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
+      if (!storeId || !channelKey) {
         alert("결제 설정이 올바르지 않습니다.");
         return;
       }
 
-      const tossPayments = await loadTossPayments(clientKey);
-      // Use a stable customer key derived from the current timestamp.
-      // Toss will return it back as a query param on redirect.
-      const customerKey = `user_${Date.now()}`;
-      const payment = tossPayments.payment({ customerKey });
-
-      await payment.requestBillingAuth({
-        method: "CARD",
-        successUrl: `${window.location.origin}/billing/success?plan=${planId}`,
-        failUrl: `${window.location.origin}/pricing?error=payment_failed`,
+      const response = await PortOne.requestIssueBillingKey({
+        storeId,
+        channelKey,
+        billingKeyMethod: "CARD",
+        customer: {
+          customerId: `user_${Date.now()}`,
+        },
+        redirectUrl: `${window.location.origin}/billing/success?plan=${planId}`,
       });
-      // requestBillingAuth redirects the page, so nothing runs after this.
+
+      if (!response || response.code) {
+        throw new Error(response?.message ?? "카드 등록에 실패했습니다.");
+      }
+
+      // billingKey issued — send to server for first charge + subscription
+      const res = await fetch("/api/billing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          billingKey: response.billingKey,
+          plan: planId,
+        }),
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+
+      // Success — redirect to dashboard
+      window.location.href = "/dashboard?subscribed=true";
     } catch (err) {
       const message = err instanceof Error ? err.message : "결제 시작 중 오류가 발생했습니다.";
       alert(message);

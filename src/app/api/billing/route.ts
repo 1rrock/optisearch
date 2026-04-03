@@ -1,15 +1,12 @@
 import { z } from "zod";
 import { getCurrentUserProfileId } from "@/services/user-service";
 import { createSubscription } from "@/services/subscription-service";
-import { issueBillingKey, chargeBillingKey } from "@/shared/lib/toss-payments";
+import { chargeByBillingKey } from "@/shared/lib/portone";
 import { PLAN_PRICING } from "@/shared/config/constants";
 
 const bodySchema = z.object({
-  authKey: z.string().min(1),
-  customerKey: z.string().min(1),
+  billingKey: z.string().min(1),
   plan: z.enum(["basic", "pro"]),
-  /** Client-generated idempotency key to prevent duplicate charges on retry */
-  idempotencyKey: z.string().min(1).optional(),
 });
 
 export async function POST(request: Request) {
@@ -31,24 +28,20 @@ export async function POST(request: Request) {
       return Response.json({ error: "Validation failed" }, { status: 422 });
     }
 
-    const { authKey, customerKey, plan, idempotencyKey } = parsed.data;
+    const { billingKey, plan } = parsed.data;
 
-    // Use client-provided idempotency key or generate a deterministic one
-    // Deterministic: same user + plan + minute = same orderId (prevents rapid retries)
+    // Deterministic payment ID: same user + plan + minute = prevents rapid retries
     const minuteSlot = Math.floor(Date.now() / 60000);
-    const orderId = idempotencyKey ?? `order_${userId}_${plan}_${minuteSlot}`;
-
-    // Issue billing key from authKey (Toss server-to-server call)
-    const { billingKey } = await issueBillingKey({ authKey, customerKey });
+    const paymentId = `order_${userId}_${plan}_${minuteSlot}`;
 
     // Charge the first payment immediately
     const pricing = PLAN_PRICING[plan];
-    await chargeBillingKey({
+    await chargeByBillingKey({
       billingKey,
-      customerKey,
+      paymentId,
       amount: pricing.monthly,
-      orderId,
       orderName: `옵티써치 ${pricing.label} 구독`,
+      customerId: userId,
     });
 
     // Persist subscription in Supabase
@@ -56,7 +49,6 @@ export async function POST(request: Request) {
       userId,
       plan,
       billingKey,
-      customerKey,
     });
 
     return Response.json({ success: true });

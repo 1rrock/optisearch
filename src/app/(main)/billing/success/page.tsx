@@ -5,6 +5,12 @@ import { useEffect, useState, Suspense } from "react";
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 
+/**
+ * /billing/success — Post-payment confirmation page.
+ *
+ * PortOne V2 PC flow: billingKey is returned directly in the pricing page.
+ * Mobile flow: PortOne redirects here with billingKey in query params.
+ */
 function BillingSuccessContent() {
   const params = useSearchParams();
   const router = useRouter();
@@ -12,11 +18,10 @@ function BillingSuccessContent() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const authKey = params.get("authKey");
-    const customerKey = params.get("customerKey");
+    const billingKey = params.get("billingKey");
     const plan = params.get("plan");
 
-    if (!authKey || !customerKey) {
+    if (!billingKey) {
       setStatus("error");
       setErrorMessage("결제 정보가 올바르지 않습니다.");
       return;
@@ -25,7 +30,7 @@ function BillingSuccessContent() {
     fetch("/api/billing", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authKey, customerKey, plan: plan ?? "basic" }),
+      body: JSON.stringify({ billingKey, plan: plan ?? "basic" }),
     })
       .then((res) => res.json())
       .then((data: { error?: string; success?: boolean }) => {

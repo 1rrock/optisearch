@@ -1,5 +1,5 @@
 import { createServerClient } from "@/shared/lib/supabase";
-import { chargeBillingKey } from "@/shared/lib/toss-payments";
+import { chargeByBillingKey } from "@/shared/lib/portone";
 import type { PlanId } from "@/shared/config/constants";
 import { PLAN_PRICING } from "@/shared/config/constants";
 
@@ -8,8 +8,7 @@ export interface Subscription {
   userId: string;
   plan: PlanId;
   status: string;
-  tossBillingKey: string | null;
-  tossCustomerKey: string | null;
+  billingKey: string | null;
   currentPeriodStart: string | null;
   currentPeriodEnd: string | null;
 }
@@ -33,8 +32,7 @@ export async function getSubscription(userId: string): Promise<Subscription | nu
     userId: data.user_id,
     plan: data.plan as PlanId,
     status: data.status,
-    tossBillingKey: data.toss_billing_key,
-    tossCustomerKey: data.toss_customer_key,
+    billingKey: data.billing_key ?? data.toss_billing_key,
     currentPeriodStart: data.current_period_start,
     currentPeriodEnd: data.current_period_end,
   };
@@ -47,14 +45,13 @@ export async function createSubscription(params: {
   userId: string;
   plan: PlanId;
   billingKey: string;
-  customerKey: string;
 }): Promise<void> {
   const supabase = await createServerClient();
   const now = new Date();
   const periodEnd = new Date(now);
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-  // Upsert: deactivate existing, create new
+  // Deactivate existing subscription
   await supabase
     .from("subscriptions")
     .update({ status: "cancelled" })
@@ -65,8 +62,7 @@ export async function createSubscription(params: {
     user_id: params.userId,
     plan: params.plan,
     status: "active",
-    toss_billing_key: params.billingKey,
-    toss_customer_key: params.customerKey,
+    billing_key: params.billingKey,
     current_period_start: now.toISOString(),
     current_period_end: periodEnd.toISOString(),
   });
@@ -100,27 +96,26 @@ export async function cancelSubscription(userId: string): Promise<void> {
  * Process recurring billing for a subscription.
  */
 export async function processRecurringBilling(subscription: Subscription): Promise<boolean> {
-  if (!subscription.tossBillingKey || !subscription.tossCustomerKey) {
+  if (!subscription.billingKey) {
     return false;
   }
 
   const pricing = PLAN_PRICING[subscription.plan];
   if (!pricing || pricing.monthly === 0) return false;
 
-  const orderId = `sub_${subscription.id}_${Date.now()}`;
-
+  const paymentId = `sub_${subscription.id}_${Date.now()}`;
   const supabase = await createServerClient();
 
   try {
-    await chargeBillingKey({
-      billingKey: subscription.tossBillingKey,
-      customerKey: subscription.tossCustomerKey,
+    await chargeByBillingKey({
+      billingKey: subscription.billingKey,
+      paymentId,
       amount: pricing.monthly,
-      orderId,
       orderName: `옵티써치 ${pricing.label} 정기결제`,
+      customerId: subscription.userId,
     });
 
-    // Extend period by 30 days from now
+    // Extend period by 30 days
     const now = new Date();
     const newEnd = new Date(now);
     newEnd.setDate(newEnd.getDate() + 30);
