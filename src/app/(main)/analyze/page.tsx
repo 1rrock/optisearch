@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -363,6 +363,14 @@ async function fetchIsKeywordSaved(keyword: string): Promise<boolean> {
 }
 
 export default function AnalyzePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24 text-muted-foreground">로딩 중...</div>}>
+      <AnalyzePageInner />
+    </Suspense>
+  );
+}
+
+function AnalyzePageInner() {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const autoTriggered = useRef(false);
