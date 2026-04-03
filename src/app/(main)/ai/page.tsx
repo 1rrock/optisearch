@@ -112,7 +112,7 @@ export default function AIToolsPage() {
       if (!res.ok) return { plan: "free" as PlanId, usage: { search: 0, title: 0, draft: 0, score: 0 } };
       return res.json();
     },
-    staleTime: 30_000,
+    staleTime: 0,
   });
 
   const plan = (dashboardData?.plan ?? "free") as PlanId;

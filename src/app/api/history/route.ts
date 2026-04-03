@@ -1,15 +1,15 @@
-import { getCurrentUserProfileId } from "@/services/user-service";
-import { getSearchHistory, saveSearchHistory } from "@/services/history-service";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
+import { getSearchHistory, saveSearchHistory, deleteSearchHistory } from "@/services/history-service";
 import { z } from "zod";
 
 export async function GET() {
   try {
-    const userId = await getCurrentUserProfileId();
-    if (!userId) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
 
-    const history = await getSearchHistory(userId);
+    const history = await getSearchHistory(user.userId);
     return Response.json({ history });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";
@@ -39,12 +39,34 @@ const saveSchema = z.object({
   }),
 });
 
-export async function POST(request: Request) {
+export async function DELETE(request: Request) {
   try {
-    const userId = await getCurrentUserProfileId();
-    if (!userId) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
+
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get("id");
+    if (!id) {
+      return Response.json({ error: "id is required" }, { status: 400 });
+    }
+
+    await deleteSearchHistory(user.userId, id);
+    return Response.json({ success: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return Response.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await getAuthenticatedUser();
+    if (!user) {
+      return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    }
+    const userId = user.userId;
 
     let body: unknown;
     try {

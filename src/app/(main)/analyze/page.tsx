@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Search,
   TrendingUp,
@@ -25,6 +26,7 @@ import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/mod
 import type { TrendPoint } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
+import { SearchInputWithHistory } from "@/shared/components/SearchInputWithHistory";
 
 // ---------------------------------------------------------------------------
 // API types
@@ -361,6 +363,9 @@ async function fetchIsKeywordSaved(keyword: string): Promise<boolean> {
 }
 
 export default function AnalyzePage() {
+  const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const autoTriggered = useRef(false);
   const [inputValue, setInputValue] = useState("");
   const [submittedKeyword, setSubmittedKeyword] = useState("");
   const [tagCopied, setTagCopied] = useState(false);
@@ -373,6 +378,11 @@ export default function AnalyzePage() {
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
     mutationFn: analyzeKeyword,
+    onSuccess: () => {
+      // Refresh search history so the dropdown shows the new entry
+      queryClient.invalidateQueries({ queryKey: ["search-history"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
     onError: (err) => {
       if (err instanceof UsageLimitError) {
         setUpgradeModal({ used: err.used, limit: err.limit });
@@ -398,6 +408,21 @@ export default function AnalyzePage() {
     setIsSaved(false);
     fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => {});
   }, [data?.analysis?.keyword]);
+
+  // Auto-analyze from URL param: /analyze?keyword=검색어
+  useEffect(() => {
+    const keyword = searchParams.get("keyword");
+    if (keyword && !autoTriggered.current) {
+      autoTriggered.current = true;
+      setInputValue(keyword);
+      setSubmittedKeyword(keyword);
+      setTrendData(null);
+      setTrendError(false);
+      reset();
+      mutate(keyword);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Fetch trend data whenever analysis result changes
   useEffect(() => {
@@ -501,25 +526,20 @@ export default function AnalyzePage() {
       {/* Search Section */}
       <section className="mb-12">
         <div className="max-w-2xl mx-auto">
-          <form onSubmit={handleSubmit} className="relative group">
-            <div className="absolute inset-y-0 left-5 flex items-center pointer-events-none">
-              <Search className="text-muted-foreground size-5" />
-            </div>
-            <input
-              className="w-full pl-14 pr-32 py-5 bg-card border-none rounded-2xl shadow-xl shadow-muted/50 focus:ring-2 focus:ring-primary text-lg font-medium placeholder:text-muted-foreground outline-none transition-all"
-              placeholder="키워드를 입력하세요"
-              type="text"
+          <form onSubmit={handleSubmit}>
+            <SearchInputWithHistory
               value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              onChange={setInputValue}
+              onSubmit={(keyword) => {
+                setSubmittedKeyword(keyword);
+                setTrendData(null);
+                setTrendError(false);
+                reset();
+                mutate(keyword);
+              }}
               disabled={isPending}
+              placeholder="키워드를 입력하세요"
             />
-            <button
-              type="submit"
-              disabled={isPending || !inputValue.trim()}
-              className="absolute right-3 inset-y-3 px-8 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isPending ? "분석 중…" : "분석"}
-            </button>
           </form>
         </div>
       </section>

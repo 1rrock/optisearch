@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   TrendingUp,
   Search,
@@ -14,9 +15,23 @@ import {
   Monitor,
   BarChart3,
   PieChart,
+  Flame,
+  Sparkles,
+  CalendarDays,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
 } from "lucide-react";
+import { cn } from "@/shared/lib/utils";
 import { PageHeader } from "@/shared/ui/page-header";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
+// Types for new keywords API
+interface NewKeywordDate {
+  date: string;
+  label: string;
+  dayOfWeek: string;
+  keywords: Array<{ keyword: string; volume: number }>;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -973,6 +988,14 @@ export default function TrendsPage() {
         </div>
       )}
 
+      {/* ================================================================= */}
+      {/* Trending / New / Seasonal Sections — always visible             */}
+      {/* ================================================================= */}
+
+      <TrendingSectionWrapper />
+      <NewKeywordsSectionWrapper />
+      <SeasonalSectionWrapper />
+
       {/* Upgrade modal */}
       <UpgradeModal
         isOpen={upgradeModal.open}
@@ -983,4 +1006,513 @@ export default function TrendsPage() {
       />
     </div>
   );
+}
+
+// ===========================================================================
+// Trending Keywords Section — WordCloud + Ranked Table
+// ===========================================================================
+
+type TrendingSort = "changeRate" | "volume";
+type TrendingOrder = "desc" | "asc";
+type TrendingView = "cloud" | "table";
+
+interface TrendingKw {
+  keyword: string;
+  volume: number;
+  changeRate: number;
+  direction: "up" | "down" | "stable";
+}
+
+function TrendingSectionWrapper() {
+  const [period, setPeriod] = useState<"daily" | "monthly">("daily");
+  const [sort, setSort] = useState<TrendingSort>("changeRate");
+  const [order, setOrder] = useState<TrendingOrder>("desc");
+  const [view, setView] = useState<TrendingView>("cloud");
+
+  const { data, isLoading } = useQuery<{ period: string; keywords: TrendingKw[] }>({
+    queryKey: ["trending-keywords", period],
+    queryFn: async () => {
+      const res = await fetch(`/api/keywords/trending?period=${period}`);
+      if (!res.ok) throw new Error("Failed to fetch trending keywords");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const rawKeywords = data?.keywords ?? [];
+
+  // Sort
+  const keywords = [...rawKeywords].sort((a, b) => {
+    const valA = sort === "volume" ? a.volume : Math.abs(a.changeRate);
+    const valB = sort === "volume" ? b.volume : Math.abs(b.changeRate);
+    return order === "desc" ? valB - valA : valA - valB;
+  });
+
+  function toggleSort(field: TrendingSort) {
+    if (sort === field) {
+      setOrder((o) => (o === "desc" ? "asc" : "desc"));
+    } else {
+      setSort(field);
+      setOrder("desc");
+    }
+  }
+
+  const sortIcon = (field: TrendingSort) => {
+    if (sort !== field) return "";
+    return order === "desc" ? " ↓" : " ↑";
+  };
+
+  return (
+    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <Flame className="size-5 text-orange-500" />
+          인기 급상승 키워드
+        </h3>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex gap-1 bg-muted/30 rounded-full p-0.5">
+            <button
+              type="button"
+              onClick={() => setView("cloud")}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                view === "cloud" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+              )}
+              title="워드클라우드"
+            >
+              ☁️
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("table")}
+              className={cn(
+                "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                view === "table" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+              )}
+              title="테이블"
+            >
+              📊
+            </button>
+          </div>
+          {/* Period toggle */}
+          <div className="flex gap-1.5">
+            {(["daily", "monthly"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
+                  period === p
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-card text-muted-foreground border-muted/50 hover:border-foreground/30"
+                )}
+              >
+                {p === "daily" ? "일간" : "월간"}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : keywords.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
+          <TrendingUp className="size-8 mb-2 opacity-30" />
+          데이터가 쌓이면 급상승 키워드가 표시됩니다.
+        </div>
+      ) : view === "cloud" ? (
+        /* -------- Word Cloud View -------- */
+        <div className="space-y-4">
+          <TrendingWordCloud keywords={keywords} />
+          {/* Ranked list below cloud */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 pt-2">
+            {keywords.slice(0, 10).map((kw, idx) => (
+              <button
+                key={kw.keyword}
+                type="button"
+                onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
+                className="flex items-center gap-3 py-2 px-2 hover:bg-muted/20 rounded-lg transition-colors cursor-pointer text-left"
+              >
+                <span className={cn(
+                  "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                  idx < 3 ? "bg-orange-500 text-white" : "bg-muted/50 text-muted-foreground"
+                )}>
+                  {idx + 1}
+                </span>
+                <span className="flex-1 text-sm font-semibold truncate">{kw.keyword}</span>
+                <span className={cn(
+                  "text-xs font-bold whitespace-nowrap",
+                  kw.direction === "up" ? "text-rose-500" : kw.direction === "down" ? "text-blue-500" : "text-muted-foreground"
+                )}>
+                  {kw.direction === "up" ? "+" : kw.direction === "down" ? "" : ""}
+                  {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* -------- Table View -------- */
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-muted/30 text-muted-foreground text-xs">
+                <th className="text-left py-2.5 pr-4 font-semibold w-10">#</th>
+                <th className="text-left py-2.5 pr-4 font-semibold">키워드</th>
+                <th
+                  className="text-right py-2.5 pr-4 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => toggleSort("volume")}
+                >
+                  검색량{sortIcon("volume")}
+                </th>
+                <th
+                  className="text-right py-2.5 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
+                  onClick={() => toggleSort("changeRate")}
+                >
+                  변동률{sortIcon("changeRate")}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {keywords.map((kw, idx) => (
+                <tr
+                  key={kw.keyword}
+                  className="border-b border-muted/15 hover:bg-muted/20 transition-colors cursor-pointer"
+                  onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
+                >
+                  <td className="py-3 pr-4 font-bold text-muted-foreground">{idx + 1}</td>
+                  <td className="py-3 pr-4 font-semibold">{kw.keyword}</td>
+                  <td className="py-3 pr-4 text-right text-muted-foreground">
+                    {kw.volume > 0 ? kw.volume.toLocaleString() : "-"}
+                  </td>
+                  <td className="py-3 text-right">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-0.5 font-bold text-xs px-2 py-1 rounded-full",
+                        kw.direction === "up"
+                          ? "text-rose-600 bg-rose-50 dark:bg-rose-950/40"
+                          : kw.direction === "down"
+                          ? "text-blue-600 bg-blue-50 dark:bg-blue-950/40"
+                          : "text-gray-500 bg-gray-100 dark:bg-gray-800/40"
+                      )}
+                    >
+                      {kw.direction === "up" ? (
+                        <ArrowUpRight className="size-3" />
+                      ) : kw.direction === "down" ? (
+                        <ArrowDownRight className="size-3" />
+                      ) : (
+                        <Minus className="size-3" />
+                      )}
+                      {Math.abs(kw.changeRate)}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Word Cloud Component (CSS-based, no external deps)
+// ---------------------------------------------------------------------------
+
+const CLOUD_COLORS = [
+  "text-blue-500 dark:text-blue-400",
+  "text-emerald-600 dark:text-emerald-400",
+  "text-violet-600 dark:text-violet-400",
+  "text-rose-500 dark:text-rose-400",
+  "text-amber-600 dark:text-amber-400",
+  "text-cyan-600 dark:text-cyan-400",
+  "text-pink-500 dark:text-pink-400",
+  "text-indigo-600 dark:text-indigo-400",
+  "text-orange-600 dark:text-orange-400",
+  "text-teal-600 dark:text-teal-400",
+];
+
+function TrendingWordCloud({ keywords }: { keywords: TrendingKw[] }) {
+  if (keywords.length === 0) return null;
+
+  // Normalize sizes: biggest keyword = largest font, smallest = smallest
+  const maxRate = Math.max(...keywords.map((k) => Math.abs(k.changeRate)), 1);
+  const minRate = Math.min(...keywords.map((k) => Math.abs(k.changeRate)), 0);
+  const range = maxRate - minRate || 1;
+
+  // Font sizes from 0.75rem to 2.25rem
+  const MIN_SIZE = 0.75;
+  const MAX_SIZE = 2.25;
+
+  // Shuffle for visual variety but deterministic per render
+  const shuffled = [...keywords].sort((a, b) => {
+    // Place larger ones toward center by interleaving
+    const ai = keywords.indexOf(a);
+    const bi = keywords.indexOf(b);
+    return (ai % 2) - (bi % 2) || ai - bi;
+  });
+
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 py-6 px-4 min-h-[180px]">
+      {shuffled.map((kw, idx) => {
+        const normalized = (Math.abs(kw.changeRate) - minRate) / range;
+        const fontSize = MIN_SIZE + normalized * (MAX_SIZE - MIN_SIZE);
+        const colorClass = CLOUD_COLORS[idx % CLOUD_COLORS.length];
+
+        return (
+          <button
+            key={kw.keyword}
+            type="button"
+            onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
+            className={cn(
+              "font-bold hover:opacity-70 transition-all cursor-pointer whitespace-nowrap",
+              colorClass
+            )}
+            style={{ fontSize: `${fontSize}rem` }}
+            title={`${kw.keyword}: ${kw.volume > 0 ? kw.volume.toLocaleString() : "-"} (${kw.changeRate > 0 ? "+" : ""}${kw.changeRate}%)`}
+          >
+            {kw.keyword}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ===========================================================================
+// New Keywords Section — BlackKiwi-style date columns
+// ===========================================================================
+
+function NewKeywordsSectionWrapper() {
+
+  const [days] = useState(7);
+
+  const { data, isLoading } = useQuery<{
+    dates: Array<{
+      date: string;
+      label: string;
+      dayOfWeek: string;
+      keywords: Array<{ keyword: string; volume: number }>;
+    }>;
+    totalCount: number;
+    source: "corpus" | "searches";
+  }>({
+    queryKey: ["new-keywords", days],
+    queryFn: async () => {
+      const res = await fetch(`/api/keywords/new?days=${days}`);
+      if (!res.ok) throw new Error("Failed to fetch new keywords");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const dates = data?.dates ?? [];
+
+  return (
+    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <Sparkles className="size-5 text-violet-500" />
+          새롭게 등장한 키워드
+        </h3>
+        {data && (
+          <span className="text-xs text-muted-foreground">
+            {data.totalCount > 0
+              ? `${data.totalCount}개 발견`
+              : "데이터 수집 대기중"}
+            {data.source === "searches" && " · 검색 기록 기반"}
+          </span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        /* Date columns — horizontal scroll container */
+        <div className="overflow-x-auto -mx-2 px-2">
+          <div
+            className="grid gap-0 min-w-max"
+            style={{
+              gridTemplateColumns: `repeat(${Math.min(dates.length, 7)}, minmax(200px, 1fr))`,
+            }}
+          >
+            {dates.slice(0, 7).map((col, colIdx) => (
+              <div
+                key={col.date}
+                className={cn(
+                  "flex flex-col",
+                  colIdx < dates.length - 1 && "border-r border-muted/30"
+                )}
+              >
+                {/* Date header */}
+                <div className="px-4 py-3 border-b border-muted/30 bg-muted/10">
+                  <div className="text-sm font-bold text-center">{col.label}</div>
+                </div>
+
+                {/* Column sub-header */}
+                <div className="grid grid-cols-[1fr_auto] px-4 py-2 border-b border-muted/20 text-[11px] text-muted-foreground font-semibold">
+                  <span>키워드</span>
+                  <span>검색량</span>
+                </div>
+
+                {/* Keywords list */}
+                <div className="flex-1 min-h-[200px]">
+                  {col.keywords.length === 0 ? (
+                    <div className="flex items-center justify-center h-full py-8 text-xs text-muted-foreground/60">
+                      표시할 데이터가 없습니다.
+                    </div>
+                  ) : (
+                    <div>
+                      {col.keywords.map((kw) => (
+                        <button
+                          key={kw.keyword}
+                          type="button"
+                          onClick={() =>
+                            window.open(
+                              `/analyze?keyword=${encodeURIComponent(kw.keyword)}`,
+                              '_blank'
+                            )
+                          }
+                          className="w-full grid grid-cols-[1fr_auto] px-4 py-2 text-left hover:bg-muted/20 transition-colors cursor-pointer border-b border-muted/10 last:border-b-0"
+                        >
+                          <span className="text-sm truncate pr-3">
+                            {kw.keyword}
+                          </span>
+                          <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
+                            {kw.volume > 0
+                              ? kw.volume.toLocaleString()
+                              : "-"}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
+// Seasonal Keywords Section
+// ===========================================================================
+
+function SeasonalSectionWrapper() {
+
+  const currentMonth = new Date().getMonth() + 1;
+
+  const { data, isLoading } = useQuery<{
+    month: number;
+    label: string;
+    keywords: Array<{
+      keyword: string;
+      avgVolume: number;
+      multiplier: number;
+      peakMonth: number;
+      peakLabel: string;
+    }>;
+  }>({
+    queryKey: ["seasonal-keywords", currentMonth],
+    queryFn: async () => {
+      const res = await fetch(`/api/keywords/seasonal?month=${currentMonth}`);
+      if (!res.ok) throw new Error("Failed to fetch seasonal keywords");
+      return res.json();
+    },
+    staleTime: 0,
+  });
+
+  const keywords = data?.keywords ?? [];
+
+  return (
+    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <CalendarDays className="size-5 text-emerald-500" />
+          {data?.label ?? `${currentMonth}월`} 시즌 키워드
+        </h3>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : keywords.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
+          <CalendarDays className="size-8 mb-2 opacity-30" />
+          시즌 데이터를 불러올 수 없습니다.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          {keywords.slice(0, 10).map((kw) => (
+            <button
+              key={kw.keyword}
+              type="button"
+              onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
+              className="bg-background border border-muted/40 rounded-xl p-4 text-left hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group"
+            >
+              <div className="font-bold text-sm mb-2 group-hover:text-primary transition-colors truncate">
+                {kw.keyword}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">평균 검색량</span>
+                  <span className="font-semibold">
+                    {kw.avgVolume > 0 ? kw.avgVolume.toLocaleString() : "-"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">검색량 배수</span>
+                  <span
+                    className={cn(
+                      "font-bold",
+                      kw.multiplier >= 2
+                        ? "text-rose-500"
+                        : kw.multiplier >= 1.5
+                        ? "text-amber-500"
+                        : "text-foreground"
+                    )}
+                  >
+                    ×{kw.multiplier}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">집중 시기</span>
+                  <span className="font-semibold">{kw.peakLabel}</span>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===========================================================================
+// Shared helpers
+// ===========================================================================
+
+function gradeColor(grade: string | null): string {
+  switch (grade) {
+    case "S": return "text-rose-500 bg-rose-50 dark:bg-rose-950/40";
+    case "A": return "text-amber-600 bg-amber-50 dark:bg-amber-950/40";
+    case "B": return "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40";
+    case "C": return "text-blue-600 bg-blue-50 dark:bg-blue-950/40";
+    case "D": return "text-gray-500 bg-gray-100 dark:bg-gray-800/40";
+    default: return "text-muted-foreground bg-muted/60";
+  }
 }

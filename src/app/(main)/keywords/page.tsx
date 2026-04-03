@@ -106,7 +106,7 @@ function KeywordCard({
   }
 
   function handleAnalyze() {
-    router.push(`/analyze?q=${encodeURIComponent(item.keyword)}`);
+    window.open(`/analyze?keyword=${encodeURIComponent(item.keyword)}`, '_blank');
   }
 
   return (

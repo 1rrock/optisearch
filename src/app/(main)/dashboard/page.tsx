@@ -57,6 +57,8 @@ function planLabel(plan: PlanId): string {
 }
 
 export default function DashboardPage() {
+  const [isExporting, setIsExporting] = useState(false);
+
   const { data, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -95,8 +97,6 @@ export default function DashboardPage() {
   const limits = PLAN_LIMITS[plan];
   const searchLimit = limits.dailySearch;
   const titleLimit = limits.dailyTitle;
-
-  const [isExporting, setIsExporting] = useState(false);
 
   async function handleExportHistory() {
     setIsExporting(true);

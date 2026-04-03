@@ -56,7 +56,9 @@ export async function POST(request: Request) {
     ]);
     await recordUsage(user.userId, "search", effectiveKeyword);
     // Save search history (non-blocking)
-    saveSearchHistory(user.userId, analysis).catch(() => {});
+    saveSearchHistory(user.userId, analysis).catch((err) => {
+      console.error("[analyze] saveSearchHistory failed:", err?.message ?? err);
+    });
     return Response.json({ analysis, relatedKeywords, correctedKeyword });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Internal server error";

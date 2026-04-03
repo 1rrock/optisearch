@@ -37,7 +37,7 @@ export function Sidebar() {
       if (!res.ok) return { plan: "free" as PlanId };
       return res.json();
     },
-    staleTime: 60_000,
+    staleTime: 0,
   });
   const userPlan = (dashboardData?.plan ?? "free") as PlanId;
 

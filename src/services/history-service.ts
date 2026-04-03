@@ -17,11 +17,8 @@ export async function saveSearchHistory(
     mobile_search_volume: result.mobileSearchVolume,
     competition: result.competition,
     blog_post_count: result.blogPostCount,
-    saturation_index: result.saturationIndex.score,
     keyword_grade: result.keywordGrade,
-    section_data: result.sectionData,
-    top_posts: result.topPosts,
-    shopping_data: result.shoppingData,
+    composite_score: result.saturationIndex?.score ?? null,
   });
 
   if (error) {
@@ -43,13 +40,12 @@ export async function getSearchHistory(
   mobileSearchVolume: number;
   totalSearchVolume: number;
   competition: string;
-  saturationIndex: number | null;
   createdAt: string;
 }>> {
   const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("keyword_searches")
-    .select("id, keyword, keyword_grade, pc_search_volume, mobile_search_volume, competition, saturation_index, created_at")
+    .select("id, keyword, keyword_grade, pc_search_volume, mobile_search_volume, competition, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -66,7 +62,6 @@ export async function getSearchHistory(
     mobileSearchVolume: row.mobile_search_volume ?? 0,
     totalSearchVolume: (row.pc_search_volume ?? 0) + (row.mobile_search_volume ?? 0),
     competition: row.competition,
-    saturationIndex: row.saturation_index ?? null,
     createdAt: row.created_at,
   }));
 }
