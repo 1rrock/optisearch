@@ -23,18 +23,24 @@ export async function getCurrentUserProfileId(): Promise<string | null> {
   if (existing) return existing.id;
 
   // Ensure public.users row exists (NextAuth adapter table, FK target)
-  const { data: existingUser } = await supabase
-    .from("users")
-    .select("id")
-    .eq("id", authUserId)
-    .single();
+  // users.id may be UUID type — wrap in try/catch since naverId may not be UUID
+  try {
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", authUserId)
+      .single();
 
-  if (!existingUser) {
-    await supabase.from("users").insert({
-      id: authUserId,
-      name: session?.user?.name ?? null,
-      email: session?.user?.email ?? null,
-    });
+    if (!existingUser) {
+      await supabase.from("users").insert({
+        id: authUserId,
+        name: session?.user?.name ?? null,
+        email: session?.user?.email ?? null,
+      });
+    }
+  } catch {
+    // users table insert may fail if id is UUID type and naverId is not UUID — safe to ignore
+    console.log("[user-service] users table insert skipped (id type mismatch)");
   }
 
   // Create profile if doesn't exist (auto-registration on first login)
@@ -49,6 +55,7 @@ export async function getCurrentUserProfileId(): Promise<string | null> {
     .single();
 
   if (error) {
+    console.error("[user-service] Failed to create user profile:", error.message);
     throw new Error(`Failed to create user profile: ${error.message}`);
   }
 

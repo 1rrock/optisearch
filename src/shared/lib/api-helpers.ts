@@ -85,7 +85,8 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
     if (!profile) return null;
 
     return { userId: profile.id, plan: (profile.plan as PlanId) ?? "free" };
-  } catch {
+  } catch (err) {
+    console.error("[getAuthenticatedUser] Error:", err instanceof Error ? err.message : err);
     return null;
   }
 }
