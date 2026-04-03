@@ -7,29 +7,14 @@
  */
 
 import { withRetry } from "./retry";
+import { getNaverAuthHeaders } from "./naver-auth";
 
 const BASE_URL = "https://openapi.naver.com/v1/search";
-
-function getAuthHeaders(): HeadersInit {
-  const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "Missing Naver API credentials: NAVER_CLIENT_ID and NAVER_CLIENT_SECRET must be set"
-    );
-  }
-
-  return {
-    "X-Naver-Client-Id": clientId,
-    "X-Naver-Client-Secret": clientSecret,
-  };
-}
 
 async function fetchSearch<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   return withRetry(async () => {
-    const response = await fetch(url, { headers: getAuthHeaders() });
+    const response = await fetch(url, { headers: getNaverAuthHeaders() });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       const err = new Error(
@@ -189,4 +174,108 @@ export async function correctTypo(
 ): Promise<TypoCorrectionResponse> {
   const params = new URLSearchParams({ query });
   return fetchSearch<TypoCorrectionResponse>(`/errata.json?${params}`);
+}
+
+// ---------------------------------------------------------------------------
+// News Search
+// ---------------------------------------------------------------------------
+
+export interface NewsSearchItem {
+  title: string;
+  originallink: string;
+  link: string;
+  description: string;
+  pubDate: string;
+}
+
+export interface NewsSearchResponse {
+  items: NewsSearchItem[];
+  total: number;
+  display: number;
+}
+
+/**
+ * Search Naver news articles for the given query.
+ * @param query - Search keyword
+ * @param display - Number of results (default 10, max 100)
+ * @param sort - Sort order: "date" (recent) | "sim" (relevance, default)
+ */
+export async function searchNews(
+  query: string,
+  display?: number,
+  sort?: "date" | "sim"
+): Promise<NewsSearchResponse> {
+  const params = new URLSearchParams({
+    query,
+    display: String(display ?? 10),
+    sort: sort ?? "date",
+  });
+  return fetchSearch<NewsSearchResponse>(`/news.json?${params}`);
+}
+
+// ---------------------------------------------------------------------------
+// Web Document Search
+// ---------------------------------------------------------------------------
+
+export interface WebSearchItem {
+  title: string;
+  link: string;
+  description: string;
+}
+
+export interface WebSearchResponse {
+  items: WebSearchItem[];
+  total: number;
+  display: number;
+}
+
+/**
+ * Search Naver web documents for the given query.
+ * @param query - Search keyword
+ * @param display - Number of results (default 10, max 100)
+ */
+export async function searchWeb(
+  query: string,
+  display?: number
+): Promise<WebSearchResponse> {
+  const params = new URLSearchParams({
+    query,
+    display: String(display ?? 10),
+  });
+  return fetchSearch<WebSearchResponse>(`/webkr.json?${params}`);
+}
+
+// ---------------------------------------------------------------------------
+// Encyclopedia Search
+// ---------------------------------------------------------------------------
+
+export interface EncycSearchItem {
+  title: string;
+  link: string;
+  description: string;
+  thumbnail: string;
+}
+
+export interface EncycSearchResponse {
+  items: EncycSearchItem[];
+  total: number;
+  display: number;
+}
+
+/**
+ * Search Naver encyclopedia for the given query.
+ * Used to detect "encyclopedia wall" — keywords where encyclopedia results
+ * dominate top rankings, making blog SEO harder.
+ * @param query - Search keyword
+ * @param display - Number of results (default 5)
+ */
+export async function searchEncyclopedia(
+  query: string,
+  display?: number
+): Promise<EncycSearchResponse> {
+  const params = new URLSearchParams({
+    query,
+    display: String(display ?? 5),
+  });
+  return fetchSearch<EncycSearchResponse>(`/encyc.json?${params}`);
 }

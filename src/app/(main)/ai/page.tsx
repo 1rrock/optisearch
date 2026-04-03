@@ -26,30 +26,7 @@ import { PLAN_LIMITS, type PlanId } from "@/shared/config/constants";
 
 type TabId = "title" | "draft" | "score";
 
-// ---------------------------------------------------------------------------
-// Usage limit error
-// ---------------------------------------------------------------------------
-
-class UsageLimitError extends Error {
-  used: number;
-  limit: number;
-  constructor(message: string, used: number, limit: number) {
-    super(message);
-    this.name = "UsageLimitError";
-    this.used = used;
-    this.limit = limit;
-  }
-}
-
-function parseUsageLimitError(status: number, data: Record<string, unknown>): UsageLimitError | null {
-  if (status === 429 && data.code === "USAGE_LIMIT_EXCEEDED") {
-    const match = /\((\d+)\/(\d+)\)/.exec((data.error as string) ?? "");
-    const used = match ? parseInt(match[1], 10) : 0;
-    const limit = match ? parseInt(match[2], 10) : 0;
-    return new UsageLimitError((data.error as string) ?? "일일 사용 한도를 초과했습니다.", used, limit);
-  }
-  return null;
-}
+import { UsageLimitError, parseUsageLimitError } from "@/shared/lib/errors";
 
 type UpgradeModalState = { feature: string; used: number; limit: number } | null;
 

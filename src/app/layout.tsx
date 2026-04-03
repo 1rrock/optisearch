@@ -3,6 +3,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/shared/components/theme-provider";
 import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
+import { Toaster } from "@/shared/ui/sonner";
 import { Geist } from "next/font/google";
 import { cn } from "@/shared/lib/utils";
 
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "옵티써치 - 네이버 키워드 분석 + AI 콘텐츠 최적화",
     description: "블랙키위보다 저렴한 네이버 키워드 분석 도구. AI가 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지.",
-    url: "https://optisearch-ochre.vercel.app",
+    url: "https://www.optisearch.kr",
     siteName: "옵티써치",
     locale: "ko_KR",
     type: "website",
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     follow: true,
   },
   alternates: {
-    canonical: "https://optisearch-ochre.vercel.app",
+    canonical: "https://www.optisearch.kr",
   },
 };
 
@@ -48,6 +49,7 @@ export default function RootLayout({
         >
           <SessionProvider>
             <QueryProvider>{children}</QueryProvider>
+            <Toaster />
           </SessionProvider>
         </ThemeProvider>
       </body>

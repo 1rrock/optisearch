@@ -1,3 +1,4 @@
+import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getRelatedKeywords } from "@/shared/lib/naver-searchad";
 import { getAllTrendingSeeds } from "@/shared/config/trending-seeds";
@@ -17,10 +18,17 @@ import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
  */
 export const maxDuration = 60; // Vercel Pro: 60s max
 
+/** Timing-safe string comparison to prevent timing attacks on secrets */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return _tse(Buffer.from(a), Buffer.from(b));
+}
+
 export async function GET(request: Request) {
   // Auth: Vercel CRON_SECRET or manual trigger
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get("authorization") ?? "";
+  if (!cronSecret || !safeEqual(authHeader, `Bearer ${cronSecret}`)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -189,65 +197,44 @@ async function upsertCorpus(
     (kw) => (kw.pcVolume + kw.mobileVolume) >= 10
   );
 
-  // Strategy: separate INSERT (new) from UPDATE (existing) to preserve first_seen_at
+  // Batch upsert: fetch existing first_seen_at, then upsert all in one call per chunk
   const CHUNK = 500;
   for (let i = 0; i < filtered.length; i += CHUNK) {
     const chunk = filtered.slice(i, i + CHUNK);
     const chunkKeywords = chunk.map((kw) => kw.keyword);
 
-    // Find which keywords already exist
+    // Fetch existing keywords with their first_seen_at to preserve it
     const { data: existing } = await supabase
       .from("keyword_corpus")
-      .select("keyword")
+      .select("keyword, first_seen_at")
       .in("keyword", chunkKeywords);
 
-    const existingSet = new Set(existing?.map((r) => r.keyword) ?? []);
+    const existingMap = new Map(
+      (existing ?? []).map((r) => [r.keyword, r.first_seen_at as string])
+    );
 
-    // Split into new and existing
-    const newKeywords = chunk.filter((kw) => !existingSet.has(kw.keyword));
-    const existingKeywords = chunk.filter((kw) => existingSet.has(kw.keyword));
+    // Build upsert rows: new → first_seen_at=today, existing → keep original
+    const rows = chunk.map((kw) => ({
+      keyword: kw.keyword,
+      source_seed: kw.sourceSeed,
+      pc_volume: kw.pcVolume,
+      mobile_volume: kw.mobileVolume,
+      competition: kw.competition,
+      first_seen_at: existingMap.get(kw.keyword) ?? today,
+      last_seen_at: today,
+    }));
 
-    // INSERT new keywords (first_seen_at = today)
-    if (newKeywords.length > 0) {
-      const rows = newKeywords.map((kw) => ({
-        keyword: kw.keyword,
-        source_seed: kw.sourceSeed,
-        pc_volume: kw.pcVolume,
-        mobile_volume: kw.mobileVolume,
-        competition: kw.competition,
-        first_seen_at: today,
-        last_seen_at: today,
-      }));
+    const newCount = chunk.filter((kw) => !existingMap.has(kw.keyword)).length;
 
-      const { error } = await supabase
-        .from("keyword_corpus")
-        .insert(rows);
+    const { error } = await supabase
+      .from("keyword_corpus")
+      .upsert(rows, { onConflict: "keyword" });
 
-      if (error) {
-        console.error(`[collect-keywords] Insert error:`, error.message);
-      } else {
-        inserted += newKeywords.length;
-      }
-    }
-
-    // UPDATE existing keywords (only last_seen_at + volumes, keep first_seen_at)
-    for (const kw of existingKeywords) {
-      const { error } = await supabase
-        .from("keyword_corpus")
-        .update({
-          pc_volume: kw.pcVolume,
-          mobile_volume: kw.mobileVolume,
-          competition: kw.competition,
-          last_seen_at: today,
-          source_seed: kw.sourceSeed,
-        })
-        .eq("keyword", kw.keyword);
-
-      if (error) {
-        console.error(`[collect-keywords] Update error for "${kw.keyword}":`, error.message);
-      } else {
-        updated++;
-      }
+    if (error) {
+      console.error(`[collect-keywords] Upsert error:`, error.message);
+    } else {
+      inserted += newCount;
+      updated += chunk.length - newCount;
     }
   }
 

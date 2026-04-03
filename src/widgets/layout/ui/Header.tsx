@@ -1,13 +1,17 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useRef, useCallback, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Bell, Search } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ThemeToggle } from "@/shared/components/theme-toggle";
+import { MobileNav } from "./MobileNav";
 
 export function Header() {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const pathMap: Record<string, string> = {
     "/dashboard": "대시보드",
@@ -23,19 +27,48 @@ export function Header() {
 
   const currentTitle = pathMap[pathname] || "프리미엄 분석";
 
+  const handleSearch = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      const value = (e.target as HTMLInputElement).value.trim();
+      if (value) {
+        router.push(`/analyze?keyword=${encodeURIComponent(value)}`);
+        (e.target as HTMLInputElement).value = "";
+      }
+    }
+  }, [router]);
+
+  // CMD+K shortcut
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur-md md:px-8 transition-all">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <MobileNav />
         <h1 className="text-lg font-bold tracking-tight">{currentTitle}</h1>
       </div>
       <div className="flex items-center gap-4">
         <div className="relative hidden md:flex items-center w-64">
           <Search className="absolute left-3 size-4 text-muted-foreground" />
-          <Input type="text" placeholder="빠른 키워드 검색 (CMD+K)" className="h-9 rounded-full pl-9 pr-4 bg-muted/50 border-input focus-visible:ring-2 focus-visible:bg-background" />
+          <Input
+            ref={searchRef}
+            type="text"
+            placeholder="빠른 키워드 검색 (CMD+K)"
+            className="h-9 rounded-full pl-9 pr-4 bg-muted/50 border-input focus-visible:ring-2 focus-visible:bg-background"
+            onKeyDown={handleSearch}
+          />
         </div>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-muted relative">
+        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-muted relative" aria-label="알림">
           <Bell className="size-4" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-background" />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-background" aria-hidden="true" />
         </Button>
         <ThemeToggle />
       </div>

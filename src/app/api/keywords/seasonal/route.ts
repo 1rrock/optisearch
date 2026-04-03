@@ -3,6 +3,7 @@ import { getSearchTrend } from "@/shared/lib/naver-datalab";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { getSeasonalSeeds, MONTH_LABELS } from "@/shared/config/seasonal-keywords";
 import { cached, CacheTTL } from "@/services/cache-service";
+import { formatDate } from "@/shared/lib/utils";
 
 export interface SeasonalKeywordItem {
   keyword: string;
@@ -48,9 +49,8 @@ export async function GET(request: Request) {
     );
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    console.error("[seasonal] error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/keywords/seasonal] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
@@ -65,71 +65,63 @@ async function fetchSeasonalData(month: number): Promise<SeasonalResponse> {
   const endDate = formatDate(now);
   const startDate = formatDate(new Date(now.getFullYear() - 2, now.getMonth(), 1));
 
-  // 1. Fetch DataLab trends in batches of 5 (API limit)
+  // 1. Fetch DataLab trends — all keywords in parallel for speed
+  // Each keyword needs independent ratios, so we query them individually.
   const trendMap = new Map<string, { ratios: Map<number, number>; avgRatio: number; peakMonth: number }>();
 
-  const MAX_GROUPS = 5;
-  for (let i = 0; i < seeds.length; i += MAX_GROUPS) {
-    const batch = seeds.slice(i, i + MAX_GROUPS);
-
-    // DataLab accepts up to 5 keywordGroups per request,
-    // but each group is compared against others in the response.
-    // To get independent ratios, query one at a time or use separate calls.
-    // We'll query each keyword individually for accurate per-keyword ratios.
-    const promises = batch.map((keyword) =>
+  const allResults = await Promise.all(
+    seeds.map((keyword) =>
       getSearchTrend({
         keyword,
         startDate,
         endDate,
         timeUnit: "month",
       }).catch(() => null)
-    );
+    )
+  );
 
-    const results = await Promise.all(promises);
+  for (let j = 0; j < seeds.length; j++) {
+    const keyword = seeds[j];
+    const result = allResults[j];
+    if (!result?.results?.[0]?.data?.length) continue;
 
-    for (let j = 0; j < batch.length; j++) {
-      const keyword = batch[j];
-      const result = results[j];
-      if (!result?.results?.[0]?.data?.length) continue;
+    const data = result.results[0].data;
+    const ratiosByMonth = new Map<number, number[]>();
 
-      const data = result.results[0].data;
-      const ratiosByMonth = new Map<number, number[]>();
-
-      for (const point of data) {
-        // period format: "YYYY-MM-01"
-        const m = parseInt(point.period.split("-")[1], 10);
-        const existing = ratiosByMonth.get(m) ?? [];
-        existing.push(point.ratio);
-        ratiosByMonth.set(m, existing);
-      }
-
-      // Average ratio per month across 2 years
-      const monthlyAvgRatios = new Map<number, number>();
-      let totalRatio = 0;
-      let count = 0;
-      for (const [m, ratios] of ratiosByMonth) {
-        const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-        monthlyAvgRatios.set(m, avg);
-        totalRatio += avg;
-        count++;
-      }
-
-      const overallAvg = count > 0 ? totalRatio / count : 1;
-      let peakMonth = month;
-      let peakRatio = 0;
-      for (const [m, avg] of monthlyAvgRatios) {
-        if (avg > peakRatio) {
-          peakRatio = avg;
-          peakMonth = m;
-        }
-      }
-
-      trendMap.set(keyword, {
-        ratios: monthlyAvgRatios,
-        avgRatio: overallAvg,
-        peakMonth,
-      });
+    for (const point of data) {
+      // period format: "YYYY-MM-01"
+      const m = parseInt(point.period.split("-")[1], 10);
+      const existing = ratiosByMonth.get(m) ?? [];
+      existing.push(point.ratio);
+      ratiosByMonth.set(m, existing);
     }
+
+    // Average ratio per month across 2 years
+    const monthlyAvgRatios = new Map<number, number>();
+    let totalRatio = 0;
+    let count = 0;
+    for (const [m, ratios] of ratiosByMonth) {
+      const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+      monthlyAvgRatios.set(m, avg);
+      totalRatio += avg;
+      count++;
+    }
+
+    const overallAvg = count > 0 ? totalRatio / count : 1;
+    let peakMonth = month;
+    let peakRatio = 0;
+    for (const [m, avg] of monthlyAvgRatios) {
+      if (avg > peakRatio) {
+        peakRatio = avg;
+        peakMonth = m;
+      }
+    }
+
+    trendMap.set(keyword, {
+      ratios: monthlyAvgRatios,
+      avgRatio: overallAvg,
+      peakMonth,
+    });
   }
 
   // 2. Fetch SearchAd volumes
@@ -191,9 +183,3 @@ async function fetchSeasonalData(month: number): Promise<SeasonalResponse> {
   };
 }
 
-function formatDate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}

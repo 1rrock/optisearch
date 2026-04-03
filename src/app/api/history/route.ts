@@ -12,8 +12,8 @@ export async function GET() {
     const history = await getSearchHistory(user.userId);
     return Response.json({ history });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/history] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
@@ -55,8 +55,8 @@ export async function DELETE(request: Request) {
     await deleteSearchHistory(user.userId, id);
     return Response.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/history] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
@@ -83,7 +83,7 @@ export async function POST(request: Request) {
     await saveSearchHistory(userId, parsed.data.result as any);
     return Response.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/history] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

@@ -8,6 +8,8 @@ const bodySchema = z.object({
   authKey: z.string().min(1),
   customerKey: z.string().min(1),
   plan: z.enum(["basic", "pro"]),
+  /** Client-generated idempotency key to prevent duplicate charges on retry */
+  idempotencyKey: z.string().min(1).optional(),
 });
 
 export async function POST(request: Request) {
@@ -29,14 +31,18 @@ export async function POST(request: Request) {
       return Response.json({ error: "Validation failed" }, { status: 422 });
     }
 
-    const { authKey, customerKey, plan } = parsed.data;
+    const { authKey, customerKey, plan, idempotencyKey } = parsed.data;
+
+    // Use client-provided idempotency key or generate a deterministic one
+    // Deterministic: same user + plan + minute = same orderId (prevents rapid retries)
+    const minuteSlot = Math.floor(Date.now() / 60000);
+    const orderId = idempotencyKey ?? `order_${userId}_${plan}_${minuteSlot}`;
 
     // Issue billing key from authKey (Toss server-to-server call)
     const { billingKey } = await issueBillingKey({ authKey, customerKey });
 
     // Charge the first payment immediately
     const pricing = PLAN_PRICING[plan];
-    const orderId = `order_${userId}_${Date.now()}`;
     await chargeBillingKey({
       billingKey,
       customerKey,
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
 
     return Response.json({ success: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/billing] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

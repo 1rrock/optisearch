@@ -10,8 +10,10 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
  */
 export async function createServerClient() {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  // Use service_role key to bypass RLS; fall back to anon key if not set
-  return createClient(supabaseUrl, serviceRoleKey || supabaseAnonKey);
+  if (!serviceRoleKey) {
+    throw new Error("[supabase] SUPABASE_SERVICE_ROLE_KEY is not set. Server-side DB access requires the service_role key.");
+  }
+  return createClient(supabaseUrl, serviceRoleKey);
 }
 
 /**

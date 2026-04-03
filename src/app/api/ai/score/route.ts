@@ -4,7 +4,7 @@ import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/l
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
-  content: z.string().min(10),
+  content: z.string().min(10).max(50000),
 });
 
 export async function POST(request: Request) {
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     await recordUsage(user.userId, "score", parsed.data.keyword);
     return Response.json({ score });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/ai/score] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

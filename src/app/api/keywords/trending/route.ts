@@ -1,9 +1,9 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
-import { getSearchTrend } from "@/shared/lib/naver-datalab";
+import { getSearchTrendBatch } from "@/shared/lib/naver-datalab";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { getAllTrendingSeeds } from "@/shared/config/trending-seeds";
-import { createServerClient } from "@/shared/lib/supabase";
 import { cached } from "@/services/cache-service";
+import { formatDate } from "@/shared/lib/utils";
 
 export interface TrendingKeywordItem {
   keyword: string;
@@ -46,24 +46,22 @@ export async function GET(request: Request) {
     const result = await cached<TrendingResponse>(
       `trending:${period}`,
       CACHE_TTL,
-      () => fetchTrendingData(period, user.userId)
+      () => fetchTrendingData(period)
     );
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    console.error("[trending] error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/keywords/trending] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
 async function fetchTrendingData(
-  period: "daily" | "monthly",
-  userId: string
+  period: "daily" | "monthly"
 ): Promise<TrendingResponse> {
-  // Combine seed keywords + user's recent search keywords
-  const seeds = getAllTrendingSeeds();
-  const userKeywords = await getUserRecentKeywords(userId);
-  const allKeywords = [...new Set([...seeds, ...userKeywords])];
+  // Use only seed keywords for trending (not user-specific)
+  // User keywords are excluded to prevent cache pollution across users
+  // (cache key is shared: `trending:${period}`)
+  const allKeywords = getAllTrendingSeeds();
 
   // Date ranges
   const now = new Date();
@@ -79,33 +77,24 @@ async function fetchTrendingData(
   }
   const endDate = formatDate(now);
 
-  // Fetch DataLab trends — one keyword at a time for independent ratios
-  // QUOTA OPTIMIZATION: Limit to 20 keywords (= 20 API calls per cache miss)
-  // Cache is 24h, so worst case = 40 calls/day (daily + monthly)
-  // DataLab daily limit: 1,000 calls/day → well within budget
+  // Fetch DataLab trends — batch 5 keywords per API call (80% quota savings)
+  // QUOTA OPTIMIZATION: 20 keywords = 4 API calls (was 20)
+  // Cache is 24h, so worst case = 8 calls/day (daily + monthly)
   const keywordsToQuery = allKeywords.slice(0, 20);
   const velocities: Array<{ keyword: string; changeRate: number }> = [];
 
-  // Process in parallel batches of 5 to respect rate limits
-  const PARALLEL = 5;
-  for (let i = 0; i < keywordsToQuery.length; i += PARALLEL) {
-    const batch = keywordsToQuery.slice(i, i + PARALLEL);
-    const results = await Promise.all(
-      batch.map((keyword) =>
-        getSearchTrend({ keyword, startDate, endDate, timeUnit })
-          .then((res) => ({ keyword, data: res.results?.[0]?.data ?? [] }))
-          .catch(() => ({ keyword, data: [] as { period: string; ratio: number }[] }))
-      )
-    );
+  try {
+    const trendMap = await getSearchTrendBatch(keywordsToQuery, { startDate, endDate, timeUnit });
 
-    for (const { keyword, data } of results) {
-      if (data.length < 4) continue; // Not enough data points
-
+    for (const [keyword, data] of trendMap) {
+      if (data.length < 4) continue;
       const changeRate = calculateChangeRate(data, period);
       if (changeRate !== null) {
         velocities.push({ keyword, changeRate });
       }
     }
+  } catch (err) {
+    console.error("[trending] DataLab batch error:", err);
   }
 
   // Sort by absolute change rate (biggest movers first), prefer "up"
@@ -166,27 +155,5 @@ function calculateChangeRate(
   }
 }
 
-async function getUserRecentKeywords(userId: string): Promise<string[]> {
-  try {
-    const supabase = await createServerClient();
-    const { data } = await supabase
-      .from("keyword_searches")
-      .select("keyword")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(20);
 
-    if (!data) return [];
-    // Deduplicate
-    return [...new Set(data.map((row) => row.keyword))];
-  } catch {
-    return [];
-  }
-}
 
-function formatDate(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
     await recordUsage(user.userId, "search", keywords.join(","));
     return Response.json({ trends });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/trends] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

@@ -7,32 +7,53 @@
  */
 
 import { withRetry } from "./retry";
+import { getNaverAuthHeaders } from "./naver-auth";
 
 const BASE_URL = "https://openapi.naver.com/v1/datalab";
 
-function getAuthHeaders(): HeadersInit {
-  const clientId = process.env.NAVER_CLIENT_ID;
-  const clientSecret = process.env.NAVER_CLIENT_SECRET;
+// ---------------------------------------------------------------------------
+// Daily quota counter (DataLab: 1,000 calls/day)
+// ---------------------------------------------------------------------------
 
-  if (!clientId || !clientSecret) {
-    throw new Error(
-      "Missing Naver API credentials: NAVER_CLIENT_ID and NAVER_CLIENT_SECRET must be set"
-    );
+const DAILY_QUOTA = 1000;
+const QUOTA_WARN = 800;
+const QUOTA_BLOCK = 950;
+
+const quotaState = {
+  count: 0,
+  date: new Date().toISOString().split("T")[0],
+};
+
+function checkAndIncrementQuota(): void {
+  const today = new Date().toISOString().split("T")[0];
+  if (quotaState.date !== today) {
+    quotaState.count = 0;
+    quotaState.date = today;
   }
+  quotaState.count++;
+  if (quotaState.count >= QUOTA_BLOCK) {
+    throw new Error(`DataLab 일일 호출 한도에 근접했습니다. (${quotaState.count}/${DAILY_QUOTA})`);
+  }
+  if (quotaState.count >= QUOTA_WARN) {
+    console.warn(`[datalab-quota] WARNING: ${quotaState.count}/${DAILY_QUOTA} calls used today`);
+  }
+}
 
-  return {
-    "Content-Type": "application/json",
-    "X-Naver-Client-Id": clientId,
-    "X-Naver-Client-Secret": clientSecret,
-  };
+/** Get current daily quota usage */
+export function getDatalabQuotaUsage() {
+  const today = new Date().toISOString().split("T")[0];
+  if (quotaState.date !== today) return { count: 0, limit: DAILY_QUOTA };
+  return { count: quotaState.count, limit: DAILY_QUOTA };
 }
 
 async function postDatalab<T>(path: string, body: unknown): Promise<T> {
+  // Quota check runs once per call (outside withRetry callback)
+  checkAndIncrementQuota();
   const url = `${BASE_URL}${path}`;
   return withRetry(async () => {
     const response = await fetch(url, {
       method: "POST",
-      headers: getAuthHeaders(),
+      headers: getNaverAuthHeaders(),
       body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -212,4 +233,141 @@ export async function getShoppingKeywordTrend(
     "/shopping/category/keywords",
     body
   );
+}
+
+// ---------------------------------------------------------------------------
+// Shopping Insight Demographics (device / gender / age)
+// ---------------------------------------------------------------------------
+
+export interface ShoppingDemoDataPoint {
+  period: string;
+  group: string;
+  ratio: number;
+}
+
+export interface ShoppingDemoResponse {
+  results: Array<{
+    title: string;
+    data: ShoppingDemoDataPoint[];
+  }>;
+}
+
+interface ShoppingDemoParams {
+  startDate: string;
+  endDate: string;
+  timeUnit: string;
+  category: string;
+  keyword?: string;
+}
+
+/**
+ * Fetch shopping category device-split trend.
+ * - Category-level: POST /shopping/category/device  (category as string)
+ * - Keyword-level:  POST /shopping/category/keyword/device  (+ keyword string)
+ */
+export async function getShoppingDeviceTrend(
+  params: ShoppingDemoParams
+): Promise<ShoppingDemoResponse> {
+  const body: Record<string, unknown> = {
+    startDate: params.startDate,
+    endDate: params.endDate,
+    timeUnit: params.timeUnit,
+    category: params.category,
+  };
+  if (params.keyword) {
+    body.keyword = params.keyword;
+    return postDatalab<ShoppingDemoResponse>("/shopping/category/keyword/device", body);
+  }
+  return postDatalab<ShoppingDemoResponse>("/shopping/category/device", body);
+}
+
+/**
+ * Fetch shopping category gender-split trend.
+ * - Category-level: POST /shopping/category/gender  (category as string)
+ * - Keyword-level:  POST /shopping/category/keyword/gender  (+ keyword string)
+ */
+export async function getShoppingGenderTrend(
+  params: ShoppingDemoParams
+): Promise<ShoppingDemoResponse> {
+  const body: Record<string, unknown> = {
+    startDate: params.startDate,
+    endDate: params.endDate,
+    timeUnit: params.timeUnit,
+    category: params.category,
+  };
+  if (params.keyword) {
+    body.keyword = params.keyword;
+    return postDatalab<ShoppingDemoResponse>("/shopping/category/keyword/gender", body);
+  }
+  return postDatalab<ShoppingDemoResponse>("/shopping/category/gender", body);
+}
+
+/**
+ * Fetch shopping category age-split trend.
+ * - Category-level: POST /shopping/category/age  (category as string)
+ * - Keyword-level:  POST /shopping/category/keyword/age  (+ keyword string)
+ */
+export async function getShoppingAgeTrend(
+  params: ShoppingDemoParams
+): Promise<ShoppingDemoResponse> {
+  const body: Record<string, unknown> = {
+    startDate: params.startDate,
+    endDate: params.endDate,
+    timeUnit: params.timeUnit,
+    category: params.category,
+  };
+  if (params.keyword) {
+    body.keyword = params.keyword;
+    return postDatalab<ShoppingDemoResponse>("/shopping/category/keyword/age", body);
+  }
+  return postDatalab<ShoppingDemoResponse>("/shopping/category/age", body);
+}
+
+// ---------------------------------------------------------------------------
+// Batch search trend — 5 keywords per API call (80% quota savings)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch search trends for multiple keywords in batches of 5.
+ * DataLab API supports up to 5 keywordGroups per request.
+ * Each batch returns relative ratios within that batch.
+ *
+ * @returns Map of keyword → TrendDataPoint[]
+ */
+export async function getSearchTrendBatch(
+  keywords: string[],
+  params: { startDate: string; endDate: string; timeUnit: "date" | "week" | "month" }
+): Promise<Map<string, TrendDataPoint[]>> {
+  const result = new Map<string, TrendDataPoint[]>();
+  const MAX_PER_BATCH = 5;
+
+  // Build all batch requests
+  const batches: string[][] = [];
+  for (let i = 0; i < keywords.length; i += MAX_PER_BATCH) {
+    batches.push(keywords.slice(i, i + MAX_PER_BATCH));
+  }
+
+  // Fire all batches in parallel (DataLab can handle concurrent requests within quota)
+  const responses = await Promise.all(
+    batches.map((batch) => {
+      const keywordGroups = batch.map((kw) => ({
+        groupName: kw,
+        keywords: [kw],
+      }));
+      return postDatalab<SearchTrendResponse>("/search", {
+        startDate: params.startDate,
+        endDate: params.endDate,
+        timeUnit: params.timeUnit,
+        keywordGroups,
+      });
+    })
+  );
+
+  for (const response of responses) {
+    for (const r of response.results) {
+      result.set(r.title, r.data);
+    }
+  }
+
+  return result;
 }

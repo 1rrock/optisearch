@@ -42,9 +42,8 @@ export async function GET(request: Request) {
     const result = await fetchNewKeywords(days, dateParam);
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    console.error("[new-keywords] error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/keywords/new] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }
 

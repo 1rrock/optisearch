@@ -42,16 +42,7 @@ interface AnalyzeResponse {
 // Inline fetch function (W4에서 feature hook으로 이전 예정)
 // ---------------------------------------------------------------------------
 
-class UsageLimitError extends Error {
-  used: number;
-  limit: number;
-  constructor(message: string, used: number, limit: number) {
-    super(message);
-    this.name = "UsageLimitError";
-    this.used = used;
-    this.limit = limit;
-  }
-}
+import { UsageLimitError, parseUsageLimitError } from "@/shared/lib/errors";
 
 async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
   const res = await fetch("/api/analyze", {
@@ -62,12 +53,8 @@ async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
 
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    if (res.status === 429 && data.code === "USAGE_LIMIT_EXCEEDED") {
-      const match = /\((\d+)\/(\d+)\)/.exec(data.error ?? "");
-      const used = match ? parseInt(match[1], 10) : 0;
-      const limit = match ? parseInt(match[2], 10) : 0;
-      throw new UsageLimitError(data.error ?? "일일 사용 한도를 초과했습니다.", used, limit);
-    }
+    const limitErr = parseUsageLimitError(res.status, data);
+    if (limitErr) throw limitErr;
     throw new Error(data.error ?? `분석 실패 (${res.status})`);
   }
 

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight } from "lucide-react";
-import { useRouter } from "next/navigation";
+
 import { PageHeader } from "@/shared/ui/page-header";
 
 // ---------------------------------------------------------------------------
@@ -85,7 +85,6 @@ function KeywordCard({
   onDelete: (keyword: string) => void;
   onMemoSave: (keyword: string, memo: string) => void;
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [memoValue, setMemoValue] = useState(item.memo ?? "");
 
@@ -265,7 +264,11 @@ export default function KeywordsPage() {
             <KeywordCard
               key={item.id}
               item={item}
-              onDelete={(keyword) => deleteMutation.mutate(keyword)}
+              onDelete={(keyword) => {
+                if (window.confirm(`"${keyword}" 키워드를 삭제하시겠습니까?`)) {
+                  deleteMutation.mutate(keyword);
+                }
+              }}
               onMemoSave={(keyword, memo) => memoMutation.mutate({ keyword, memo })}
             />
           ))}

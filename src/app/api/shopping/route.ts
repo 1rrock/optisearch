@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getShoppingTrend, getShoppingKeywordTrend } from "@/shared/lib/naver-datalab";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { PLAN_LIMITS } from "@/shared/config/constants";
+import { cached } from "@/services/cache-service";
 
 const bodySchema = z.object({
   category: z.string().min(1),
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     startDate.setMonth(startDate.getMonth() - months);
     const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
-    const params: any = {
+    const baseParams = {
       startDate: formatDate(startDate),
       endDate: formatDate(endDate),
       timeUnit: "month",
@@ -57,18 +58,22 @@ export async function POST(request: Request) {
       ages,
     };
 
+    const SHOPPING_TTL = 6 * 60 * 60 * 1000; // 6시간
+
     if (keyword) {
-      params.keyword = keyword;
-      const result = await getShoppingKeywordTrend(params);
+      const keywordParams = { ...baseParams, keyword };
+      const cacheKey = `shop:kw:${category}:${keyword}:${months}:${device ?? ""}:${gender ?? ""}`;
+      const result = await cached(cacheKey, SHOPPING_TTL, () => getShoppingKeywordTrend(keywordParams));
       await recordUsage(user.userId, "search", keyword);
       return Response.json(result);
     } else {
-      const result = await getShoppingTrend(params);
+      const cacheKey = `shop:cat:${category}:${months}:${device ?? ""}:${gender ?? ""}`;
+      const result = await cached(cacheKey, SHOPPING_TTL, () => getShoppingTrend(baseParams));
       await recordUsage(user.userId, "search", category);
       return Response.json(result);
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/shopping] Error:", err);
+    return Response.json({ error: "쇼핑 트렌드 조회 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

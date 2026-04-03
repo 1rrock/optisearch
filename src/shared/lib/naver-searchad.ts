@@ -129,32 +129,37 @@ export async function getKeywordStats(
   keywords: string[]
 ): Promise<NaverKeywordStat[]> {
   const MAX_PER_BATCH = 5;
-  const results: NaverKeywordStat[] = [];
 
+  // Build all batch requests
+  const batches: string[][] = [];
   for (let i = 0; i < keywords.length; i += MAX_PER_BATCH) {
-    const batch = keywords.slice(i, i + MAX_PER_BATCH);
-    // Signature is computed over the URI path only (no query string)
-    const signaturePath = "/keywordstool";
-    const queryString = `?hintKeywords=${encodeURIComponent(batch.join(","))}&showDetail=1`;
-
-    const data = await withRetry(async () => {
-      const response = await fetch(
-        `${BASE_URL}${signaturePath}${queryString}`,
-        { method: "GET", headers: buildHeaders("GET", signaturePath) }
-      );
-      if (!response.ok) {
-        const err = new Error(
-          `Naver SearchAd API error: ${response.status} ${response.statusText}`
-        ) as Error & { status: number };
-        err.status = response.status;
-        throw err;
-      }
-      return response.json() as Promise<KeywordToolResponse>;
-    });
-    results.push(...data.keywordList.map(normalise));
+    batches.push(keywords.slice(i, i + MAX_PER_BATCH));
   }
 
-  return results;
+  // Fire all batches in parallel (SearchAd: ~20-30 req/s, no daily limit)
+  const batchResults = await Promise.all(
+    batches.map((batch) => {
+      const signaturePath = "/keywordstool";
+      const queryString = `?hintKeywords=${encodeURIComponent(batch.join(","))}&showDetail=1`;
+
+      return withRetry(async () => {
+        const response = await fetch(
+          `${BASE_URL}${signaturePath}${queryString}`,
+          { method: "GET", headers: buildHeaders("GET", signaturePath) }
+        );
+        if (!response.ok) {
+          const err = new Error(
+            `Naver SearchAd API error: ${response.status} ${response.statusText}`
+          ) as Error & { status: number };
+          err.status = response.status;
+          throw err;
+        }
+        return response.json() as Promise<KeywordToolResponse>;
+      });
+    })
+  );
+
+  return batchResults.flatMap((data) => data.keywordList.map(normalise));
 }
 
 /**
@@ -184,4 +189,172 @@ export async function getRelatedKeywords(
     return response.json() as Promise<KeywordToolResponse>;
   });
   return data.keywordList.map(normalise);
+}
+
+// ---------------------------------------------------------------------------
+// Estimate API — CPC / bid data
+// ---------------------------------------------------------------------------
+
+/** Result from POST /estimate/performance */
+export interface EstimatePerformanceResult {
+  keyword: string;
+  bid: number;
+  impressions: number;
+  clicks: number;
+  cost: number;
+  avgCpc: number;
+}
+
+/** Result from GET /estimate/average-position-bid/keyword */
+export interface AveragePositionBid {
+  keyword: string;
+  position: number;
+  bid: number;
+}
+
+/** Result from GET /estimate/exposure-minimum-bid/keyword */
+export interface ExposureMinimumBid {
+  keyword: string;
+  bid: number;
+}
+
+/**
+ * Fetch estimated ad performance (impressions, clicks, CPC) for a keyword.
+ *
+ * @param keyword - Target keyword
+ * @param device  - Device type: PC | MOBILE
+ * @param bid     - Optional bid amount. If omitted, uses 500 KRW default.
+ */
+export async function getEstimatePerformance(
+  keyword: string,
+  device: "PC" | "MOBILE" = "PC",
+  bid: number = 500
+): Promise<EstimatePerformanceResult | null> {
+  const signaturePath = "/estimate/performance";
+  const body = {
+    device,
+    keywordplus: false,
+    key: keyword,
+    bids: [bid],
+  };
+
+  try {
+    const data = await withRetry(async () => {
+      const response = await fetch(`${BASE_URL}${signaturePath}`, {
+        method: "POST",
+        headers: buildHeaders("POST", signaturePath),
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        const err = new Error(
+          `SearchAd Estimate API error: ${response.status}`
+        ) as Error & { status: number };
+        err.status = response.status;
+        throw err;
+      }
+      return response.json();
+    });
+
+    // API returns an estimate object or array
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const estimate = Array.isArray(data) ? data[0] : data;
+    if (!estimate) return null;
+
+    return {
+      keyword,
+      bid: estimate.bid ?? bid,
+      impressions: estimate.impressions ?? 0,
+      clicks: estimate.clicks ?? 0,
+      cost: estimate.cost ?? 0,
+      avgCpc: estimate.clicks > 0
+        ? Math.round((estimate.cost ?? 0) / estimate.clicks)
+        : 0,
+    };
+  } catch (err) {
+    console.warn(`[searchad] Estimate performance failed for "${keyword}":`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * Fetch the minimum bid required for ad exposure.
+ *
+ * @param keyword - Target keyword
+ */
+export async function getExposureMinimumBid(
+  keyword: string
+): Promise<ExposureMinimumBid | null> {
+  const signaturePath = "/estimate/exposure-minimum-bid/keyword";
+  const queryString = `?keyword=${encodeURIComponent(keyword)}`;
+
+  try {
+    const data = await withRetry(async () => {
+      const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
+        method: "GET",
+        headers: buildHeaders("GET", signaturePath),
+      });
+      if (!response.ok) {
+        const err = new Error(
+          `SearchAd MinBid API error: ${response.status}`
+        ) as Error & { status: number };
+        err.status = response.status;
+        throw err;
+      }
+      return response.json();
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = Array.isArray(data) ? data[0] : data;
+    if (!result) return null;
+
+    return {
+      keyword,
+      bid: result.bid ?? 0,
+    };
+  } catch (err) {
+    console.warn(`[searchad] MinBid failed for "${keyword}":`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
+ * Fetch average position bids for a keyword (positions 1-5).
+ *
+ * @param keyword - Target keyword
+ */
+export async function getAveragePositionBid(
+  keyword: string
+): Promise<AveragePositionBid[]> {
+  const signaturePath = "/estimate/average-position-bid/keyword";
+  const queryString = `?keyword=${encodeURIComponent(keyword)}`;
+
+  try {
+    const data = await withRetry(async () => {
+      const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
+        method: "GET",
+        headers: buildHeaders("GET", signaturePath),
+      });
+      if (!response.ok) {
+        const err = new Error(
+          `SearchAd PositionBid API error: ${response.status}`
+        ) as Error & { status: number };
+        err.status = response.status;
+        throw err;
+      }
+      return response.json();
+    });
+
+    // API returns array of position-bid pairs
+    if (!Array.isArray(data)) return [];
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return data.map((item: any) => ({
+      keyword,
+      position: item.position ?? 0,
+      bid: item.bid ?? 0,
+    }));
+  } catch (err) {
+    console.warn(`[searchad] PositionBid failed for "${keyword}":`, err instanceof Error ? err.message : err);
+    return [];
+  }
 }

@@ -1,3 +1,4 @@
+import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { processRecurringBilling } from "@/services/subscription-service";
 
@@ -5,10 +6,17 @@ import { processRecurringBilling } from "@/services/subscription-service";
  * Vercel Cron job — runs daily to process recurring billing.
  * Configure in vercel.json: { "crons": [{ "path": "/api/cron/billing", "schedule": "0 9 * * *" }] }
  */
+/** Timing-safe string comparison to prevent timing attacks on secrets */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return _tse(Buffer.from(a), Buffer.from(b));
+}
+
 export async function GET(request: Request) {
   // Verify cron secret (Vercel sets CRON_SECRET)
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cronSecret = process.env.CRON_SECRET;
+  const authHeader = request.headers.get("authorization") ?? "";
+  if (!cronSecret || !safeEqual(authHeader, `Bearer ${cronSecret}`)) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

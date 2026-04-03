@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { analyzeKeyword, getRelatedKeywords } from "@/services/keyword-service";
-import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
+import { checkAdult, correctTypo, searchNews, searchWeb, searchEncyclopedia } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { saveSearchHistory } from "@/services/history-service";
 
@@ -50,18 +50,33 @@ export async function POST(request: Request) {
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
     const effectiveKeyword = correctedKeyword ?? keyword;
 
-    const [analysis, relatedKeywords] = await Promise.all([
+    const [analysis, relatedKeywords, newsResult, webResult, encycResult] = await Promise.all([
       analyzeKeyword(effectiveKeyword),
       getRelatedKeywords(effectiveKeyword),
+      searchNews(effectiveKeyword, 5).catch(() => null),
+      searchWeb(effectiveKeyword, 3).catch(() => null),
+      searchEncyclopedia(effectiveKeyword, 3).catch(() => null),
     ]);
     await recordUsage(user.userId, "search", effectiveKeyword);
     // Save search history (non-blocking)
     saveSearchHistory(user.userId, analysis).catch((err) => {
       console.error("[analyze] saveSearchHistory failed:", err?.message ?? err);
     });
-    return Response.json({ analysis, relatedKeywords, correctedKeyword });
+
+    // Encyclopedia wall detection: if encyclopedia results exist, blog SEO is harder
+    const hasEncycWall = (encycResult?.total ?? 0) > 0;
+
+    return Response.json({
+      analysis,
+      relatedKeywords,
+      correctedKeyword,
+      news: newsResult ? { items: newsResult.items, total: newsResult.total } : null,
+      webDocuments: webResult ? { items: webResult.items, total: webResult.total } : null,
+      encyclopediaWall: hasEncycWall,
+      encyclopediaCount: encycResult?.total ?? 0,
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[api/analyze] Error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

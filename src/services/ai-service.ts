@@ -38,7 +38,14 @@ JSON 배열로 응답하세요:
   });
 
   const content = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(content);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    console.error("[ai-service] Failed to parse title response:", content.slice(0, 200));
+    throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
+  }
   const suggestions: AITitleSuggestion[] = parsed.titles ?? parsed.suggestions ?? (Array.isArray(parsed) ? parsed : []);
 
   return suggestions.slice(0, 5).map((s, i) => ({
@@ -88,7 +95,14 @@ JSON으로 응답하세요:
   });
 
   const content = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(content);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    console.error("[ai-service] Failed to parse draft response:", content.slice(0, 200));
+    throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
+  }
 
   return {
     keyword,
@@ -143,7 +157,14 @@ JSON으로 응답하세요:
   });
 
   const result = completion.choices[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(result);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let parsed: any;
+  try {
+    parsed = JSON.parse(result);
+  } catch {
+    console.error("[ai-service] Failed to parse score response:", result.slice(0, 200));
+    throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
+  }
 
   const subMetrics: AIContentSubMetrics = {
     keywordUsage: parsed.subMetrics?.keywordUsage ?? 0,

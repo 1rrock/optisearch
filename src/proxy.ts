@@ -1,4 +1,3 @@
-import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
@@ -16,9 +15,18 @@ function isPublicPath(pathname: string): boolean {
   return false
 }
 
-export default auth((req: NextRequest & { auth: unknown }) => {
-  // Dev bypass - skip auth redirect
-  if (process.env.DEV_AUTH_BYPASS === "true") {
+/**
+ * Proxy (formerly middleware) for auth redirect.
+ *
+ * Optimistic cookie check: verifies the auth session cookie exists.
+ * Actual auth validation happens in API route handlers via getAuthenticatedUser().
+ *
+ * Note: next-auth's auth() wrapper was for middleware convention.
+ * In proxy convention, we check the session cookie directly.
+ */
+export function proxy(req: NextRequest) {
+  // Dev bypass - skip auth redirect (production에서는 절대 활성화 금지)
+  if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production") {
     return NextResponse.next()
   }
 
@@ -28,26 +36,21 @@ export default auth((req: NextRequest & { auth: unknown }) => {
     return NextResponse.next()
   }
 
-  // `req.auth` is injected by the `auth` wrapper; null means unauthenticated.
-  if (!req.auth) {
+  // Optimistic auth check: look for the session cookie
+  // next-auth v5 uses "authjs.session-token" (secure) or "__Secure-authjs.session-token"
+  const hasSessionCookie =
+    req.cookies.has("authjs.session-token") ||
+    req.cookies.has("__Secure-authjs.session-token")
+
+  if (!hasSessionCookie) {
     const loginUrl = new URL("/login", req.nextUrl.origin)
-    // Preserve the originally-requested URL so /login can redirect back after
-    // a successful sign-in.
     loginUrl.searchParams.set("callbackUrl", req.nextUrl.href)
     return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
-  /*
-   * Apply middleware to every route EXCEPT:
-   *   - Next.js internals (_next/static, _next/image)
-   *   - The public /favicon.ico
-   *
-   * Auth-specific public paths (/login, /api/auth/*) are handled inside the
-   * middleware function itself so we can keep the matcher simple.
-   */
   matcher: ["/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|css|js)$).*)"],
 }
