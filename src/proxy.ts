@@ -32,6 +32,16 @@ export function proxy(req: NextRequest) {
 
   const { pathname } = req.nextUrl
 
+  // 로그인 상태에서 /login 접근 시 dashboard로 리다이렉트
+  if (pathname === "/login") {
+    const hasSessionCookie =
+      req.cookies.has("authjs.session-token") ||
+      req.cookies.has("__Secure-authjs.session-token")
+    if (hasSessionCookie) {
+      return NextResponse.redirect(new URL("/dashboard", req.nextUrl.origin))
+    }
+  }
+
   if (isPublicPath(pathname)) {
     return NextResponse.next()
   }
