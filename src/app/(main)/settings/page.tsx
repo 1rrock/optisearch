@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/sha
 import { Button } from "@/shared/ui/button";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { CreditCard, User, ShieldAlert, Search, Flame, Zap, Star } from "lucide-react";
+import { toast } from "sonner";
 
 type Section = "profile" | "subscription" | "danger";
 
@@ -170,7 +171,7 @@ export default function SettingsPage() {
                   </div>
                   <Button
                     className="w-fit rounded-xl font-bold"
-                    onClick={() => alert("변경사항이 저장되었습니다.")}
+                    onClick={() => toast.success("변경사항이 저장되었습니다.")}
                   >
                     변경사항 저장
                   </Button>
@@ -260,7 +261,7 @@ export default function SettingsPage() {
                 <Button
                   variant="destructive"
                   className="rounded-xl font-bold bg-rose-500 hover:bg-rose-600"
-                  onClick={() => alert("회원 탈퇴 기능은 준비 중입니다.")}
+                  onClick={() => toast.info("회원 탈퇴 기능은 준비 중입니다.")}
                 >
                   회원 탈퇴
                 </Button>

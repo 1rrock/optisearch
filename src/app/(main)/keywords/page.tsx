@@ -1,10 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight } from "lucide-react";
+import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight, ArrowRightLeft, Database } from "lucide-react";
 
 import { PageHeader } from "@/shared/ui/page-header";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/shared/ui/alert-dialog";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -80,10 +90,14 @@ function KeywordCard({
   item,
   onDelete,
   onMemoSave,
+  isSelected,
+  onToggleSelect,
 }: {
   item: SavedKeyword;
   onDelete: (keyword: string) => void;
   onMemoSave: (keyword: string, memo: string) => void;
+  isSelected: boolean;
+  onToggleSelect: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [memoValue, setMemoValue] = useState(item.memo ?? "");
@@ -113,6 +127,12 @@ function KeywordCard({
       {/* Header row */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            className="size-4 rounded border-muted-foreground/30 text-primary focus:ring-primary/30 shrink-0 cursor-pointer"
+          />
           <Bookmark className="size-4 text-primary shrink-0" />
           <span className="font-bold text-foreground truncate">{item.keyword}</span>
         </div>
@@ -192,6 +212,11 @@ function KeywordCard({
 export default function KeywordsPage() {
   const queryClient = useQueryClient();
 
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
   const { data, isLoading, isError, error } = useQuery<SavedKeywordsResponse>({
     queryKey: ["savedKeywords"],
     queryFn: fetchSavedKeywords,
@@ -214,6 +239,18 @@ export default function KeywordsPage() {
 
   const keywords = data?.keywords ?? [];
 
+  const filteredKeywords = useMemo(() => {
+    let list = keywords;
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(k => k.keyword.toLowerCase().includes(q));
+    }
+    return [...list].sort((a, b) => {
+      if (sortBy === "name") return a.keyword.localeCompare(b.keyword, "ko");
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+  }, [keywords, searchQuery, sortBy]);
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -228,6 +265,65 @@ export default function KeywordsPage() {
           ) : undefined
         }
       />
+
+      {/* Toolbar */}
+      {!isLoading && keywords.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-muted/20 rounded-2xl border border-muted/30 p-4">
+          {/* Search */}
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              className="w-full pl-9 pr-4 py-2 text-sm bg-card border border-muted/50 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+              placeholder="키워드 검색..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sort buttons */}
+            <div className="flex items-center gap-1 bg-card border border-muted/50 rounded-lg p-1">
+              <button
+                onClick={() => setSortBy("date")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${sortBy === "date" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                최신순
+              </button>
+              <button
+                onClick={() => setSortBy("name")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${sortBy === "name" ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                이름순
+              </button>
+            </div>
+            {/* Bulk actions */}
+            {selected.size > 0 && (
+              <>
+                <span className="text-xs font-semibold text-muted-foreground">
+                  {selected.size}개 선택
+                </span>
+                <a
+                  href={`/compare?keywords=${Array.from(selected).map(k => encodeURIComponent(k)).join(",")}`}
+                  className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl transition-colors ${
+                    selected.size >= 2
+                      ? "bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 hover:bg-violet-200 dark:hover:bg-violet-950/50"
+                      : "bg-muted/50 text-muted-foreground cursor-not-allowed pointer-events-none"
+                  }`}
+                >
+                  <ArrowRightLeft className="size-3.5" />
+                  비교하기 {selected.size < 2 && "(2개 이상)"}
+                </a>
+                <a
+                  href={`/bulk?keywords=${Array.from(selected).map(k => encodeURIComponent(k)).join(",")}`}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-blue-100 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 rounded-xl hover:bg-blue-200 dark:hover:bg-blue-950/50 transition-colors"
+                >
+                  <Database className="size-3.5" />
+                  대량 분석
+                </a>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Loading */}
       {isLoading && (
@@ -260,20 +356,48 @@ export default function KeywordsPage() {
       {/* Keyword grid */}
       {!isLoading && keywords.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {keywords.map((item) => (
+          {filteredKeywords.map((item) => (
             <KeywordCard
               key={item.id}
               item={item}
-              onDelete={(keyword) => {
-                if (window.confirm(`"${keyword}" 키워드를 삭제하시겠습니까?`)) {
-                  deleteMutation.mutate(keyword);
-                }
+              isSelected={selected.has(item.keyword)}
+              onToggleSelect={() => {
+                setSelected(prev => {
+                  const next = new Set(prev);
+                  if (next.has(item.keyword)) next.delete(item.keyword);
+                  else next.add(item.keyword);
+                  return next;
+                });
               }}
+              onDelete={(keyword) => setDeleteTarget(keyword)}
               onMemoSave={(keyword, memo) => memoMutation.mutate({ keyword, memo })}
             />
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>키워드 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              &ldquo;{deleteTarget}&rdquo; 키워드를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleteTarget) deleteMutation.mutate(deleteTarget);
+                setDeleteTarget(null);
+              }}
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

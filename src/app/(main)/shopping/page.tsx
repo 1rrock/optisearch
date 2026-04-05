@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ShoppingBag, Search, Loader2, AlertCircle, TrendingUp } from "lucide-react";
+import { ShoppingBag, Search, Loader2, AlertCircle, TrendingUp, ChevronDown } from "lucide-react";
+import { PageHeader } from "@/shared/ui/page-header";
+import { Popover, PopoverTrigger, PopoverContent } from "@/shared/ui/popover";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -29,6 +31,29 @@ interface SearchParams {
   device?: "pc" | "mo";
   gender?: "m" | "f";
 }
+
+// ---------------------------------------------------------------------------
+// Category Presets
+// ---------------------------------------------------------------------------
+
+const CATEGORY_PRESETS = [
+  { code: "50000000", label: "패션의류" },
+  { code: "50000001", label: "패션잡화" },
+  { code: "50000002", label: "화장품/미용" },
+  { code: "50000003", label: "디지털/가전" },
+  { code: "50000004", label: "가구/인테리어" },
+  { code: "50000005", label: "출산/육아" },
+  { code: "50000006", label: "식품" },
+  { code: "50000007", label: "스포츠/레저" },
+  { code: "50000008", label: "생활/건강" },
+  { code: "50000009", label: "여가/생활편의" },
+  { code: "50000010", label: "면세점" },
+  { code: "50000803", label: "도서" },
+  { code: "50000804", label: "티켓/쿠폰" },
+  { code: "50000805", label: "반려동물" },
+  { code: "50000806", label: "자동차용품" },
+  { code: "50005542", label: "키즈패션" },
+];
 
 // ---------------------------------------------------------------------------
 // API
@@ -220,6 +245,8 @@ export default function ShoppingInsightPage() {
   const [months, setMonths] = useState(12);
   const [device, setDevice] = useState<"" | "pc" | "mo">("");
   const [gender, setGender] = useState<"" | "m" | "f">("");
+  const [categoryOpen, setCategoryOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
 
   const { mutate, data, isPending, error, isIdle } = useMutation({
     mutationFn: fetchShopping,
@@ -234,16 +261,22 @@ export default function ShoppingInsightPage() {
     mutate(params);
   }
 
+  const filteredCategories = CATEGORY_PRESETS.filter(c =>
+    c.label.toLowerCase().includes(categorySearch.toLowerCase()) ||
+    c.code.includes(categorySearch)
+  );
+
   const chartData = data?.results?.[0]?.data ?? [];
   const resultTitle = data?.results?.[0]?.title;
 
   return (
     <div className="flex flex-col gap-8">
       {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">쇼핑 키워드 인사이트</h2>
-        <p className="text-muted-foreground">네이버 쇼핑 카테고리별 검색 트렌드를 파악하세요.</p>
-      </div>
+      <PageHeader
+        icon={<ShoppingBag className="size-8 text-primary" />}
+        title="쇼핑 키워드 인사이트"
+        description="네이버 쇼핑 카테고리별 검색 트렌드를 파악하세요."
+      />
 
       {/* Search Form */}
       <div className="bg-card border border-muted/50 rounded-2xl p-6 space-y-5 shadow-sm">
@@ -251,16 +284,73 @@ export default function ShoppingInsightPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-foreground/80">
-              카테고리 코드 <span className="text-destructive">*</span>
+              카테고리 <span className="text-destructive">*</span>
             </label>
-            <input
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-              placeholder="예: 50000000"
-              className="px-4 py-2.5 bg-background border border-muted/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
+            <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  className="w-full px-4 py-2.5 bg-popover border border-border rounded-xl text-sm text-left flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <span className={category ? "text-foreground" : "text-muted-foreground"}>
+                    {category
+                      ? CATEGORY_PRESETS.find(c => c.code === category)?.label
+                        ? `${CATEGORY_PRESETS.find(c => c.code === category)!.label} (${category})`
+                        : category
+                      : "카테고리 선택 또는 코드 입력"
+                    }
+                  </span>
+                  <ChevronDown className={`size-4 text-muted-foreground transition-transform ${categoryOpen ? "rotate-180" : ""}`} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="p-0 rounded-xl" style={{ width: "var(--radix-popover-trigger-width)" }}>
+                <div className="p-2 border-b border-muted/30">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    placeholder="카테고리명 또는 코드 검색..."
+                    className="w-full px-3 py-2 text-sm bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto p-1">
+                  {filteredCategories.map(c => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        category === c.code
+                          ? "bg-primary/10 text-primary font-semibold"
+                          : "hover:bg-accent"
+                      }`}
+                      onClick={() => {
+                        setCategory(c.code);
+                        setCategoryOpen(false);
+                        setCategorySearch("");
+                      }}
+                    >
+                      <span className="font-medium">{c.label}</span>
+                      <span className="text-muted-foreground ml-2 text-xs">{c.code}</span>
+                    </button>
+                  ))}
+                  {filteredCategories.length === 0 && categorySearch.trim() && (
+                    <button
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-accent"
+                      onClick={() => {
+                        setCategory(categorySearch.trim());
+                        setCategoryOpen(false);
+                        setCategorySearch("");
+                      }}
+                    >
+                      <span className="text-muted-foreground">직접 입력: </span>
+                      <span className="font-medium">{categorySearch.trim()}</span>
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-semibold text-foreground/80">
@@ -351,9 +441,9 @@ export default function ShoppingInsightPage() {
             <ShoppingBag className="size-8 text-muted-foreground/40" />
           </div>
           <div>
-            <p className="font-semibold text-foreground/70">카테고리 코드를 입력하세요</p>
+            <p className="font-semibold text-foreground/70">카테고리를 선택하세요</p>
             <p className="text-sm text-muted-foreground mt-1">
-              네이버 쇼핑 카테고리 코드와 기간을 선택한 뒤 조회하면 트렌드 차트가 표시됩니다.
+              네이버 쇼핑 카테고리를 선택한 뒤 기간과 필터를 설정하고 조회하세요.
             </p>
           </div>
         </div>

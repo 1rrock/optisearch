@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, X, ArrowRightLeft, Search, AlertCircle, BarChart2 } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Plus, X, ArrowRightLeft, Search, AlertCircle, BarChart2, Bookmark } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
+import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,16 +61,6 @@ const SATURATION_COLORS: Record<string, string> = {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
-}
-
-function competitionBadgeClass(competition: string): string {
-  if (competition === "낮음") return "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400";
-  if (competition === "높음") return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
-  return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
-}
 
 async function fetchKeyword(keyword: string): Promise<KeywordSearchResult> {
   const res = await fetch("/api/keywords", {
@@ -146,29 +138,30 @@ function VolumeBar({
 // ---------------------------------------------------------------------------
 
 export default function KeywordComparePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24 text-muted-foreground">로딩 중...</div>}>
+      <KeywordComparePageInner />
+    </Suspense>
+  );
+}
+
+function KeywordComparePageInner() {
+  const searchParams = useSearchParams();
   const [inputs, setInputs] = useState<string[]>(["", ""]);
   const [results, setResults] = useState<KeywordResult[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [savedKeywords, setSavedKeywords] = useState<Array<{ keyword: string }>>([]);
+  const [activePopover, setActivePopover] = useState<number | null>(null);
 
-  function addInput() {
-    if (inputs.length < MAX_KEYWORDS) {
-      setInputs((prev) => [...prev, ""]);
-    }
-  }
+  useEffect(() => {
+    fetch("/api/keywords/saved")
+      .then(res => res.ok ? res.json() : { keywords: [] })
+      .then(data => setSavedKeywords(data.keywords ?? []))
+      .catch(() => {});
+  }, []);
 
-  function removeInput(index: number) {
-    if (inputs.length <= MIN_KEYWORDS) return;
-    setInputs((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function updateInput(index: number, value: string) {
-    setInputs((prev) => prev.map((v, i) => (i === index ? value : v)));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const keywords = inputs.map((k) => k.trim()).filter(Boolean);
+  async function runComparison(keywords: string[]) {
     if (keywords.length < 1) return;
 
     setIsLoading(true);
@@ -190,6 +183,40 @@ export default function KeywordComparePage() {
 
     setResults(mapped);
     setIsLoading(false);
+  }
+
+  useEffect(() => {
+    const param = searchParams.get("keywords");
+    if (!param) return;
+    const keywords = param
+      .split(",")
+      .map((k) => decodeURIComponent(k.trim()))
+      .filter(Boolean);
+    if (keywords.length < 1) return;
+    setInputs(keywords.length >= MIN_KEYWORDS ? keywords : [...keywords, ...Array(MIN_KEYWORDS - keywords.length).fill("")]);
+    runComparison(keywords);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function addInput() {
+    if (inputs.length < MAX_KEYWORDS) {
+      setInputs((prev) => [...prev, ""]);
+    }
+  }
+
+  function removeInput(index: number) {
+    if (inputs.length <= MIN_KEYWORDS) return;
+    setInputs((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function updateInput(index: number, value: string) {
+    setInputs((prev) => prev.map((v, i) => (i === index ? value : v)));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const keywords = inputs.map((k) => k.trim()).filter(Boolean);
+    await runComparison(keywords);
   }
 
   const loadedResults = results?.filter((r) => r.data !== null) ?? [];
@@ -248,6 +275,9 @@ export default function KeywordComparePage() {
 
       {/* Input Form */}
       <section>
+        {activePopover !== null && (
+          <div className="fixed inset-0 z-40" onClick={() => setActivePopover(null)} />
+        )}
         <form onSubmit={handleSubmit}>
           <div className="bg-card rounded-2xl shadow-sm border border-muted/50 p-6 md:p-8 space-y-6">
             <p className="text-sm font-semibold text-muted-foreground">
@@ -272,6 +302,36 @@ export default function KeywordComparePage() {
                       placeholder={`키워드 ${index + 1}`}
                       className="w-full pl-9 pr-4 py-3 bg-background border border-muted/60 rounded-xl text-sm font-medium placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
                     />
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setActivePopover(activePopover === index ? null : index)}
+                      className="size-9 flex items-center justify-center rounded-full text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+                      title="저장된 키워드에서 선택"
+                    >
+                      <Bookmark className="size-4" />
+                    </button>
+                    {activePopover === index && savedKeywords.length > 0 && (
+                      <div className="absolute top-full right-0 mt-1 w-56 max-h-60 overflow-y-auto bg-card border border-muted/50 rounded-xl shadow-lg z-50">
+                        <div className="p-2">
+                          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-2 py-1.5">저장된 키워드</p>
+                          {savedKeywords.map(sk => (
+                            <button
+                              key={sk.keyword}
+                              type="button"
+                              className="w-full text-left px-3 py-2 text-sm font-medium rounded-lg hover:bg-muted/50 transition-colors truncate"
+                              onClick={() => {
+                                updateInput(index, sk.keyword);
+                                setActivePopover(null);
+                              }}
+                            >
+                              {sk.keyword}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   {inputs.length > MIN_KEYWORDS && (
                     <button

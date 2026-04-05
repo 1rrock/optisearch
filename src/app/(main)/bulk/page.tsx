@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Database,
   Upload,
   Download,
-  Save,
   Search,
   ArrowUpDown,
   Sparkles,
@@ -14,13 +14,16 @@ import {
   ChevronRight,
   Copy,
   Check,
+  ArrowRightLeft,
 } from "lucide-react";
 import { copyToClipboard, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { parseKeywordsFromFile, exportToExcel } from "@/shared/lib/excel";
 import { Button } from "@/shared/ui/button";
+import { SavedKeywordsPopover } from "@/shared/ui/saved-keywords-popover";
 import { PageHeader } from "@/shared/ui/page-header";
 import type { KeywordSearchResult, KeywordGrade } from "@/entities/keyword/model/types";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
+import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,26 +56,16 @@ function parseKeywords(raw: string): string[] {
   return result;
 }
 
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
-}
-
 function formatPct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
 
-function competitionBadgeClass(comp: string): string {
-  if (comp === "높음") return "bg-rose-100 text-rose-700";
-  if (comp === "중간") return "bg-amber-100 text-amber-700";
-  return "bg-emerald-100 text-emerald-700";
-}
-
 // ---------------------------------------------------------------------------
-// Page
+// Inner Page (uses useSearchParams)
 // ---------------------------------------------------------------------------
 
-export default function BulkAnalysisPage() {
-  const [tab, setTab] = useState<"text" | "csv">("text");
+function BulkAnalysisPageInner() {
+  const searchParams = useSearchParams();
   const [inputText, setInputText] = useState("");
   const [csvParsedCount, setCsvParsedCount] = useState<number | null>(null);
   const [results, setResults] = useState<KeywordSearchResult[]>([]);
@@ -85,9 +78,23 @@ export default function BulkAnalysisPage() {
   const [page, setPage] = useState(1);
   const [bulkTagsCopied, setBulkTagsCopied] = useState(false);
 
+  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const keywords = useMemo(() => parseKeywords(inputText), [inputText]);
+
+  // Populate from URL ?keywords=a,b,c
+  useEffect(() => {
+    const kw = searchParams.get("keywords");
+    if (kw) {
+      const kwList = kw.split(",").map(k => decodeURIComponent(k.trim())).filter(Boolean);
+      if (kwList.length > 0) {
+        setInputText(kwList.join("\n"));
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Sort + filter
   const filtered = useMemo(() => {
@@ -119,8 +126,8 @@ export default function BulkAnalysisPage() {
   }
 
   async function handleCopyAllTags() {
-    const keywords = results.map((r) => r.keyword);
-    const text = formatKeywordsAsTags(keywords);
+    const allKeywords = results.map((r) => r.keyword);
+    const text = formatKeywordsAsTags(allKeywords);
     const ok = await copyToClipboard(text);
     if (ok) {
       setBulkTagsCopied(true);
@@ -132,11 +139,10 @@ export default function BulkAnalysisPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const buffer = await file.arrayBuffer();
-    const keywords = parseKeywordsFromFile(buffer, file.name);
-    const limited = keywords.slice(0, 50);
+    const parsedKeywords = parseKeywordsFromFile(buffer, file.name);
+    const limited = parsedKeywords.slice(0, 50);
     setInputText(limited.join("\n"));
     setCsvParsedCount(limited.length);
-    setTab("text");
     // Reset so the same file can be re-selected
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -201,43 +207,53 @@ export default function BulkAnalysisPage() {
       />
 
       {/* 2. Input Section */}
-      <section className="bg-card rounded-2xl shadow-sm border border-muted/50 overflow-hidden mb-12">
-        <div className="flex border-b border-muted/30">
-          <button
-            onClick={() => setTab("text")}
-            className={`px-8 py-4 text-sm font-bold border-b-2 transition-colors ${
-              tab === "text"
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:bg-muted/30"
-            }`}
-          >
-            직접 입력
-          </button>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="px-8 py-4 text-sm font-semibold text-muted-foreground flex items-center gap-2 hover:bg-muted/30 transition-colors"
-          >
-            <Upload className="size-4" /> CSV 업로드
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-        </div>
-
-        <div className="p-8">
-          <div className="relative group">
-            <textarea
-              className="w-full h-48 p-6 bg-muted/20 rounded-xl border border-muted/50 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 text-foreground resize-none font-mono text-sm transition-all"
-              placeholder={`분석할 키워드를 줄바꿈(Enter)으로 구분하여 입력하세요 (최대 50개)\n예시:\n여름 원피스\n제주도 여행\n단백질 쉐이크`}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-            />
+      <section className="bg-card rounded-2xl shadow-sm border border-muted/50 overflow-hidden">
+        <div className="p-6 space-y-4">
+          {/* Action buttons row */}
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-bold text-foreground">키워드 입력</label>
+            <div className="flex items-center gap-2">
+              {/* CSV Upload button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-muted/60 bg-muted/20 text-muted-foreground hover:text-foreground hover:border-foreground/20 hover:bg-muted/40 transition-colors"
+              >
+                <Upload className="size-3.5" />
+                CSV 업로드
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              {/* Saved keywords popover */}
+              <SavedKeywordsPopover
+                mode="multi"
+                onAdd={(kws) => {
+                  setInputText(prev => {
+                    const existing = prev.trim();
+                    if (!existing) return kws.join("\n");
+                    return existing + "\n" + kws.join("\n");
+                  });
+                }}
+                triggerLabel="저장된 키워드"
+              />
+            </div>
           </div>
-          <div className="mt-6 flex items-center justify-between">
+
+          {/* Textarea - always visible */}
+          <textarea
+            className="w-full h-48 p-4 bg-muted/20 rounded-xl border border-muted/50 focus:border-primary/50 focus:ring-4 focus:ring-primary/10 text-foreground resize-none font-mono text-sm transition-all"
+            placeholder={`분석할 키워드를 줄바꿈(Enter)으로 구분하여 입력하세요 (최대 50개)\n예시:\n여름 원피스\n제주도 여행\n단백질 쉐이크`}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+          />
+
+          {/* Footer: count + analyze button */}
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg">
               <Info className="size-4 text-blue-500" />
               <span>현재 {keywords.length}개 / 최대 50개</span>
@@ -267,7 +283,7 @@ export default function BulkAnalysisPage() {
             </Button>
           </div>
           {error && (
-            <p className="mt-3 text-sm text-rose-500 font-medium">{error}</p>
+            <p className="text-sm text-rose-500 font-medium">{error}</p>
           )}
         </div>
       </section>
@@ -307,10 +323,17 @@ export default function BulkAnalysisPage() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" className="rounded-xl font-semibold text-muted-foreground hover:text-foreground opacity-50 cursor-not-allowed" disabled>
-                <Save className="size-4 mr-2" />
-                선택 저장 <span className="ml-1 text-[11px] font-normal">(준비 중)</span>
-              </Button>
+              <a
+                href={selectedRows.size >= 2 ? `/compare?keywords=${Array.from(selectedRows).slice(0, 5).map(k => encodeURIComponent(k)).join(",")}` : "#"}
+                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors ${
+                  selectedRows.size >= 2
+                    ? "bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-200"
+                    : "bg-muted/50 text-muted-foreground border-muted/50 cursor-not-allowed pointer-events-none"
+                }`}
+              >
+                <ArrowRightLeft className="size-4" />
+                선택 비교 {selectedRows.size > 0 ? `(${Math.min(selectedRows.size, 5)})` : ""}
+              </a>
               <Button
                 variant="outline"
                 className="rounded-xl font-semibold"
@@ -320,10 +343,17 @@ export default function BulkAnalysisPage() {
                 <Download className="size-4 mr-2" />
                 엑셀 다운로드
               </Button>
-              <Button variant="default" className="rounded-xl font-bold bg-purple-100 text-purple-700 hover:bg-purple-200 border-none shadow-none opacity-50 cursor-not-allowed" disabled>
-                <Sparkles className="size-4 mr-2" />
-                AI 딥다이브 분석 <span className="ml-1 text-[11px] font-normal">(준비 중)</span>
-              </Button>
+              <a
+                href={selectedRows.size >= 1 ? `/ai?keyword=${encodeURIComponent(Array.from(selectedRows)[0])}&tab=title` : "#"}
+                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-colors ${
+                  selectedRows.size >= 1
+                    ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 hover:bg-purple-200"
+                    : "bg-muted/50 text-muted-foreground cursor-not-allowed pointer-events-none"
+                }`}
+              >
+                <Sparkles className="size-4" />
+                AI 제목 추천 {selectedRows.size >= 1 ? `(${Array.from(selectedRows)[0]})` : ""}
+              </a>
             </div>
           </div>
 
@@ -333,6 +363,20 @@ export default function BulkAnalysisPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-muted/20 border-b border-muted/30 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <th className="p-4 w-12 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.size === paginated.length && paginated.length > 0}
+                        onChange={() => {
+                          if (selectedRows.size === paginated.length) {
+                            setSelectedRows(new Set());
+                          } else {
+                            setSelectedRows(new Set(paginated.map(r => r.keyword)));
+                          }
+                        }}
+                        className="size-4 rounded border-muted-foreground/30 text-primary focus:ring-primary/30"
+                      />
+                    </th>
                     <th className="p-4 w-16 text-center">#</th>
                     <th className="p-4 min-w-[150px]">키워드</th>
                     <th
@@ -369,6 +413,21 @@ export default function BulkAnalysisPage() {
                     const globalIdx = (page - 1) * PAGE_SIZE + idx + 1;
                     return (
                       <tr key={row.keyword} className="hover:bg-muted/20 transition-colors group cursor-pointer">
+                        <td className="p-4 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(row.keyword)}
+                            onChange={() => {
+                              setSelectedRows(prev => {
+                                const next = new Set(prev);
+                                if (next.has(row.keyword)) next.delete(row.keyword);
+                                else next.add(row.keyword);
+                                return next;
+                              });
+                            }}
+                            className="size-4 rounded border-muted-foreground/30 text-primary focus:ring-primary/30"
+                          />
+                        </td>
                         <td className="p-4 text-center text-sm font-mono text-muted-foreground/80">
                           {String(globalIdx).padStart(2, "0")}
                         </td>
@@ -463,5 +522,17 @@ export default function BulkAnalysisPage() {
       )}
 
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page (Suspense wrapper for useSearchParams)
+// ---------------------------------------------------------------------------
+
+export default function BulkAnalysisPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24 text-muted-foreground">로딩 중...</div>}>
+      <BulkAnalysisPageInner />
+    </Suspense>
   );
 }

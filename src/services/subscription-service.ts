@@ -1,5 +1,4 @@
 import { createServerClient } from "@/shared/lib/supabase";
-import { chargeByBillingKey } from "@/shared/lib/portone";
 import type { PlanId } from "@/shared/config/constants";
 import { PLAN_PRICING } from "@/shared/config/constants";
 
@@ -93,53 +92,9 @@ export async function cancelSubscription(userId: string): Promise<void> {
 }
 
 /**
- * Process recurring billing for a subscription.
+ * Process recurring billing for a subscription. (DISABLED: PortOne removed)
  */
 export async function processRecurringBilling(subscription: Subscription): Promise<boolean> {
-  if (!subscription.billingKey) {
-    return false;
-  }
-
-  const pricing = PLAN_PRICING[subscription.plan];
-  if (!pricing || pricing.monthly === 0) return false;
-
-  const paymentId = `sub_${subscription.id}_${Date.now()}`;
-  const supabase = await createServerClient();
-
-  try {
-    await chargeByBillingKey({
-      billingKey: subscription.billingKey,
-      paymentId,
-      amount: pricing.monthly,
-      orderName: `옵티써치 ${pricing.label} 정기결제`,
-      customerId: subscription.userId,
-    });
-
-    // Extend period by 30 days
-    const now = new Date();
-    const newEnd = new Date(now);
-    newEnd.setDate(newEnd.getDate() + 30);
-
-    await supabase
-      .from("subscriptions")
-      .update({
-        current_period_start: now.toISOString(),
-        current_period_end: newEnd.toISOString(),
-      })
-      .eq("id", subscription.id);
-
-    return true;
-  } catch (err) {
-    console.error(
-      `[billing] Failed to charge subscription ${subscription.id} (user: ${subscription.userId}):`,
-      err instanceof Error ? err.message : err,
-    );
-
-    await supabase
-      .from("subscriptions")
-      .update({ status: "payment_failed" })
-      .eq("id", subscription.id);
-
-    return false;
-  }
+  console.log(`[billing] Recurring billing is currently disabled for subscription: ${subscription.id}`);
+  return false;
 }

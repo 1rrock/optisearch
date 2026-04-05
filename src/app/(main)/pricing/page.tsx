@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { useState } from "react";
+import { toast } from "sonner";
 
 interface DashboardData {
   plan: PlanId;
@@ -157,7 +157,6 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
 export default function PricingPage() {
   const { status } = useSession();
   const isAuthenticated = status === "authenticated";
-  const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null);
 
   const { data } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
@@ -173,51 +172,7 @@ export default function PricingPage() {
 
   const handleSubscribe = async (planId: PlanId) => {
     if (planId === "free") return;
-    setLoadingPlan(planId);
-    try {
-      const PortOne = await import("@portone/browser-sdk/v2");
-
-      const storeId = process.env.NEXT_PUBLIC_PORTONE_STORE_ID;
-      const channelKey = process.env.NEXT_PUBLIC_PORTONE_CHANNEL_KEY;
-      if (!storeId || !channelKey) {
-        alert("결제 설정이 올바르지 않습니다.");
-        return;
-      }
-
-      const response = await PortOne.requestIssueBillingKey({
-        storeId,
-        channelKey,
-        billingKeyMethod: "CARD",
-        customer: {
-          customerId: `user_${Date.now()}`,
-        },
-        redirectUrl: `${window.location.origin}/billing/success?plan=${planId}`,
-      });
-
-      if (!response || response.code) {
-        throw new Error(response?.message ?? "카드 등록에 실패했습니다.");
-      }
-
-      // billingKey issued — send to server for first charge + subscription
-      const res = await fetch("/api/billing", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          billingKey: response.billingKey,
-          plan: planId,
-        }),
-      });
-      const result = await res.json();
-      if (result.error) throw new Error(result.error);
-
-      // Success — redirect to dashboard
-      window.location.href = "/dashboard?subscribed=true";
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "결제 시작 중 오류가 발생했습니다.";
-      alert(message);
-    } finally {
-      setLoadingPlan(null);
-    }
+    toast.info("결제 기능 준비중입니다. 빠른 시일 내에 오픈 예정이에요!");
   };
 
   return (
@@ -232,9 +187,9 @@ export default function PricingPage() {
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto w-full items-start">
-        <PlanCard planId="free" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={loadingPlan === "free"} />
-        <PlanCard planId="basic" currentPlan={currentPlan} isPopular onSubscribe={handleSubscribe} isLoading={loadingPlan === "basic"} />
-        <PlanCard planId="pro" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={loadingPlan === "pro"} />
+        <PlanCard planId="free" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
+        <PlanCard planId="basic" currentPlan={currentPlan} isPopular onSubscribe={handleSubscribe} isLoading={false} />
+        <PlanCard planId="pro" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
       </div>
 
       {/* Feature comparison table (desktop) */}

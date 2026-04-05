@@ -7,6 +7,7 @@ import {
   Search,
   TrendingUp,
   ArrowRight,
+  ArrowRightLeft,
   Sparkles,
   FileText,
   Gauge,
@@ -27,6 +28,7 @@ import type { TrendPoint } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
 import { SearchInputWithHistory } from "@/shared/components/SearchInputWithHistory";
+import { competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
 // API types
@@ -70,14 +72,8 @@ function stripHtml(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Competition badge helper
+// Competition helpers
 // ---------------------------------------------------------------------------
-
-function competitionBadgeClass(competition: string) {
-  if (competition === "낮음") return "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400";
-  if (competition === "높음") return "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400";
-  return "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400";
-}
 
 function competitionBarClass(competition: string) {
   if (competition === "낮음") return "bg-emerald-500";
@@ -229,7 +225,7 @@ function KeywordTrendChart({ data, error }: { data: TrendPoint[] | null; error: 
   );
 }
 
-function RelatedRow({ word, vol, comp, onClick }: { word: string; vol: string; comp: string; onClick: () => void }) {
+function RelatedRow({ word, vol, comp, onClick, onCompare }: { word: string; vol: string; comp: string; onClick: () => void; onCompare: () => void }) {
   const badgeCls = competitionBadgeClass(comp);
 
   return (
@@ -244,13 +240,22 @@ function RelatedRow({ word, vol, comp, onClick }: { word: string; vol: string; c
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${badgeCls}`}>{comp}</span>
       </td>
       <td className="px-6 py-4 text-right">
-        <button
-          className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-background shadow-sm border border-muted transition-colors"
-          onClick={(e) => { e.stopPropagation(); onClick(); }}
-          title="분석하기"
-        >
-          <ArrowRight className="size-4" />
-        </button>
+        <div className="flex items-center justify-end gap-2">
+          <button
+            className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20 shadow-sm border border-muted transition-colors"
+            onClick={(e) => { e.stopPropagation(); onCompare(); }}
+            title="비교하기"
+          >
+            <ArrowRightLeft className="size-3.5" />
+          </button>
+          <button
+            className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-background shadow-sm border border-muted transition-colors"
+            onClick={(e) => { e.stopPropagation(); onClick(); }}
+            title="분석하기"
+          >
+            <ArrowRight className="size-4" />
+          </button>
+        </div>
       </td>
     </tr>
   );
@@ -401,7 +406,7 @@ function AnalyzePageInner() {
   useEffect(() => {
     if (!data?.analysis?.keyword) return;
     setIsSaved(false);
-    fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => {});
+    fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => { });
   }, [data?.analysis?.keyword]);
 
   // Auto-analyze from URL param: /analyze?keyword=검색어
@@ -416,14 +421,14 @@ function AnalyzePageInner() {
       reset();
       mutate(keyword);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // Fetch trend data whenever analysis result changes
   useEffect(() => {
     if (!data?.analysis?.keyword) return;
     fetchTrendData(data.analysis.keyword);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.analysis?.keyword]);
 
   async function fetchTrendData(keyword: string) {
@@ -581,11 +586,10 @@ function AnalyzePageInner() {
                   bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
                 }
                 disabled={bookmarkMutation.isPending}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors disabled:opacity-60 ${
-                  isSaved
-                    ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
-                    : "border-muted/60 bg-card hover:bg-muted/30 text-muted-foreground hover:text-foreground"
-                }`}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors disabled:opacity-60 ${isSaved
+                  ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+                  : "border-muted/60 bg-card hover:bg-muted/30 text-muted-foreground hover:text-foreground"
+                  }`}
                 title={isSaved ? "저장 해제" : "키워드 저장"}
               >
                 <Star
@@ -789,6 +793,9 @@ function AnalyzePageInner() {
                           vol={(rk.pcSearchVolume + rk.mobileSearchVolume).toLocaleString("ko-KR")}
                           comp={rk.competition}
                           onClick={() => handleRelatedKeywordClick(rk.keyword)}
+                          onCompare={() => {
+                            window.location.href = `/compare?keywords=${encodeURIComponent(analysis!.keyword)},${encodeURIComponent(rk.keyword)}`;
+                          }}
                         />
                       ))}
                     </tbody>
@@ -840,65 +847,60 @@ function AnalyzePageInner() {
             </section>
           )}
 
-          {/* Row 3: AI Quick Actions */}
+          {/* Row 3: Quick Actions */}
           <section className="mb-12">
-            <h3 className="text-lg font-bold mb-6">AI 분석 및 생성</h3>
+            <h3 className="text-lg font-bold mb-6">빠른 실행</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-              <button
-                disabled
-                title="준비 중"
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left opacity-50 cursor-not-allowed"
+              {/* Compare */}
+              <a
+                href={`/compare?keywords=${encodeURIComponent(analysis.keyword)}`}
+                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-4">
-                  <div className="size-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center">
+                  <div className="size-12 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 rounded-full flex items-center justify-center">
+                    <ArrowRightLeft className="size-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold">키워드 비교</h4>
+                    <p className="text-xs text-muted-foreground mt-1">다른 키워드와 비교 분석</p>
+                  </div>
+                </div>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+              </a>
+
+              {/* AI Title */}
+              <a
+                href={`/ai?keyword=${encodeURIComponent(analysis.keyword)}&tab=title`}
+                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="size-12 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
                     <Sparkles className="size-6" />
                   </div>
                   <div>
-                    <h4 className="font-bold">AI 제목 추천 받기</h4>
-                    <p className="text-xs text-muted-foreground mt-1">클릭률 높은 제목 10선</p>
-                    <p className="text-[10px] text-amber-600 font-semibold mt-0.5">준비 중</p>
+                    <h4 className="font-bold">AI 제목 추천</h4>
+                    <p className="text-xs text-muted-foreground mt-1">클릭률 높은 제목 생성</p>
                   </div>
                 </div>
-                <ArrowRight className="text-muted-foreground size-5" />
-              </button>
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+              </a>
 
-              <button
-                disabled
-                title="준비 중"
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left opacity-50 cursor-not-allowed"
+              {/* AI Draft */}
+              <a
+                href={`/ai?keyword=${encodeURIComponent(analysis.keyword)}&tab=draft`}
+                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-4">
-                  <div className="size-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center">
+                  <div className="size-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
                     <FileText className="size-6" />
                   </div>
                   <div>
                     <h4 className="font-bold">AI 글 초안 생성</h4>
-                    <p className="text-xs text-muted-foreground mt-1">블로그 포스팅 아웃라인</p>
-                    <p className="text-[10px] text-amber-600 font-semibold mt-0.5">준비 중</p>
+                    <p className="text-xs text-muted-foreground mt-1">블로그 포스팅 초안 작성</p>
                   </div>
                 </div>
-                <ArrowRight className="text-muted-foreground size-5" />
-              </button>
-
-              <button
-                disabled
-                title="준비 중"
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left opacity-50 cursor-not-allowed"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="size-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center">
-                    <Gauge className="size-6" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold">콘텐츠 점수 측정</h4>
-                    <p className="text-xs text-muted-foreground mt-1">상위 노출 확률 분석</p>
-                    <p className="text-[10px] text-amber-600 font-semibold mt-0.5">준비 중</p>
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground size-5" />
-              </button>
-
+                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+              </a>
             </div>
           </section>
 
@@ -910,24 +912,23 @@ function AnalyzePageInner() {
                 bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
               }
               disabled={bookmarkMutation.isPending}
-              className={`px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${
-                isSaved
-                  ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
-                  : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
-              }`}
+              className={`px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
+                ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
+                : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+                }`}
             >
               <span className="flex items-center gap-2">
                 <Star className={`size-5 ${isSaved ? "fill-white" : ""}`} />
                 {bookmarkMutation.isPending ? "처리 중…" : isSaved ? "저장됨" : "키워드 저장"}
               </span>
             </button>
-            <button
-              disabled
-              title="준비 중"
-              className="px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold opacity-50 cursor-not-allowed"
+            <a
+              href={`/compare?keywords=${encodeURIComponent(analysis.keyword)}`}
+              className="px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center gap-2"
             >
+              <ArrowRightLeft className="size-5" />
               비교에 추가
-            </button>
+            </a>
           </footer>
         </>
       )}

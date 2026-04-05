@@ -1,0 +1,19 @@
+Task: 3. New Keywords 렌더링 정책 검증 중 이슈 로그
+Date: 2026-04-04
+
+1) Dev server cross-origin HMR warning (127.0.0.1)
+- Symptom: Headless browser opened `http://127.0.0.1:3000` and Next dev server blocked dev HMR resource due to allowedDevOrigins policy.
+- Impact: Query execution/interaction checks became unreliable (some client effects did not run as expected).
+- Resolution: Re-ran Playwright verification against `http://localhost:3000` instead of 127.0.0.1.
+
+2) Shell quoting issues in early inline Playwright script
+- Symptom: `zsh: bad substitution` and malformed JS from template literal interpolation.
+- Resolution: Rewrote script with shell-safe string concatenation and escaped selectors.
+
+3) Initial selector-target mismatch for search input
+- Symptom: First `input[type="text"]` targeted header quick-search, keeping main `조회` button disabled.
+- Resolution: Adjusted to explicit selector (`input[placeholder*='원피스']`) and then verified target behavior through direct new-keywords mock path.
+
+Final status
+- Top20 + +20 increment behavior verified successfully in final localhost run.
+- No runtime page errors in final verification output.

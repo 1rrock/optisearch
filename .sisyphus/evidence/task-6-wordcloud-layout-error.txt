@@ -1,0 +1,1 @@
+No errors found during wordcloud layout verification.

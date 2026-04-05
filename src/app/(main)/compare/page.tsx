@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { Plus, X, Bot, ArrowRightLeft } from "lucide-react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import { Plus, X, ArrowRightLeft } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { PageHeader } from "@/shared/ui/page-header";
+import { SavedKeywordsPopover } from "@/shared/ui/saved-keywords-popover";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
+import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,20 +43,6 @@ const CHART_COLORS = [
   "#f59e0b",
   "#ef4444",
 ];
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function competitionBadgeClass(competition: string): string {
-  if (competition === "낮음") return "bg-emerald-100 text-emerald-700";
-  if (competition === "중간") return "bg-amber-100 text-amber-700";
-  return "bg-rose-100 text-rose-700";
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString("ko-KR");
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -96,10 +85,19 @@ function SkeletonCell() {
 }
 
 // ---------------------------------------------------------------------------
-// Main page
+// Main page (Suspense wrapper)
 // ---------------------------------------------------------------------------
 
 export default function ComparePage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center py-24 text-muted-foreground">로딩 중...</div>}>
+      <ComparePageInner />
+    </Suspense>
+  );
+}
+
+function ComparePageInner() {
+  const searchParams = useSearchParams();
   const [entries, setEntries] = useState<KeywordEntry[]>([]);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +116,6 @@ export default function ComparePage() {
       return res.json() as Promise<AnalyzeResponse>;
     },
     onMutate: (keyword) => {
-      // Mark the entry as loading
       setEntries((prev) =>
         prev.map((e) =>
           e.keyword === keyword ? { ...e, loading: true, error: null } : e
@@ -145,24 +142,41 @@ export default function ComparePage() {
     },
   });
 
-  function addKeyword() {
-    const kw = inputValue.trim();
-    if (!kw) return;
+  // Auto-add keywords from URL params
+  useEffect(() => {
+    const param = searchParams.get("keywords");
+    if (!param) return;
+    const keywords = param.split(",").map(k => decodeURIComponent(k.trim())).filter(Boolean);
+    keywords.forEach(kw => {
+      const newEntry: KeywordEntry = { keyword: kw, data: null, loading: true, error: null };
+      setEntries(prev => {
+        if (prev.some(e => e.keyword === kw)) return prev;
+        if (prev.length >= MAX_KEYWORDS) return prev;
+        return [...prev, newEntry];
+      });
+      analyzeMutation.mutate(kw);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function addKeyword(kw?: string) {
+    const keyword = (kw ?? inputValue).trim();
+    if (!keyword) return;
     if (entries.length >= MAX_KEYWORDS) return;
-    if (entries.some((e) => e.keyword === kw)) {
-      setInputValue("");
+    if (entries.some((e) => e.keyword === keyword)) {
+      if (!kw) setInputValue("");
       return;
     }
 
     const newEntry: KeywordEntry = {
-      keyword: kw,
+      keyword,
       data: null,
       loading: true,
       error: null,
     };
     setEntries((prev) => [...prev, newEntry]);
-    setInputValue("");
-    analyzeMutation.mutate(kw);
+    if (!kw) setInputValue("");
+    analyzeMutation.mutate(keyword);
     inputRef.current?.focus();
   }
 
@@ -214,7 +228,6 @@ export default function ComparePage() {
   })();
 
   const lowestCompetition = (() => {
-    // 낮음 < 중간 < 높음, prefer 낮음
     const order = ["낮음", "중간", "높음"];
     let bestRank = Infinity;
     let bestIdx = -1;
@@ -231,7 +244,6 @@ export default function ComparePage() {
   })();
 
   const bestGrade = (() => {
-    // Grade order: S+ is best (index 0 in KEYWORD_GRADES)
     const gradeOrder = [
       "S+", "S", "S-",
       "A+", "A", "A-",
@@ -308,24 +320,33 @@ export default function ComparePage() {
 
             {/* Input row */}
             {entries.length < MAX_KEYWORDS && (
-              <div className="flex items-center gap-2">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="키워드 입력..."
-                  className="h-9 rounded-full border border-muted/60 bg-background px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <Button
-                  variant="ghost"
-                  onClick={addKeyword}
-                  disabled={!inputValue.trim()}
-                  className="flex items-center gap-1 px-4 py-2 text-primary hover:bg-primary/5 rounded-full transition-colors text-sm font-semibold border border-transparent"
-                >
-                  <Plus className="size-4" /> 추가
-                </Button>
+              <div className="flex flex-col gap-2 md:items-end">
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="키워드 입력..."
+                    className="h-9 rounded-full border border-muted/60 bg-background px-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                  <Button
+                    variant="ghost"
+                    onClick={() => addKeyword()}
+                    disabled={!inputValue.trim()}
+                    className="flex items-center gap-1 px-4 py-2 text-primary hover:bg-primary/5 rounded-full transition-colors text-sm font-semibold border border-transparent"
+                  >
+                    <Plus className="size-4" /> 추가
+                  </Button>
+                  {/* Saved keywords bookmark button */}
+                  <SavedKeywordsPopover
+                    mode="single"
+                    onAdd={([kw]) => addKeyword(kw)}
+                    triggerLabel="저장됨"
+                    triggerClassName="flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-full border border-muted/60 bg-muted/30 text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -547,7 +568,6 @@ export default function ComparePage() {
 
             <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 256" preserveAspectRatio="none">
               {entries.map((entry, i) => {
-                // Placeholder SVG paths per slot — real data via W4 DataLab
                 const placeholderPaths = [
                   "M0,150 Q80,140 160,180 T320,130 T480,160 T640,110 T800,140 T960,90",
                   "M0,180 Q80,190 160,170 T320,160 T480,180 T640,150 T800,165 T960,140",
@@ -576,17 +596,6 @@ export default function ComparePage() {
           </div>
         </Card>
       )}
-
-      {/* Final CTA */}
-      <div className="pt-8 pb-12 flex justify-center">
-        <Button
-          size="lg"
-          disabled
-          className="px-12 py-5 text-lg font-bold rounded-2xl shadow-xl shadow-primary/20 flex items-center gap-3 opacity-60 cursor-not-allowed"
-        >
-          <Bot className="size-6" /> 준비 중
-        </Button>
-      </div>
 
     </div>
   );
