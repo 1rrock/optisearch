@@ -145,7 +145,7 @@ export async function getKeywordStats(
       return withRetry(async () => {
         const response = await fetch(
           `${BASE_URL}${signaturePath}${queryString}`,
-          { method: "GET", headers: buildHeaders("GET", signaturePath) }
+          { method: "GET", headers: buildHeaders("GET", signaturePath), signal: AbortSignal.timeout(8000) }
         );
         if (!response.ok) {
           const err = new Error(

@@ -18,8 +18,24 @@ export async function POST(req: Request) {
   try {
     event = await paddle.webhooks.unmarshal(rawBody, secret, signature);
   } catch (err) {
-    console.error("[paddle-webhook] Signature verification failed:", err);
+    console.error("[paddle-webhook] Signature verification failed");
     return Response.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  // Idempotency: skip already-processed events
+  const eventId = (event as { eventId?: string }).eventId;
+  if (eventId) {
+    const supabase = await createServerClient();
+    const { data: existing } = await supabase
+      .from("webhook_events")
+      .select("id")
+      .eq("event_id", eventId)
+      .maybeSingle();
+
+    if (existing) {
+      console.log(`[paddle-webhook] Event ${eventId} already processed, skipping`);
+      return Response.json({ received: true });
+    }
   }
 
   try {
@@ -35,8 +51,23 @@ export async function POST(req: Request) {
         console.log("[paddle-webhook] Unhandled event:", event.eventType);
     }
   } catch (err) {
-    console.error("[paddle-webhook] Handler error:", err);
+    console.error("[paddle-webhook] Handler error:", err instanceof Error ? err.message : String(err));
     return Response.json({ error: "Handler failed" }, { status: 500 });
+  }
+
+  // Record processed event for idempotency
+  if (eventId) {
+    try {
+      const supabase = await createServerClient();
+      await supabase.from("webhook_events").insert({
+        event_id: eventId,
+        event_type: event.eventType,
+        processed_at: new Date().toISOString(),
+      });
+    } catch {
+      // Non-critical: worst case is a duplicate processing on retry
+      console.warn("[paddle-webhook] Failed to record event ID for idempotency");
+    }
   }
 
   return Response.json({ received: true });
@@ -48,7 +79,8 @@ async function handleSubscriptionChange(data: any) {
   const userId = customData?.userId;
   if (!userId) {
     console.warn("[paddle-webhook] No userId in customData");
-    return;
+    // Return error so Paddle retries (user may not have profile yet)
+    throw new Error("No userId in customData");
   }
 
   const priceId = data.items?.[0]?.price?.id;
@@ -73,7 +105,7 @@ async function handleSubscriptionChange(data: any) {
   const supabase = await createServerClient();
 
   // Update user plan
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from("user_profiles")
     .update({
       plan,
@@ -87,6 +119,12 @@ async function handleSubscriptionChange(data: any) {
     throw error;
   }
 
+  if (count === 0) {
+    console.error(`[paddle-webhook] No profile found for userId ${userId}`);
+    // Throw so Paddle retries — profile may be created shortly after
+    throw new Error(`No profile found for userId ${userId}`);
+  }
+
   console.log(`[paddle-webhook] User ${userId} upgraded to ${plan}`);
 }
 
@@ -97,7 +135,7 @@ async function handleSubscriptionCanceled(data: any) {
   const supabase = await createServerClient();
 
   // Downgrade to free
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from("user_profiles")
     .update({ plan: "free" })
     .eq("paddle_subscription_id", subscriptionId);
@@ -105,6 +143,25 @@ async function handleSubscriptionCanceled(data: any) {
   if (error) {
     console.error("[paddle-webhook] Failed to downgrade plan:", error.message);
     throw error;
+  }
+
+  if (count === 0) {
+    // Try fallback: look up by customer ID
+    const customerId = data.customerId as string | undefined;
+    if (customerId) {
+      const { error: fallbackErr } = await supabase
+        .from("user_profiles")
+        .update({ plan: "free" })
+        .eq("paddle_customer_id", customerId);
+
+      if (fallbackErr) {
+        console.error("[paddle-webhook] Fallback downgrade failed:", fallbackErr.message);
+        throw fallbackErr;
+      }
+      console.log(`[paddle-webhook] Subscription ${subscriptionId} canceled via customer fallback → free`);
+      return;
+    }
+    console.warn(`[paddle-webhook] No profile found for subscription ${subscriptionId}`);
   }
 
   console.log(`[paddle-webhook] Subscription ${subscriptionId} canceled → free`);

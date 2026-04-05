@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /analyze
+Disallow: /ai
+Disallow: /keywords
+Disallow: /bulk
+Disallow: /compare
+Disallow: /shopping
+
+Sitemap: https://optisearch.kr/sitemap.xml

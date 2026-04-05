@@ -257,7 +257,7 @@ export default function LandingPage() {
             <p className="text-lg text-muted-foreground capitalize font-medium">투자한 시간 대비 압도적인 결과물을 얻으세요.</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto">
             {/* Free */}
             <div className="bg-card p-10 rounded-3xl border border-muted/50 hover:border-primary/30 transition-all flex flex-col">
               <h3 className="text-xl font-bold text-muted-foreground mb-2">{PLAN_PRICING.free.label} (Free)</h3>
@@ -275,7 +275,7 @@ export default function LandingPage() {
             </div>
 
             {/* Basic (Highlighted) */}
-            <div className="bg-card p-10 rounded-3xl border-2 border-primary shadow-2xl scale-105 relative z-10 flex flex-col pt-12">
+            <div className="bg-card p-8 md:p-10 rounded-3xl border-2 border-primary shadow-2xl md:scale-105 relative z-10 flex flex-col pt-12">
               <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase shadow-lg shadow-primary/30">
                 Most Popular
               </div>
@@ -283,16 +283,16 @@ export default function LandingPage() {
               <div className="text-4xl font-black mb-1 text-foreground">
                 ₩{PLAN_PRICING.basic.monthly.toLocaleString()}
               </div>
-              <p className="text-sm font-bold text-muted-foreground mb-8">월 결제 기준</p>
+              <p className="text-sm font-bold text-muted-foreground mb-8">첫 1개월 무료 · 이후 월 결제</p>
 
               <ul className="space-y-4 mb-10 flex-1 font-semibold text-foreground">
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 키워드 대량 분석 무제한</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> AI 글 초안 무제한 생성</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 프리미엄 SEO 점수 리포트</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 검색량 데이터 엑셀 추출</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 무제한 키워드 검색</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> AI 제목 20회/일, 초안 5회/일</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> SEO 점수 분석 + 엑셀 추출</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 쇼핑 인사이트 + 트렌드 1년</li>
               </ul>
               <a href="/login">
-                <Button size="lg" className="w-full rounded-xl font-bold h-12 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-transform">무료 체험 7일 시작하기</Button>
+                <Button size="lg" className="w-full rounded-xl font-bold h-12 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-transform">1개월 무료 체험 시작하기</Button>
               </a>
             </div>
 
@@ -304,10 +304,12 @@ export default function LandingPage() {
               </div>
               <ul className="space-y-4 mb-10 flex-1 font-semibold text-muted-foreground">
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 베이직 플랜의 모든 기능</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 팀 워크스페이스 공유</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 통합 API 액세스</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> AI 제목 100회/일, 초안 30회/일</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 대량 분석 500개, 전체 트렌드</li>
               </ul>
-              <Button variant="outline" size="lg" className="w-full rounded-xl font-bold h-12">팀 문의하기</Button>
+              <a href="/pricing">
+                <Button variant="outline" size="lg" className="w-full rounded-xl font-bold h-12">1개월 무료 체험 시작하기</Button>
+              </a>
             </div>
           </div>
         </div>

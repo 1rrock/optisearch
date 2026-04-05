@@ -73,12 +73,20 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
   const pricing = PLAN_PRICING[planId];
   const isCurrent = currentPlan === planId;
 
-  const ctaLabel =
-    planId === "free"
-      ? "현재 플랜"
-      : planId === "basic"
-      ? "베이직 시작하기"
-      : "프로 시작하기";
+  // Determine if user already has a higher or same paid plan
+  const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
+  const currentRank = currentPlan ? planRank[currentPlan] : -1;
+  const thisRank = planRank[planId];
+  const isDowngrade = currentRank > thisRank;
+  const isUpgrade = currentRank < thisRank;
+
+  const ctaLabel = isCurrent
+    ? "현재 플랜"
+    : isDowngrade
+    ? "다운그레이드"
+    : planId === "basic"
+    ? "베이직 시작하기"
+    : "프로 시작하기";
 
   return (
     <Card
@@ -140,19 +148,26 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
           })}
         </ul>
 
+        {/* Trial info */}
+        {planId !== "free" && !isCurrent && isUpgrade && (
+          <p className="text-center text-xs text-muted-foreground font-medium">
+            첫 1개월 무료 체험 후 월 ₩{pricing.monthly.toLocaleString()}
+          </p>
+        )}
+
         {/* CTA */}
         <Button
           size="lg"
-          variant={planId === "free" ? "outline" : "default"}
-          disabled={(isCurrent && planId === "free") || isLoading}
+          variant={planId === "free" || isDowngrade ? "outline" : "default"}
+          disabled={isCurrent || isLoading}
           className={[
-            "w-full rounded-xl font-bold h-12 mt-2",
-            isPopular
+            "w-full rounded-xl font-bold h-12",
+            isPopular && !isCurrent
               ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
               : "",
           ].join(" ")}
           onClick={() => {
-            if (planId !== "free") {
+            if (planId !== "free" && !isCurrent) {
               void onSubscribe(planId);
             }
           }}

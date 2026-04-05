@@ -14,7 +14,10 @@ const BASE_URL = "https://openapi.naver.com/v1/search";
 async function fetchSearch<T>(path: string): Promise<T> {
   const url = `${BASE_URL}${path}`;
   return withRetry(async () => {
-    const response = await fetch(url, { headers: getNaverAuthHeaders() });
+    const response = await fetch(url, {
+      headers: getNaverAuthHeaders(),
+      signal: AbortSignal.timeout(8000),
+    });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       const err = new Error(

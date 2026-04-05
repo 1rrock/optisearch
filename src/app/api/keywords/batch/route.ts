@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { analyzeKeywordBatch } from "@/services/keyword-service";
-import { getAuthenticatedUser, enforceUsageLimit } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
@@ -36,6 +36,12 @@ export async function POST(request: Request) {
   try {
     const { keywords } = parsed.data;
     const results = await analyzeKeywordBatch(keywords);
+
+    // Record usage for each keyword in the batch
+    await Promise.all(
+      keywords.map((kw) => recordUsage(user.userId, "search", kw))
+    );
+
     return Response.json({ results });
   } catch (err) {
     console.error("[api/keywords/batch] Error:", err);

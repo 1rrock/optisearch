@@ -25,13 +25,19 @@ export async function checkUsageLimit(
   const supabase = await createServerClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from("ai_usage")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId)
     .eq("feature", feature)
     .gte("created_at", `${today}T00:00:00`)
     .lte("created_at", `${today}T23:59:59`);
+
+  if (error) {
+    console.error("[checkUsageLimit] Supabase error:", error.message);
+    // Fail closed: deny on DB error to prevent unlimited usage
+    return { allowed: false, used: limit, limit };
+  }
 
   const used = count ?? 0;
   return { allowed: used < limit, used, limit };

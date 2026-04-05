@@ -105,6 +105,7 @@ async function postDatalab<T>(path: string, body: unknown): Promise<T> {
       method: "POST",
       headers: getNaverAuthHeaders(),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
       const text = await response.text().catch(() => "");
