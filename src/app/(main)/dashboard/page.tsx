@@ -250,7 +250,6 @@ export default function DashboardPage() {
                   {isExporting ? "내보내는 중..." : "엑셀 내보내기"}
                 </button>
               )}
-              <a href="/history" className="text-primary text-sm font-semibold hover:underline">전체보기</a>
             </div>
           </div>
           {data.recentSearches.length === 0 ? (

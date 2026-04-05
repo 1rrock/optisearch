@@ -82,7 +82,7 @@ export function TitleTool({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      handleGenerate();
+      if (!mutation.isPending) handleGenerate();
     }
   };
 

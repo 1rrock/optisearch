@@ -103,6 +103,8 @@ async function fetchFromCorpus(
   return buildResponse(items, days, endDate, "corpus");
 }
 
+// Intentionally queries all users' searches to identify globally trending keywords.
+// This is NOT user-scoped because the feature shows community-wide trends.
 async function fetchFromSearches(
   startStr: string,
   endStr: string,

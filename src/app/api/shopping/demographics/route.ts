@@ -80,11 +80,15 @@ export async function POST(request: Request) {
           keyword,
         };
 
-        const [deviceData, genderData, ageData] = await Promise.all([
+        const [deviceResult, genderResult, ageResult] = await Promise.allSettled([
           getShoppingDeviceTrend(params),
           getShoppingGenderTrend(params),
           getShoppingAgeTrend(params),
         ]);
+
+        const deviceData = deviceResult.status === "fulfilled" ? deviceResult.value : { results: [] };
+        const genderData = genderResult.status === "fulfilled" ? genderResult.value : { results: [] };
+        const ageData = ageResult.status === "fulfilled" ? ageResult.value : { results: [] };
 
         // Extract the latest period's ratios for each dimension
         const extractLatest = (data: typeof deviceData) => {

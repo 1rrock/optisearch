@@ -1,12 +1,17 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background p-4 relative overflow-hidden">
       {/* Login Card */}
@@ -26,7 +31,7 @@ export default function LoginPage() {
 
         <div className="flex flex-col gap-4">
           <Button
-            onClick={() => signIn("naver", { callbackUrl: "/dashboard" })}
+            onClick={() => signIn("naver", { callbackUrl })}
             className="flex items-center justify-center w-full h-14 rounded-2xl bg-[#03C75A] hover:bg-[#02b34f] text-white font-bold text-md transition-colors shadow-sm gap-3"
           >
             <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white" xmlns="http://www.w3.org/2000/svg">
@@ -43,5 +48,13 @@ export default function LoginPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   );
 }

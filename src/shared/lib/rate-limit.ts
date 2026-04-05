@@ -21,12 +21,22 @@ interface RateLimitEntry {
 }
 
 const memStore = new Map<string, RateLimitEntry>();
+const MAX_MEM_ENTRIES = 1000;
+
+function pruneMemStore() {
+  const now = Date.now();
+  for (const [key, entry] of memStore) {
+    if (now > entry.resetAt) memStore.delete(key);
+  }
+}
 
 function checkMemory(userId: string): { allowed: boolean; remaining: number } {
   const now = Date.now();
   const entry = memStore.get(userId);
 
   if (!entry || now > entry.resetAt) {
+    // Evict expired entries if store is growing large
+    if (memStore.size >= MAX_MEM_ENTRIES) pruneMemStore();
     memStore.set(userId, { count: 1, resetAt: now + WINDOW_SEC * 1000 });
     return { allowed: true, remaining: MAX_REQUESTS - 1 };
   }

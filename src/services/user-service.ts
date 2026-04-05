@@ -44,13 +44,17 @@ export async function getCurrentUserProfileId(): Promise<string | null> {
   }
 
   // Create profile if doesn't exist (auto-registration on first login)
+  // Use upsert to prevent race condition when concurrent requests arrive for a new user
   const { data: created, error } = await supabase
     .from("user_profiles")
-    .insert({
-      auth_user_id: authUserId,
-      name: session?.user?.name ?? null,
-      email: session?.user?.email ?? null,
-    })
+    .upsert(
+      {
+        auth_user_id: authUserId,
+        name: session?.user?.name ?? null,
+        email: session?.user?.email ?? null,
+      },
+      { onConflict: "auth_user_id" }
+    )
     .select("id")
     .single();
 

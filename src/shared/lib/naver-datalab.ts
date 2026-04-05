@@ -8,6 +8,7 @@
 
 import { withRetry } from "./retry";
 import { getNaverAuthHeaders } from "./naver-auth";
+import { getRedis } from "./redis";
 
 const BASE_URL = "https://openapi.naver.com/v1/datalab";
 
@@ -19,13 +20,49 @@ const DAILY_QUOTA = 1000;
 const QUOTA_WARN = 800;
 const QUOTA_BLOCK = 950;
 
+// In-memory fallback (used when Redis is unavailable)
 const quotaState = {
   count: 0,
   date: new Date().toISOString().split("T")[0],
 };
 
-function checkAndIncrementQuota(): void {
+// Lua script: atomic INCR + conditional EXPIRE (no race window)
+const QUOTA_INCR_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+if count == 1 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+`;
+
+async function checkAndIncrementQuota(): Promise<void> {
   const today = new Date().toISOString().split("T")[0];
+  const redis = getRedis();
+
+  if (redis) {
+    try {
+      const key = `datalab:quota:${today}`;
+      const count = (await redis.eval(
+        QUOTA_INCR_SCRIPT,
+        [key],
+        [86400]
+      )) as number;
+
+      if (count >= QUOTA_BLOCK) {
+        throw new Error(`DataLab 일일 호출 한도에 근접했습니다. (${count}/${DAILY_QUOTA})`);
+      }
+      if (count >= QUOTA_WARN) {
+        console.warn(`[datalab-quota] WARNING: ${count}/${DAILY_QUOTA} calls used today`);
+      }
+      return;
+    } catch (err) {
+      // Re-throw quota exceeded errors; fall back to in-memory for Redis failures
+      if (err instanceof Error && err.message.startsWith("DataLab 일일")) throw err;
+      console.warn("[datalab-quota] Redis unavailable, using in-memory fallback:", err);
+    }
+  }
+
+  // In-memory fallback
   if (quotaState.date !== today) {
     quotaState.count = 0;
     quotaState.date = today;
@@ -40,16 +77,29 @@ function checkAndIncrementQuota(): void {
 }
 
 /** Get current daily quota usage */
-export function getDatalabQuotaUsage() {
+export async function getDatalabQuotaUsage(): Promise<{ count: number; limit: number }> {
   const today = new Date().toISOString().split("T")[0];
+  const redis = getRedis();
+
+  if (redis) {
+    try {
+      const key = `datalab:quota:${today}`;
+      const val = await redis.get<number>(key);
+      return { count: val ?? 0, limit: DAILY_QUOTA };
+    } catch {
+      // Fall through to in-memory
+    }
+  }
+
   if (quotaState.date !== today) return { count: 0, limit: DAILY_QUOTA };
   return { count: quotaState.count, limit: DAILY_QUOTA };
 }
 
 async function postDatalab<T>(path: string, body: unknown): Promise<T> {
   // Quota check runs once per call (outside withRetry callback)
-  checkAndIncrementQuota();
+  await checkAndIncrementQuota();
   const url = `${BASE_URL}${path}`;
+  // DataLab 429 means daily quota exceeded — retrying wastes quota
   return withRetry(async () => {
     const response = await fetch(url, {
       method: "POST",
@@ -65,7 +115,7 @@ async function postDatalab<T>(path: string, body: unknown): Promise<T> {
       throw err;
     }
     return response.json() as Promise<T>;
-  });
+  }, { maxRetries: 0 });
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
-import { getSearchTrend } from "@/shared/lib/naver-datalab";
+import { getSearchTrendBatch, type TrendDataPoint } from "@/shared/lib/naver-datalab";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { getSeasonalSeeds, MONTH_LABELS } from "@/shared/config/seasonal-keywords";
 import { cached, CacheTTL } from "@/services/cache-service";
@@ -65,27 +65,18 @@ async function fetchSeasonalData(month: number): Promise<SeasonalResponse> {
   const endDate = formatDate(now);
   const startDate = formatDate(new Date(now.getFullYear() - 2, now.getMonth(), 1));
 
-  // 1. Fetch DataLab trends — all keywords in parallel for speed
-  // Each keyword needs independent ratios, so we query them individually.
+  // 1. Fetch DataLab trends — batch up to 5 keywords per API call (80% quota savings)
   const trendMap = new Map<string, { ratios: Map<number, number>; avgRatio: number; peakMonth: number }>();
 
-  const allResults = await Promise.all(
-    seeds.map((keyword) =>
-      getSearchTrend({
-        keyword,
-        startDate,
-        endDate,
-        timeUnit: "month",
-      }).catch(() => null)
-    )
-  );
+  const batchResults = await getSearchTrendBatch(seeds, { startDate, endDate, timeUnit: "month" }).catch((err) => {
+    console.error("[seasonal] DataLab batch trend fetch failed:", err);
+    return new Map<string, TrendDataPoint[]>();
+  });
 
-  for (let j = 0; j < seeds.length; j++) {
-    const keyword = seeds[j];
-    const result = allResults[j];
-    if (!result?.results?.[0]?.data?.length) continue;
+  for (const keyword of seeds) {
+    const data = batchResults.get(keyword);
+    if (!data?.length) continue;
 
-    const data = result.results[0].data;
     const ratiosByMonth = new Map<number, number[]>();
 
     for (const point of data) {

@@ -236,7 +236,7 @@ function RelatedRow({ word, vol, comp, onClick, onCompare }: { word: string; vol
     >
       <td className="px-6 py-4 text-sm font-semibold text-foreground/80 hover:text-primary transition-colors">{word}</td>
       <td className="px-4 py-4 text-sm text-right font-medium text-muted-foreground">{vol}</td>
-      <td className="px-4 py-4 text-center">
+      <td className="px-4 py-4 text-center whitespace-nowrap">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${badgeCls}`}>{comp}</span>
       </td>
       <td className="px-6 py-4 text-right">

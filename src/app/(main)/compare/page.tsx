@@ -546,53 +546,10 @@ function ComparePageInner() {
             </div>
           </div>
 
-          {/* TODO: W4 DataLab connection — replace placeholder with real trend data */}
-          <div className="relative h-64 w-full pl-8">
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pl-8">
-              <div className="w-full h-[1px] bg-muted relative">
-                <span className="absolute -left-10 -top-2 text-[10px] text-muted-foreground">60k</span>
-              </div>
-              <div className="w-full h-[1px] bg-muted relative">
-                <span className="absolute -left-10 -top-2 text-[10px] text-muted-foreground">45k</span>
-              </div>
-              <div className="w-full h-[1px] bg-muted relative">
-                <span className="absolute -left-10 -top-2 text-[10px] text-muted-foreground">30k</span>
-              </div>
-              <div className="w-full h-[1px] bg-muted relative">
-                <span className="absolute -left-10 -top-2 text-[10px] text-muted-foreground">15k</span>
-              </div>
-              <div className="w-full h-[1px] bg-muted relative">
-                <span className="absolute -left-10 -top-2 text-[10px] text-muted-foreground">0</span>
-              </div>
-            </div>
-
-            <svg className="w-full h-full overflow-visible" viewBox="0 0 1000 256" preserveAspectRatio="none">
-              {entries.map((entry, i) => {
-                const placeholderPaths = [
-                  "M0,150 Q80,140 160,180 T320,130 T480,160 T640,110 T800,140 T960,90",
-                  "M0,180 Q80,190 160,170 T320,160 T480,180 T640,150 T800,165 T960,140",
-                  "M0,130 Q80,120 160,110 T320,140 T480,90 T640,105 T800,75 T960,40",
-                  "M0,160 Q80,155 160,145 T320,150 T480,120 T640,135 T800,110 T960,80",
-                  "M0,140 Q80,150 160,130 T320,120 T480,145 T640,90 T800,100 T960,60",
-                ];
-                return (
-                  <path
-                    key={entry.keyword}
-                    d={placeholderPaths[i % placeholderPaths.length]}
-                    fill="none"
-                    stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                    strokeLinecap="round"
-                    strokeWidth="3"
-                  />
-                );
-              })}
-            </svg>
-
-            <div className="flex justify-between mt-4 px-2">
-              {["1월", "3월", "5월", "7월", "9월", "11월", "12월"].map((m) => (
-                <span key={m} className="text-[11px] text-muted-foreground font-medium">{m}</span>
-              ))}
-            </div>
+          {/* 트렌드 차트 — 추후 DataLab 연동 예정 */}
+          <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+            <p className="text-sm font-medium">트렌드 비교 차트 준비 중</p>
+            <p className="text-xs mt-1">개별 키워드 분석 페이지에서 트렌드를 확인하세요.</p>
           </div>
         </Card>
       )}

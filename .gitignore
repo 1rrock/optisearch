@@ -33,6 +33,12 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# IDE / tooling
+.idea/
+.claude/
+.omc/
+.sisyphus/
+
 # vercel
 .vercel
 

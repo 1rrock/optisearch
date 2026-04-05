@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
+import { getDatalabQuotaUsage } from "@/shared/lib/naver-datalab";
 
 const EMPTY_DASHBOARD = {
   plan: "free" as const,
@@ -54,6 +55,8 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .eq("user_id", userId);
 
+    const quotaUsage = await getDatalabQuotaUsage();
+
     return Response.json({
       plan,
       usage,
@@ -65,6 +68,11 @@ export async function GET() {
       })),
       savedKeywordsCount: savedCount ?? 0,
       totalSearches: totalSearches ?? 0,
+      datalabQuota: {
+        used: quotaUsage.count,
+        limit: quotaUsage.limit,
+        remaining: quotaUsage.limit - quotaUsage.count,
+      },
     });
   } catch (err) {
     console.error("[api/dashboard] Error:", err);

@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { CreditCard, User, ShieldAlert, Search, Flame, Zap, Star } from "lucide-react";
+import { CreditCard, ShieldAlert, Search, Flame, Zap, Star } from "lucide-react";
 import { toast } from "sonner";
 
-type Section = "profile" | "subscription" | "danger";
+type Section = "subscription" | "danger";
 
 interface DashboardData {
   plan: PlanId;
@@ -78,9 +77,7 @@ function SkeletonCard() {
 }
 
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState<Section>("profile");
-  const { data: session } = useSession();
-
+  const [activeSection, setActiveSection] = useState<Section>("subscription");
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -96,9 +93,6 @@ export default function SettingsPage() {
   const plan = data?.plan ?? "free";
   const limits = PLAN_LIMITS[plan];
   const pricing = PLAN_PRICING[plan];
-  const userName = session?.user?.name ?? "";
-  const userEmail = session?.user?.email ?? "";
-  const userInitial = userName ? userName.charAt(0).toUpperCase() : "?";
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
@@ -110,12 +104,6 @@ export default function SettingsPage() {
       <div className="flex flex-col md:flex-row gap-8 items-start">
         {/* Settings Menu */}
         <div className="w-full md:w-64 flex flex-col gap-1 sticky top-24">
-          <SettingNav
-            icon={<User />}
-            label="내 프로필"
-            active={activeSection === "profile"}
-            onClick={() => setActiveSection("profile")}
-          />
           <SettingNav
             icon={<CreditCard />}
             label="구독 관리"
@@ -132,53 +120,6 @@ export default function SettingsPage() {
 
         {/* Setting Content */}
         <div className="flex-1 flex flex-col gap-6 w-full">
-
-          {/* Profile Section */}
-          {activeSection === "profile" && (
-            isLoading ? <SkeletonCard /> : (
-              <Card className="rounded-2xl border-muted shadow-sm">
-                <CardHeader className="pb-4 border-b">
-                  <CardTitle className="text-lg">프로필 설정</CardTitle>
-                  <CardDescription>플랫폼에 표시될 닉네임과 이메일을 변경합니다.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-6 pt-6">
-                  <div className="flex items-center gap-6">
-                    <div className="size-20 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-3xl shadow-inner">
-                      {userInitial}
-                    </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="rounded-xl font-medium">사진 변경</Button>
-                      <Button variant="ghost" className="rounded-xl font-medium text-rose-500 hover:text-rose-600 hover:bg-rose-50">제거</Button>
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-semibold">이름</label>
-                    <input
-                      type="text"
-                      defaultValue={userName}
-                      className="h-12 w-full max-w-sm rounded-xl border border-input bg-background px-4 outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <label className="text-sm font-semibold">이메일 계정</label>
-                    <input
-                      type="email"
-                      defaultValue={userEmail}
-                      disabled
-                      className="h-12 w-full max-w-sm rounded-xl border border-input bg-muted text-muted-foreground px-4 outline-none cursor-not-allowed"
-                    />
-                    <span className="text-xs text-muted-foreground font-medium">이메일 변경은 고객센터로 문의해주세요.</span>
-                  </div>
-                  <Button
-                    className="w-fit rounded-xl font-bold"
-                    onClick={() => toast.success("변경사항이 저장되었습니다.")}
-                  >
-                    변경사항 저장
-                  </Button>
-                </CardContent>
-              </Card>
-            )
-          )}
 
           {/* Subscription Section */}
           {activeSection === "subscription" && (
@@ -240,7 +181,7 @@ export default function SettingsPage() {
                         <span className="text-xs text-muted-foreground">베이직 플랜부터 무제한 검색을 사용하세요.</span>
                       </div>
                       <Button asChild className="rounded-xl font-bold shrink-0">
-                        <a href="/#pricing">업그레이드</a>
+                        <a href="/pricing">업그레이드</a>
                       </Button>
                     </div>
                   )}

@@ -2,7 +2,7 @@
 
 import { useRef, useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ThemeToggle } from "@/shared/components/theme-toggle";
@@ -66,10 +66,6 @@ export function Header() {
             onKeyDown={handleSearch}
           />
         </div>
-        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-muted relative" aria-label="알림">
-          <Bell className="size-4" />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-background" aria-hidden="true" />
-        </Button>
         <ThemeToggle />
       </div>
     </header>

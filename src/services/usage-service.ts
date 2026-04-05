@@ -47,10 +47,13 @@ export async function recordUsage(
   tokensUsed?: number
 ): Promise<void> {
   const supabase = await createServerClient();
-  await supabase.from("ai_usage").insert({
+  const { error } = await supabase.from("ai_usage").insert({
     user_id: userId,
     feature,
     keyword: keyword ?? null,
     tokens_used: tokensUsed ?? 0,
   });
+  if (error) {
+    console.error("[recordUsage] insert failed:", error.message);
+  }
 }

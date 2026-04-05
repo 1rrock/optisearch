@@ -61,9 +61,8 @@ export async function GET(request: Request) {
     console.log(`[collect-keywords] Done:`, result);
     return Response.json(result);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Internal server error";
-    console.error("[collect-keywords] Fatal error:", message);
-    return Response.json({ error: message }, { status: 500 });
+    console.error("[collect-keywords] Fatal error:", err instanceof Error ? err.message : err);
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 

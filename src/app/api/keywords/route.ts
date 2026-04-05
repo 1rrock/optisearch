@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     const result = await analyzeKeyword(effectiveKeyword);
     await recordUsage(user.userId, "search", effectiveKeyword);
     // Save search history (non-blocking)
-    saveSearchHistory(user.userId, result).catch(() => {});
+    saveSearchHistory(user.userId, result).catch((err) => console.error("[keywords] saveHistory failed:", err));
     return Response.json({ ...result, correctedKeyword });
   } catch (err) {
     console.error("[api/keywords] Error:", err);

@@ -92,7 +92,7 @@ export function ScoreTool({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      handleAnalyze();
+      if (!mutation.isPending) handleAnalyze();
     }
   };
 

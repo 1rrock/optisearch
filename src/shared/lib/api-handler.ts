@@ -93,7 +93,7 @@ export function createApiHandler<T = unknown>(options: ApiHandlerOptions<T>) {
           ? String((data as Record<string, unknown>).keyword)
           : undefined;
         if (keyword) {
-          recordUsage(user.userId, feature, keyword).catch(() => {});
+          recordUsage(user.userId, feature, keyword).catch((err) => console.error("[api-handler] recordUsage failed:", err));
         }
       }
 

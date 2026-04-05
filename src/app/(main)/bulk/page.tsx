@@ -161,7 +161,7 @@ function BulkAnalysisPageInner() {
   }
 
   async function handleAnalyze() {
-    if (keywords.length === 0) return;
+    if (keywords.length === 0 || loading) return;
     setLoading(true);
     setError(null);
     setResults([]);

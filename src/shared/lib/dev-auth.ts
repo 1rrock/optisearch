@@ -10,5 +10,5 @@ export const DEV_USER = {
 };
 
 export function isDevBypass(): boolean {
-  return process.env.DEV_AUTH_BYPASS === "true";
+  return process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production";
 }
