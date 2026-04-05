@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { usePaddle } from "@/shared/providers/paddle-provider";
+import { priceIdFromPlanId } from "@/shared/lib/paddle";
 import { toast } from "sonner";
 
 interface DashboardData {
@@ -163,8 +165,9 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
 }
 
 export default function PricingPage() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
   const isAuthenticated = status === "authenticated";
+  const paddle = usePaddle();
 
   const { data } = useQuery<DashboardData>({
     queryKey: ["dashboard"],
@@ -180,7 +183,31 @@ export default function PricingPage() {
 
   const handleSubscribe = async (planId: PlanId) => {
     if (planId === "free") return;
-    toast.info("결제 기능 준비중입니다. 빠른 시일 내에 오픈 예정이에요!");
+
+    if (!isAuthenticated) {
+      toast.error("로그인이 필요합니다.");
+      window.location.href = "/login?callbackUrl=/pricing";
+      return;
+    }
+
+    const paddlePriceId = priceIdFromPlanId(planId);
+    if (!paddlePriceId) {
+      toast.error("가격 정보를 찾을 수 없습니다.");
+      return;
+    }
+
+    if (!paddle) {
+      toast.error("결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
+    paddle.Checkout.open({
+      items: [{ priceId: paddlePriceId, quantity: 1 }],
+      ...(session?.user?.email ? { customer: { email: session.user.email } } : {}),
+      customData: {
+        userId: session?.user?.id ?? "",
+      },
+    });
   };
 
   return (

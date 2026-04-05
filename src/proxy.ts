@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server"
 const PUBLIC_PATHS = new Set(["/", "/login", "/pricing", "/privacy", "/terms"])
 
 // API route prefixes that handle their own auth (webhooks, cron, etc.)
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/"]
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/", "/api/webhooks/"]
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true

@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
+    "@paddle/paddle-js": "^1.6.2",
+    "@paddle/paddle-node-sdk": "^3.6.1",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "@tanstack/react-query": "^5.96.1",

@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/shared/components/theme-provider";
 import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
 import { Toaster } from "@/shared/ui/sonner";
+import { PaddleProvider } from "@/shared/providers/paddle-provider";
 import { Geist } from "next/font/google";
 import { cn } from "@/shared/lib/utils";
 
@@ -48,7 +49,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SessionProvider>
-            <QueryProvider>{children}</QueryProvider>
+            <PaddleProvider>
+              <QueryProvider>{children}</QueryProvider>
+            </PaddleProvider>
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
