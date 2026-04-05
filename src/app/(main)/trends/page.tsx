@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   TrendingUp,
@@ -21,17 +21,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Minus,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PageHeader } from "@/shared/ui/page-header";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
-// Types for new keywords API
-interface NewKeywordDate {
-  date: string;
-  label: string;
-  dayOfWeek: string;
-  keywords: Array<{ keyword: string; volume: number }>;
-}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -511,14 +505,318 @@ function PeriodPill({
     <button
       type="button"
       onClick={onClick}
-      className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border ${
-        active
-          ? "bg-foreground text-background border-foreground shadow-sm"
-          : "bg-card text-muted-foreground border-muted/50 hover:border-foreground/30 hover:text-foreground"
-      }`}
+      className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border ${active
+        ? "bg-foreground text-background border-foreground shadow-sm"
+        : "bg-card text-muted-foreground border-muted/50 hover:border-foreground/30 hover:text-foreground"
+        }`}
     >
       {children}
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SVG Word Cloud — Archimedean Spiral Placement
+// ---------------------------------------------------------------------------
+
+interface WordCloudItem {
+  keyword: string;
+  volume: number;
+  changeRate: number;
+  direction: "up" | "down" | "stable";
+}
+
+interface PlacedWord {
+  keyword: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  width: number;
+  height: number;
+  color: string;
+  volume: number;
+  changeRate: number;
+  direction: "up" | "down" | "stable";
+}
+
+function getWordColor(direction: "up" | "down" | "stable", changeRate: number): string {
+  if (direction === "up") {
+    const intensity = Math.min(Math.abs(changeRate) / 100, 1);
+    if (intensity > 0.6) return "#e11d48"; // rose-600
+    if (intensity > 0.3) return "#ea580c"; // orange-600
+    return "#d97706"; // amber-600
+  }
+  if (direction === "down") {
+    const intensity = Math.min(Math.abs(changeRate) / 100, 1);
+    if (intensity > 0.6) return "#2563eb"; // blue-600
+    if (intensity > 0.3) return "#0891b2"; // cyan-600
+    return "#0d9488"; // teal-600
+  }
+  return "#6b7280"; // gray-500
+}
+
+function getWordColorDark(direction: "up" | "down" | "stable", changeRate: number): string {
+  if (direction === "up") {
+    const intensity = Math.min(Math.abs(changeRate) / 100, 1);
+    if (intensity > 0.6) return "#fb7185"; // rose-400
+    if (intensity > 0.3) return "#fb923c"; // orange-400
+    return "#fbbf24"; // amber-400
+  }
+  if (direction === "down") {
+    const intensity = Math.min(Math.abs(changeRate) / 100, 1);
+    if (intensity > 0.6) return "#60a5fa"; // blue-400
+    if (intensity > 0.3) return "#22d3ee"; // cyan-400
+    return "#2dd4bf"; // teal-400
+  }
+  return "#9ca3af"; // gray-400
+}
+
+// Lazy singleton canvas for text measurement — avoids useEffect timing issues
+let _measureCanvas: HTMLCanvasElement | null = null;
+function getMeasureCanvas(): HTMLCanvasElement {
+  if (!_measureCanvas) {
+    _measureCanvas = document.createElement("canvas");
+    _measureCanvas.width = 1;
+    _measureCanvas.height = 1;
+  }
+  return _measureCanvas;
+}
+
+function TrendingWordCloud({ keywords }: { keywords: WordCloudItem[] }) {
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const [isDark, setIsDark] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Mark mounted — ensures canvas APIs are available (SSR safety)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Detect dark mode
+  useEffect(() => {
+    const check = () => setIsDark(document.documentElement.classList.contains("dark"));
+    check();
+    const observer = new MutationObserver(check);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  const placedWords = useMemo(() => {
+    if (!mounted || keywords.length === 0) return [];
+
+    const ctx = getMeasureCanvas().getContext("2d");
+    if (!ctx) return [];
+
+    // Sort by weight (abs changeRate) descending — largest first
+    const sorted = [...keywords].sort(
+      (a, b) => Math.abs(b.changeRate) - Math.abs(a.changeRate)
+    );
+
+    const maxRate = Math.max(...sorted.map((k) => Math.abs(k.changeRate)), 1);
+    const minRate = Math.min(...sorted.map((k) => Math.abs(k.changeRate)), 0);
+    const range = maxRate - minRate || 1;
+
+    const MIN_FONT = 14;
+    const MAX_FONT = 48;
+
+    const placed: PlacedWord[] = [];
+    const rects: { x: number; y: number; w: number; h: number }[] = [];
+
+    // AABB collision check with padding
+    function collides(
+      nx: number,
+      ny: number,
+      nw: number,
+      nh: number
+    ): boolean {
+      const pad = 4;
+      for (const r of rects) {
+        if (
+          nx - pad < r.x + r.w &&
+          nx + nw + pad > r.x &&
+          ny - pad < r.y + r.h &&
+          ny + nh + pad > r.y
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    for (const kw of sorted) {
+      const normalized = (Math.abs(kw.changeRate) - minRate) / range;
+      const fontSize = Math.round(MIN_FONT + normalized * (MAX_FONT - MIN_FONT));
+
+      ctx.font = `bold ${fontSize}px system-ui, -apple-system, sans-serif`;
+      const metrics = ctx.measureText(kw.keyword);
+      const textWidth = metrics.width * 1.15; // 15% CJK padding
+      const textHeight = fontSize * 1.3;
+
+      // Archimedean spiral — tighter spacing, start with slight random offset for variety
+      const a = 2.5;
+      const tStep = 0.25;
+      // Alternate initial angle per word to avoid directional bias
+      const startAngle = placed.length * 0.7;
+      let t = startAngle;
+      let foundPos = false;
+      let px = 0;
+      let py = 0;
+
+      for (let attempts = 0; attempts < 800; attempts++) {
+        const spiralR = a * (t - startAngle);
+        const spiralX = spiralR * Math.cos(t);
+        const spiralY = spiralR * Math.sin(t);
+
+        px = spiralX - textWidth / 2;
+        py = spiralY - textHeight / 2;
+
+        if (!collides(px, py, textWidth, textHeight)) {
+          foundPos = true;
+          break;
+        }
+
+        t += tStep;
+      }
+
+      if (!foundPos) continue;
+
+      const color = isDark
+        ? getWordColorDark(kw.direction, kw.changeRate)
+        : getWordColor(kw.direction, kw.changeRate);
+
+      placed.push({
+        keyword: kw.keyword,
+        x: px,
+        y: py,
+        fontSize,
+        width: textWidth,
+        height: textHeight,
+        color,
+        volume: kw.volume,
+        changeRate: kw.changeRate,
+        direction: kw.direction,
+      });
+
+      rects.push({ x: px, y: py, w: textWidth, h: textHeight });
+    }
+
+    return placed;
+  }, [keywords, isDark, mounted]);
+
+  // Compute viewBox — centered around origin with symmetric padding
+  const viewBox = useMemo(() => {
+    if (placedWords.length === 0) return { x: -200, y: -100, w: 400, h: 200 };
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const w of placedWords) {
+      minX = Math.min(minX, w.x);
+      minY = Math.min(minY, w.y);
+      maxX = Math.max(maxX, w.x + w.width);
+      maxY = Math.max(maxY, w.y + w.height);
+    }
+
+    // Make viewBox symmetric around origin for centered appearance
+    const absX = Math.max(Math.abs(minX), Math.abs(maxX));
+    const absY = Math.max(Math.abs(minY), Math.abs(maxY));
+    const pad = 25;
+    return {
+      x: -absX - pad,
+      y: -absY - pad,
+      w: (absX + pad) * 2,
+      h: (absY + pad) * 2,
+    };
+  }, [placedWords]);
+
+  if (keywords.length === 0) return null;
+
+  return (
+    <div className="relative w-full h-full flex items-center justify-center" style={{ minHeight: 300 }}>
+      <svg
+        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+        className="w-full h-full"
+        style={{ minHeight: 300, maxHeight: 420 }}
+        aria-label="인기 키워드 워드클라우드"
+        preserveAspectRatio="xMidYMid meet"
+      >
+        {placedWords.map((word, idx) => (
+          <g key={word.keyword}>
+            <text
+              x={word.x + word.width / 2}
+              y={word.y + word.height * 0.75}
+              textAnchor="middle"
+              fontSize={word.fontSize}
+              fontWeight="bold"
+              fontFamily="system-ui, -apple-system, sans-serif"
+              fill={word.color}
+              opacity={hoveredIdx !== null && hoveredIdx !== idx ? 0.35 : 1}
+              className="cursor-pointer transition-opacity duration-150"
+              style={{ userSelect: "none" }}
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              onClick={() =>
+                window.open(
+                  `/analyze?keyword=${encodeURIComponent(word.keyword)}`,
+                  "_blank"
+                )
+              }
+            >
+              {word.keyword}
+            </text>
+            {/* Invisible hit area for easier hovering */}
+            <rect
+              x={word.x}
+              y={word.y}
+              width={word.width}
+              height={word.height}
+              fill="transparent"
+              className="cursor-pointer"
+              onMouseEnter={() => setHoveredIdx(idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              onClick={() =>
+                window.open(
+                  `/analyze?keyword=${encodeURIComponent(word.keyword)}`,
+                  "_blank"
+                )
+              }
+            />
+          </g>
+        ))}
+      </svg>
+
+      {/* Tooltip */}
+      {hoveredIdx !== null && placedWords[hoveredIdx] && (
+        <div
+          className="absolute pointer-events-none z-10 bg-card border border-muted/50 shadow-lg rounded-lg px-3 py-2 text-xs"
+          style={{
+            left: "50%",
+            bottom: 8,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <span className="font-bold">{placedWords[hoveredIdx].keyword}</span>
+          <span className="text-muted-foreground mx-2">|</span>
+          <span className="text-muted-foreground">
+            {placedWords[hoveredIdx].volume > 0
+              ? `${placedWords[hoveredIdx].volume.toLocaleString()} 검색`
+              : "검색량 미확인"}
+          </span>
+          <span className="text-muted-foreground mx-2">|</span>
+          <span
+            className={cn(
+              "font-bold",
+              placedWords[hoveredIdx].direction === "up"
+                ? "text-rose-500"
+                : placedWords[hoveredIdx].direction === "down"
+                  ? "text-blue-500"
+                  : "text-muted-foreground"
+            )}
+          >
+            {placedWords[hoveredIdx].changeRate > 0 ? "+" : ""}
+            {placedWords[hoveredIdx].changeRate}%
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -555,10 +853,6 @@ export default function TrendsPage() {
     used?: number;
     limit?: number;
   }>({ open: false });
-
-  const allKeywords = primaryKeyword
-    ? [primaryKeyword, ...compareKeywords]
-    : [];
 
   function handlePrimarySearch() {
     const kw = inputValue.trim();
@@ -743,7 +1037,7 @@ export default function TrendsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <PageHeader
         icon={<TrendingUp className="size-8 text-primary" />}
@@ -751,8 +1045,8 @@ export default function TrendsPage() {
         description="네이버 DataLab 기반 키워드 검색 트렌드 분석 · 인구통계 · 기기별 비교"
       />
 
-      {/* Search Section */}
-      <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm space-y-4">
+      {/* Search Section — subtle primary border on focus-within */}
+      <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm space-y-4 transition-colors focus-within:border-primary/30">
         {/* Primary keyword input */}
         <div>
           <label className="text-sm font-semibold text-foreground/80 mb-2 block">
@@ -896,8 +1190,8 @@ export default function TrendsPage() {
       {/* Results */}
       {hasFetched && !loading && (
         <div className="space-y-6">
-          {/* Trend Chart */}
-          <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+          {/* Trend Chart — PRIMARY card: bigger shadow, subtle primary border */}
+          <div className="bg-card border border-primary/10 rounded-2xl p-8 shadow-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <BarChart3 className="size-5 text-blue-500" />
@@ -910,11 +1204,11 @@ export default function TrendsPage() {
             <TrendLineChart trends={trends} />
           </div>
 
-          {/* Demographics Section */}
+          {/* Demographics Section — lighter weight cards */}
           {demographics && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Gender */}
-              <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
                 <h3 className="text-base font-bold flex items-center gap-2 mb-5">
                   <Users className="size-4 text-pink-500" />
                   성별 분포
@@ -923,7 +1217,7 @@ export default function TrendsPage() {
               </div>
 
               {/* Age */}
-              <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
                 <h3 className="text-base font-bold flex items-center gap-2 mb-5">
                   <PieChart className="size-4 text-purple-500" />
                   연령대 분포
@@ -932,7 +1226,7 @@ export default function TrendsPage() {
               </div>
 
               {/* Device */}
-              <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
                 <h3 className="text-base font-bold flex items-center gap-2 mb-5">
                   <Smartphone className="size-4 text-emerald-500" />
                   기기별 비율
@@ -948,7 +1242,7 @@ export default function TrendsPage() {
               {[1, 2, 3].map((i) => (
                 <div
                   key={i}
-                  className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm flex items-center justify-center h-48"
+                  className="bg-card border border-muted/30 rounded-2xl p-6 flex items-center justify-center h-48"
                 >
                   <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <Loader2 className="size-5 animate-spin" />
@@ -993,8 +1287,7 @@ export default function TrendsPage() {
       {/* ================================================================= */}
 
       <TrendingSectionWrapper />
-      <NewKeywordsSectionWrapper />
-      <SeasonalSectionWrapper />
+      <DiscoverySectionWrapper />
 
       {/* Upgrade modal */}
       <UpgradeModal
@@ -1009,7 +1302,7 @@ export default function TrendsPage() {
 }
 
 // ===========================================================================
-// Trending Keywords Section — WordCloud + Ranked Table
+// Trending Keywords Section — WordCloud + Ranked List (side by side)
 // ===========================================================================
 
 type TrendingSort = "changeRate" | "volume";
@@ -1063,7 +1356,7 @@ function TrendingSectionWrapper() {
   };
 
   return (
-    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+    <div className="bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 border border-muted/50 border-l-4 border-l-orange-500 rounded-2xl p-6 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <h3 className="text-lg font-bold flex items-center gap-2">
@@ -1072,7 +1365,7 @@ function TrendingSectionWrapper() {
         </h3>
         <div className="flex items-center gap-2">
           {/* View toggle */}
-          <div className="flex gap-1 bg-muted/30 rounded-full p-0.5">
+          <div className="flex gap-1 bg-white/60 dark:bg-white/10 rounded-full p-0.5">
             <button
               type="button"
               onClick={() => setView("cloud")}
@@ -1081,8 +1374,9 @@ function TrendingSectionWrapper() {
                 view === "cloud" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
               )}
               title="워드클라우드"
+              aria-label="워드클라우드 뷰"
             >
-              ☁️
+              Cloud
             </button>
             <button
               type="button"
@@ -1092,8 +1386,9 @@ function TrendingSectionWrapper() {
                 view === "table" ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
               )}
               title="테이블"
+              aria-label="테이블 뷰"
             >
-              📊
+              Table
             </button>
           </div>
           {/* Period toggle */}
@@ -1107,7 +1402,7 @@ function TrendingSectionWrapper() {
                   "px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
                   period === p
                     ? "bg-foreground text-background border-foreground"
-                    : "bg-card text-muted-foreground border-muted/50 hover:border-foreground/30"
+                    : "bg-white/60 dark:bg-white/10 text-muted-foreground border-muted/50 hover:border-foreground/30"
                 )}
               >
                 {p === "daily" ? "일간" : "월간"}
@@ -1127,43 +1422,55 @@ function TrendingSectionWrapper() {
           데이터가 쌓이면 급상승 키워드가 표시됩니다.
         </div>
       ) : view === "cloud" ? (
-        /* -------- Word Cloud View -------- */
-        <div className="space-y-4">
-          <TrendingWordCloud keywords={keywords} />
-          {/* Ranked list below cloud */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 pt-2">
+        /* -------- Cloud View: side-by-side on desktop -------- */
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Word cloud — 2/3 width on desktop */}
+          <div className="lg:w-2/3 bg-white/40 dark:bg-white/5 rounded-xl border border-muted/20">
+            <TrendingWordCloud keywords={keywords} />
+          </div>
+
+          {/* Top 10 ranked list — 1/3 width */}
+          <div className="lg:w-1/3 space-y-1">
+            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 px-1">
+              Top 10 순위
+            </div>
             {keywords.slice(0, 10).map((kw, idx) => (
               <button
                 key={kw.keyword}
                 type="button"
                 onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
-                className="flex items-center gap-3 py-2 px-2 hover:bg-muted/20 rounded-lg transition-colors cursor-pointer text-left"
+                className="flex items-center gap-3 py-2.5 px-2 hover:bg-white/60 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-left w-full"
               >
                 <span className={cn(
-                  "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold",
+                  "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
                   idx < 3 ? "bg-orange-500 text-white" : "bg-muted/50 text-muted-foreground"
                 )}>
                   {idx + 1}
                 </span>
                 <span className="flex-1 text-sm font-semibold truncate">{kw.keyword}</span>
-                <span className={cn(
-                  "text-xs font-bold whitespace-nowrap",
-                  kw.direction === "up" ? "text-rose-500" : kw.direction === "down" ? "text-blue-500" : "text-muted-foreground"
-                )}>
-                  {kw.direction === "up" ? "+" : kw.direction === "down" ? "" : ""}
-                  {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
-                </span>
+                <div className="flex flex-col items-end shrink-0">
+                  <span className={cn(
+                    "text-xs font-bold",
+                    kw.direction === "up" ? "text-rose-500" : kw.direction === "down" ? "text-blue-500" : "text-muted-foreground"
+                  )}>
+                    {kw.direction === "up" ? <ArrowUpRight className="size-3 inline" /> : kw.direction === "down" ? <ArrowDownRight className="size-3 inline" /> : null}
+                    {Math.abs(kw.changeRate)}%
+                  </span>
+                  <span className="text-[10px] text-muted-foreground tabular-nums">
+                    {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
         </div>
       ) : (
         /* -------- Table View -------- */
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto bg-white/40 dark:bg-white/5 rounded-xl border border-muted/20">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-muted/30 text-muted-foreground text-xs">
-                <th className="text-left py-2.5 pr-4 font-semibold w-10">#</th>
+                <th className="text-left py-2.5 px-4 font-semibold w-10">#</th>
                 <th className="text-left py-2.5 pr-4 font-semibold">키워드</th>
                 <th
                   className="text-right py-2.5 pr-4 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
@@ -1172,7 +1479,7 @@ function TrendingSectionWrapper() {
                   검색량{sortIcon("volume")}
                 </th>
                 <th
-                  className="text-right py-2.5 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
+                  className="text-right py-2.5 pr-4 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
                   onClick={() => toggleSort("changeRate")}
                 >
                   변동률{sortIcon("changeRate")}
@@ -1183,23 +1490,23 @@ function TrendingSectionWrapper() {
               {keywords.map((kw, idx) => (
                 <tr
                   key={kw.keyword}
-                  className="border-b border-muted/15 hover:bg-muted/20 transition-colors cursor-pointer"
+                  className="border-b border-muted/15 hover:bg-white/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
                 >
-                  <td className="py-3 pr-4 font-bold text-muted-foreground">{idx + 1}</td>
+                  <td className="py-3 px-4 font-bold text-muted-foreground">{idx + 1}</td>
                   <td className="py-3 pr-4 font-semibold">{kw.keyword}</td>
                   <td className="py-3 pr-4 text-right text-muted-foreground">
                     {kw.volume > 0 ? kw.volume.toLocaleString() : "-"}
                   </td>
-                  <td className="py-3 text-right">
+                  <td className="py-3 pr-4 text-right">
                     <span
                       className={cn(
                         "inline-flex items-center gap-0.5 font-bold text-xs px-2 py-1 rounded-full",
                         kw.direction === "up"
                           ? "text-rose-600 bg-rose-50 dark:bg-rose-950/40"
                           : kw.direction === "down"
-                          ? "text-blue-600 bg-blue-50 dark:bg-blue-950/40"
-                          : "text-gray-500 bg-gray-100 dark:bg-gray-800/40"
+                            ? "text-blue-600 bg-blue-50 dark:bg-blue-950/40"
+                            : "text-gray-500 bg-gray-100 dark:bg-gray-800/40"
                       )}
                     >
                       {kw.direction === "up" ? (
@@ -1222,77 +1529,65 @@ function TrendingSectionWrapper() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Word Cloud Component (CSS-based, no external deps)
-// ---------------------------------------------------------------------------
+// ===========================================================================
+// Discovery Section — Tabbed container: New Keywords | Seasonal Keywords
+// ===========================================================================
 
-const CLOUD_COLORS = [
-  "text-blue-500 dark:text-blue-400",
-  "text-emerald-600 dark:text-emerald-400",
-  "text-violet-600 dark:text-violet-400",
-  "text-rose-500 dark:text-rose-400",
-  "text-amber-600 dark:text-amber-400",
-  "text-cyan-600 dark:text-cyan-400",
-  "text-pink-500 dark:text-pink-400",
-  "text-indigo-600 dark:text-indigo-400",
-  "text-orange-600 dark:text-orange-400",
-  "text-teal-600 dark:text-teal-400",
-];
+type DiscoveryTab = "new" | "seasonal";
 
-function TrendingWordCloud({ keywords }: { keywords: TrendingKw[] }) {
-  if (keywords.length === 0) return null;
-
-  // Normalize sizes: biggest keyword = largest font, smallest = smallest
-  const maxRate = Math.max(...keywords.map((k) => Math.abs(k.changeRate)), 1);
-  const minRate = Math.min(...keywords.map((k) => Math.abs(k.changeRate)), 0);
-  const range = maxRate - minRate || 1;
-
-  // Font sizes from 0.75rem to 2.25rem
-  const MIN_SIZE = 0.75;
-  const MAX_SIZE = 2.25;
-
-  // Shuffle for visual variety but deterministic per render
-  const shuffled = [...keywords].sort((a, b) => {
-    // Place larger ones toward center by interleaving
-    const ai = keywords.indexOf(a);
-    const bi = keywords.indexOf(b);
-    return (ai % 2) - (bi % 2) || ai - bi;
-  });
+function DiscoverySectionWrapper() {
+  const [activeTab, setActiveTab] = useState<DiscoveryTab>("new");
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 py-6 px-4 min-h-[180px]">
-      {shuffled.map((kw, idx) => {
-        const normalized = (Math.abs(kw.changeRate) - minRate) / range;
-        const fontSize = MIN_SIZE + normalized * (MAX_SIZE - MIN_SIZE);
-        const colorClass = CLOUD_COLORS[idx % CLOUD_COLORS.length];
+    <div className="bg-card border border-muted/50 rounded-2xl shadow-sm overflow-hidden">
+      {/* Tab header */}
+      <div className="flex border-b border-muted/30">
+        <button
+          type="button"
+          onClick={() => setActiveTab("new")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-bold transition-colors",
+            activeTab === "new"
+              ? "text-foreground border-b-2 border-primary bg-primary/5"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+          )}
+        >
+          <Sparkles className="size-4" />
+          새 키워드
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("seasonal")}
+          className={cn(
+            "flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-bold transition-colors",
+            activeTab === "seasonal"
+              ? "text-foreground border-b-2 border-primary bg-primary/5"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/10"
+          )}
+        >
+          <CalendarDays className="size-4" />
+          시즌 키워드
+        </button>
+      </div>
 
-        return (
-          <button
-            key={kw.keyword}
-            type="button"
-            onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
-            className={cn(
-              "font-bold hover:opacity-70 transition-all cursor-pointer whitespace-nowrap",
-              colorClass
-            )}
-            style={{ fontSize: `${fontSize}rem` }}
-            title={`${kw.keyword}: ${kw.volume > 0 ? kw.volume.toLocaleString() : "-"} (${kw.changeRate > 0 ? "+" : ""}${kw.changeRate}%)`}
-          >
-            {kw.keyword}
-          </button>
-        );
-      })}
+      {/* Tab content */}
+      <div className="p-6">
+        {activeTab === "new" ? <NewKeywordsContent /> : <SeasonalKeywordsContent />}
+      </div>
     </div>
   );
 }
 
 // ===========================================================================
-// New Keywords Section — BlackKiwi-style date columns
+// New Keywords Content — Fixed scroll with column limits
 // ===========================================================================
 
-function NewKeywordsSectionWrapper() {
-
+function NewKeywordsContent() {
   const [days] = useState(7);
+  const [expanded, setExpanded] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(-1); // -1 = auto-select first date with data
+
+  const MAX_VISIBLE = 12;
 
   const { data, isLoading } = useQuery<{
     dates: Array<{
@@ -1315,104 +1610,153 @@ function NewKeywordsSectionWrapper() {
 
   const dates = data?.dates ?? [];
 
-  return (
-    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-lg font-bold flex items-center gap-2">
-          <Sparkles className="size-5 text-violet-500" />
-          새롭게 등장한 키워드
-        </h3>
-        {data && (
-          <span className="text-xs text-muted-foreground">
-            {data.totalCount > 0
-              ? `${data.totalCount}개 발견`
-              : "데이터 수집 대기중"}
-            {data.source === "searches" && " · 검색 기록 기반"}
-          </span>
-        )}
-      </div>
+  // Auto-select first date with data
+  const activeDay = selectedDay >= 0
+    ? selectedDay
+    : dates.findIndex((d) => d.keywords.length > 0) >= 0
+      ? dates.findIndex((d) => d.keywords.length > 0)
+      : 0;
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : (
-        /* Date columns — horizontal scroll container */
-        <div className="overflow-x-auto -mx-2 px-2">
-          <div
-            className="grid gap-0 min-w-max"
-            style={{
-              gridTemplateColumns: `repeat(${Math.min(dates.length, 7)}, minmax(200px, 1fr))`,
-            }}
-          >
-            {dates.slice(0, 7).map((col, colIdx) => (
-              <div
+  const activeDate = dates[activeDay];
+  const keywords = activeDate?.keywords ?? [];
+  const maxVolume = Math.max(...keywords.map((k) => k.volume), 1);
+  const visibleKws = expanded ? keywords : keywords.slice(0, MAX_VISIBLE);
+  const hasMore = keywords.length > MAX_VISIBLE;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (dates.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
+        <Sparkles className="size-8 mb-2 opacity-30" />
+        데이터 수집 대기중
+      </div>
+    );
+  }
+
+  function formatVolume(v: number): string {
+    if (v >= 10000) return `${(v / 10000).toFixed(1)}만`;
+    if (v >= 1000) return `${(v / 1000).toFixed(1)}천`;
+    return v.toLocaleString();
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Top bar: day selector + count */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
+          {dates.slice(0, 7).map((col, idx) => {
+            const hasData = col.keywords.length > 0;
+            return (
+              <button
                 key={col.date}
+                type="button"
+                onClick={() => { setSelectedDay(idx); setExpanded(false); }}
                 className={cn(
-                  "flex flex-col",
-                  colIdx < dates.length - 1 && "border-r border-muted/30"
+                  "relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap shrink-0",
+                  activeDay === idx
+                    ? "bg-foreground text-background shadow-sm"
+                    : "text-muted-foreground hover:bg-muted/40 hover:text-foreground"
                 )}
               >
-                {/* Date header */}
-                <div className="px-4 py-3 border-b border-muted/30 bg-muted/10">
-                  <div className="text-sm font-bold text-center">{col.label}</div>
-                </div>
-
-                {/* Column sub-header */}
-                <div className="grid grid-cols-[1fr_auto] px-4 py-2 border-b border-muted/20 text-[11px] text-muted-foreground font-semibold">
-                  <span>키워드</span>
-                  <span>검색량</span>
-                </div>
-
-                {/* Keywords list */}
-                <div className="flex-1 min-h-[200px]">
-                  {col.keywords.length === 0 ? (
-                    <div className="flex items-center justify-center h-full py-8 text-xs text-muted-foreground/60">
-                      표시할 데이터가 없습니다.
-                    </div>
-                  ) : (
-                    <div>
-                      {col.keywords.map((kw) => (
-                        <button
-                          key={kw.keyword}
-                          type="button"
-                          onClick={() =>
-                            window.open(
-                              `/analyze?keyword=${encodeURIComponent(kw.keyword)}`,
-                              '_blank'
-                            )
-                          }
-                          className="w-full grid grid-cols-[1fr_auto] px-4 py-2 text-left hover:bg-muted/20 transition-colors cursor-pointer border-b border-muted/10 last:border-b-0"
-                        >
-                          <span className="text-sm truncate pr-3">
-                            {kw.keyword}
-                          </span>
-                          <span className="text-sm text-muted-foreground tabular-nums whitespace-nowrap">
-                            {kw.volume > 0
-                              ? kw.volume.toLocaleString()
-                              : "-"}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+                {col.dayOfWeek} <span className="opacity-60">{col.date.slice(5)}</span>
+                {hasData && activeDay !== idx && (
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-primary" />
+                )}
+              </button>
+            );
+          })}
         </div>
+        <span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+          {data?.totalCount ? `${data.totalCount.toLocaleString()}개` : ""}
+          {data?.source === "searches" && " · 검색 기록"}
+        </span>
+      </div>
+
+      {/* Keywords grid — card-style with volume bar */}
+      {keywords.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
+          <Sparkles className="size-6 mb-2 opacity-20" />
+          이 날짜에 새 키워드가 없습니다
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            {visibleKws.map((kw, idx) => {
+              const barPct = Math.max((kw.volume / maxVolume) * 100, 2);
+              return (
+                <button
+                  key={kw.keyword}
+                  type="button"
+                  onClick={() =>
+                    window.open(
+                      `/analyze?keyword=${encodeURIComponent(kw.keyword)}`,
+                      "_blank"
+                    )
+                  }
+                  className="group flex items-center gap-3 px-3 py-2.5 rounded-xl bg-muted/20 hover:bg-muted/40 dark:bg-white/5 dark:hover:bg-white/10 transition-all cursor-pointer text-left"
+                >
+                  {/* Rank number */}
+                  <span className={cn(
+                    "shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-extrabold",
+                    idx < 3
+                      ? "bg-primary/15 text-primary dark:bg-primary/25"
+                      : "bg-muted/40 text-muted-foreground dark:bg-white/10"
+                  )}>
+                    {idx + 1}
+                  </span>
+
+                  {/* Keyword + volume bar */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
+                        {kw.keyword}
+                      </span>
+                      <span className="text-[11px] text-muted-foreground tabular-nums shrink-0 font-medium">
+                        {kw.volume > 0 ? formatVolume(kw.volume) : "-"}
+                      </span>
+                    </div>
+                    {/* Volume bar */}
+                    <div className="h-1 rounded-full bg-muted/30 dark:bg-white/10 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-primary/60 to-primary/30 transition-all duration-500"
+                        style={{ width: `${barPct}%` }}
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* More / Collapse */}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setExpanded(!expanded)}
+              className="w-full py-2 text-xs font-semibold text-primary hover:text-primary/80 transition-colors flex items-center justify-center gap-1"
+            >
+              <ChevronDown className={cn("size-3.5 transition-transform", expanded && "rotate-180")} />
+              {expanded ? "접기" : `${keywords.length - MAX_VISIBLE}개 더보기`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 // ===========================================================================
-// Seasonal Keywords Section
+// Seasonal Keywords Content — improved cards with heat indicator
 // ===========================================================================
 
-function SeasonalSectionWrapper() {
-
+function SeasonalKeywordsContent() {
   const currentMonth = new Date().getMonth() + 1;
 
   const { data, isLoading } = useQuery<{
@@ -1437,36 +1781,76 @@ function SeasonalSectionWrapper() {
 
   const keywords = data?.keywords ?? [];
 
-  return (
-    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-lg font-bold flex items-center gap-2">
-          <CalendarDays className="size-5 text-emerald-500" />
-          {data?.label ?? `${currentMonth}월`} 시즌 키워드
-        </h3>
-      </div>
+  // Compute max multiplier for heat bar normalization
+  const maxMultiplier = Math.max(...keywords.map((k) => k.multiplier), 1);
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
-        </div>
-      ) : keywords.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
-          <CalendarDays className="size-8 mb-2 opacity-30" />
-          시즌 데이터를 불러올 수 없습니다.
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          {keywords.slice(0, 10).map((kw) => (
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-10">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (keywords.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">
+        <CalendarDays className="size-8 mb-2 opacity-30" />
+        시즌 데이터를 불러올 수 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-sm font-semibold text-muted-foreground">
+          {data?.label ?? `${currentMonth}월`} 시즌
+        </span>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {keywords.slice(0, 8).map((kw) => {
+          const heatPct = Math.min((kw.multiplier / maxMultiplier) * 100, 100);
+          const heatColor =
+            kw.multiplier >= 2
+              ? "from-rose-500 to-orange-400"
+              : kw.multiplier >= 1.5
+                ? "from-amber-500 to-yellow-400"
+                : "from-emerald-500 to-teal-400";
+
+          return (
             <button
               key={kw.keyword}
               type="button"
               onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
               className="bg-background border border-muted/40 rounded-xl p-4 text-left hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group"
             >
-              <div className="font-bold text-sm mb-2 group-hover:text-primary transition-colors truncate">
-                {kw.keyword}
+              {/* Heat indicator bar at top */}
+              <div className="h-1.5 rounded-full bg-muted/20 mb-3 overflow-hidden">
+                <div
+                  className={cn("h-full rounded-full bg-gradient-to-r transition-all duration-500", heatColor)}
+                  style={{ width: `${heatPct}%` }}
+                />
               </div>
+
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <span className="font-bold text-sm group-hover:text-primary transition-colors truncate">
+                  {kw.keyword}
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-extrabold shrink-0 px-1.5 py-0.5 rounded",
+                    kw.multiplier >= 2
+                      ? "text-rose-600 bg-rose-50 dark:text-rose-400 dark:bg-rose-950/40"
+                      : kw.multiplier >= 1.5
+                        ? "text-amber-600 bg-amber-50 dark:text-amber-400 dark:bg-amber-950/40"
+                        : "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/40"
+                  )}
+                >
+                  x{kw.multiplier}
+                </span>
+              </div>
+
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">평균 검색량</span>
@@ -1475,44 +1859,14 @@ function SeasonalSectionWrapper() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">검색량 배수</span>
-                  <span
-                    className={cn(
-                      "font-bold",
-                      kw.multiplier >= 2
-                        ? "text-rose-500"
-                        : kw.multiplier >= 1.5
-                        ? "text-amber-500"
-                        : "text-foreground"
-                    )}
-                  >
-                    ×{kw.multiplier}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">집중 시기</span>
                   <span className="font-semibold">{kw.peakLabel}</span>
                 </div>
               </div>
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
-}
-
-// ===========================================================================
-// Shared helpers
-// ===========================================================================
-
-function gradeColor(grade: string | null): string {
-  switch (grade) {
-    case "S": return "text-rose-500 bg-rose-50 dark:bg-rose-950/40";
-    case "A": return "text-amber-600 bg-amber-50 dark:bg-amber-950/40";
-    case "B": return "text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40";
-    case "C": return "text-blue-600 bg-blue-50 dark:bg-blue-950/40";
-    case "D": return "text-gray-500 bg-gray-100 dark:bg-gray-800/40";
-    default: return "text-muted-foreground bg-muted/60";
-  }
 }
