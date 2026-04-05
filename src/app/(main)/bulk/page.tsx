@@ -253,9 +253,9 @@ function BulkAnalysisPageInner() {
           />
 
           {/* Footer: count + analyze button */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground bg-muted/40 px-3 py-1.5 rounded-lg">
-              <Info className="size-4 text-blue-500" />
+              <Info className="size-4 text-blue-500 shrink-0" />
               <span>현재 {keywords.length}개 / 최대 50개</span>
               {csvParsedCount !== null && (
                 <span className="ml-2 text-emerald-600 font-medium">
@@ -304,55 +304,55 @@ function BulkAnalysisPageInner() {
               />
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
-                className="rounded-xl font-semibold"
+                className="rounded-xl font-semibold text-xs sm:text-sm"
                 onClick={handleCopyAllTags}
                 disabled={results.length === 0}
               >
                 {bulkTagsCopied ? (
                   <>
-                    <Check className="size-4 mr-2 text-emerald-500" />
+                    <Check className="size-4 mr-1.5 text-emerald-500" />
                     <span className="text-emerald-600">복사 완료!</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="size-4 mr-2" />
-                    전체 태그 복사
+                    <Copy className="size-4 mr-1.5" />
+                    태그 복사
                   </>
                 )}
               </Button>
               <a
                 href={selectedRows.size >= 2 ? `/compare?keywords=${Array.from(selectedRows).slice(0, 5).map(k => encodeURIComponent(k)).join(",")}` : "#"}
-                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl border transition-colors ${
                   selectedRows.size >= 2
                     ? "bg-violet-100 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 border-violet-200 dark:border-violet-800 hover:bg-violet-200"
                     : "bg-muted/50 text-muted-foreground border-muted/50 cursor-not-allowed pointer-events-none"
                 }`}
               >
                 <ArrowRightLeft className="size-4" />
-                선택 비교 {selectedRows.size > 0 ? `(${Math.min(selectedRows.size, 5)})` : ""}
+                <span className="hidden sm:inline">선택</span> 비교 {selectedRows.size > 0 ? `(${Math.min(selectedRows.size, 5)})` : ""}
               </a>
               <Button
                 variant="outline"
-                className="rounded-xl font-semibold"
+                className="rounded-xl font-semibold text-xs sm:text-sm"
                 onClick={handleExportExcel}
                 disabled={results.length === 0}
               >
-                <Download className="size-4 mr-2" />
-                엑셀 다운로드
+                <Download className="size-4 mr-1.5" />
+                엑셀
               </Button>
               <a
                 href={selectedRows.size >= 1 ? `/ai?keyword=${encodeURIComponent(Array.from(selectedRows)[0])}&tab=title` : "#"}
-                className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold rounded-xl transition-colors ${
                   selectedRows.size >= 1
                     ? "bg-purple-100 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 hover:bg-purple-200"
                     : "bg-muted/50 text-muted-foreground cursor-not-allowed pointer-events-none"
                 }`}
               >
                 <Sparkles className="size-4" />
-                AI 제목 추천 {selectedRows.size >= 1 ? `(${Array.from(selectedRows)[0]})` : ""}
+                <span className="hidden sm:inline">AI 제목</span><span className="sm:hidden">AI</span>
               </a>
             </div>
           </div>

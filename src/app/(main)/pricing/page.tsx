@@ -42,11 +42,19 @@ const FEATURES: Feature[] = [
 ];
 
 function FeatureCell({ value }: { value: FeatureValue }) {
+  if (value === false) {
+    return <X className="size-4 text-muted-foreground/40 mx-auto" />;
+  }
+  // Both true and string values mean the feature is available
+  return <CheckCircle2 className="size-5 text-primary mx-auto" />;
+}
+
+function TableFeatureCell({ value }: { value: FeatureValue }) {
   if (value === true) {
     return <CheckCircle2 className="size-5 text-primary mx-auto" />;
   }
   if (value === false) {
-    return <X className="size-4 text-muted-foreground/40 mx-auto" />;
+    return <X className="size-4 text-muted-foreground/30 mx-auto" />;
   }
   return <span className="text-sm font-semibold text-foreground">{value}</span>;
 }
@@ -75,7 +83,7 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
       className={[
         "relative flex flex-col rounded-3xl transition-all",
         isPopular
-          ? "border-2 border-primary shadow-2xl scale-[1.03] z-10"
+          ? "border-2 border-primary shadow-2xl md:scale-[1.03] z-10"
           : "border border-muted/50 hover:border-primary/30",
       ].join(" ")}
     >
@@ -85,7 +93,7 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
         </div>
       )}
 
-      <CardContent className="flex flex-col flex-1 p-8 pt-10 gap-6">
+      <CardContent className="flex flex-col flex-1 p-5 sm:p-8 pt-8 sm:pt-10 gap-6">
         {/* Header */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
@@ -97,7 +105,7 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
             )}
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-4xl font-black text-foreground">
+            <span className="text-3xl sm:text-4xl font-black text-foreground">
               ₩{pricing.monthly.toLocaleString()}
             </span>
             {pricing.monthly > 0 && (
@@ -176,7 +184,7 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="flex flex-col gap-10 w-full">
+    <div className="flex flex-col gap-8 sm:gap-10 w-full">
       {/* Page header */}
       <div>
         <h2 className="text-3xl font-bold tracking-tight mb-2 text-foreground">요금제</h2>
@@ -186,14 +194,14 @@ export default function PricingPage() {
       </div>
 
       {/* Plan cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 max-w-5xl mx-auto w-full items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto w-full items-start">
         <PlanCard planId="free" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
         <PlanCard planId="basic" currentPlan={currentPlan} isPopular onSubscribe={handleSubscribe} isLoading={false} />
         <PlanCard planId="pro" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
       </div>
 
       {/* Feature comparison table (desktop) */}
-      <div className="max-w-5xl mx-auto w-full mt-4 hidden md:block">
+      <div className="max-w-5xl mx-auto w-full mt-4 hidden lg:block">
         <div className="bg-card rounded-3xl border border-muted/50 shadow-sm overflow-hidden">
           <table className="w-full text-left">
             <thead className="bg-muted/30 border-b border-muted/50">
@@ -208,39 +216,9 @@ export default function PricingPage() {
               {FEATURES.map((f) => (
                 <tr key={f.label} className="hover:bg-muted/10 transition-colors">
                   <td className="py-4 px-6 font-semibold text-foreground">{f.label}</td>
-                  <td className="py-4 px-4 text-center">
-                    {typeof f.free === "boolean" ? (
-                      f.free ? (
-                        <CheckCircle2 className="size-5 text-primary/60 mx-auto" />
-                      ) : (
-                        <X className="size-4 text-muted-foreground/30 mx-auto" />
-                      )
-                    ) : (
-                      <span className="text-muted-foreground font-medium">{f.free}</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-center bg-primary/5">
-                    {typeof f.basic === "boolean" ? (
-                      f.basic ? (
-                        <CheckCircle2 className="size-5 text-primary mx-auto" />
-                      ) : (
-                        <X className="size-4 text-muted-foreground/30 mx-auto" />
-                      )
-                    ) : (
-                      <span className="text-primary font-semibold">{f.basic}</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    {typeof f.pro === "boolean" ? (
-                      f.pro ? (
-                        <CheckCircle2 className="size-5 text-primary/60 mx-auto" />
-                      ) : (
-                        <X className="size-4 text-muted-foreground/30 mx-auto" />
-                      )
-                    ) : (
-                      <span className="text-muted-foreground font-medium">{f.pro}</span>
-                    )}
-                  </td>
+                  <td className="py-4 px-4 text-center"><TableFeatureCell value={f.free} /></td>
+                  <td className="py-4 px-4 text-center bg-primary/5"><TableFeatureCell value={f.basic} /></td>
+                  <td className="py-4 px-4 text-center"><TableFeatureCell value={f.pro} /></td>
                 </tr>
               ))}
             </tbody>

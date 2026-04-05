@@ -199,7 +199,7 @@ export default function DashboardPage() {
       </div>
 
       {/* 2. Middle Section: Search */}
-      <section className="bg-card p-10 rounded-xl shadow-sm border border-muted/50">
+      <section className="bg-card p-5 sm:p-10 rounded-xl shadow-sm border border-muted/50">
         <div className="max-w-3xl mx-auto text-center mb-8">
           <h2 className="text-2xl font-bold tracking-tight mb-2">어떤 키워드를 분석해드릴까요?</h2>
           <p className="text-muted-foreground text-sm">실시간 네이버 검색량과 AI 기반 경쟁 강도를 즉시 확인하세요.</p>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
               placeholder="키워드를 입력하세요..."
               type="text"
             />
-            <button className="bg-primary text-primary-foreground px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all">
+            <button className="bg-primary text-primary-foreground px-5 sm:px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all shrink-0">
               검색하기
             </button>
           </div>
@@ -369,8 +369,8 @@ export default function DashboardPage() {
       </div>
 
       {/* FAB Contextual */}
-      <button className="fixed bottom-8 right-8 w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
-        <Plus className="size-8" />
+      <button className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
+        <Plus className="size-6 sm:size-8" />
       </button>
 
     </div>

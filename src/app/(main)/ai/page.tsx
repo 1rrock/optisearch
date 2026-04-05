@@ -72,8 +72,8 @@ function AIToolsPageInner() {
       />
 
       {/* Segmented Tab Navigation */}
-      <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl border-b border-muted/30 mb-8 pt-2 pb-2">
-        <div className="inline-flex bg-muted/30 rounded-xl p-1 gap-1">
+      <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl border-b border-muted/30 mb-8 pt-2 pb-2 overflow-x-auto">
+        <div className="inline-flex bg-muted/30 rounded-xl p-1 gap-1 min-w-max">
           <TabButton
             active={activeTab === "title"}
             onClick={() => setActiveTab("title")}
