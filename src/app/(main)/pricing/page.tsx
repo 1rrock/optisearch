@@ -188,6 +188,30 @@ export default function PricingPage() {
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
+  const activatePlan = async (transactionId: string) => {
+    toast.success("결제가 완료되었습니다! 플랜을 업그레이드하고 있습니다...");
+    try {
+      const res = await fetch("/api/paddle/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transactionId }),
+      });
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        await useUserStore.getState().refresh();
+        toast.success(`${result.plan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
+        router.push("/dashboard");
+      } else {
+        console.error("[pricing] activate response:", result);
+        toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`);
+      }
+    } catch (err) {
+      console.error("[pricing] activate failed:", err);
+      toast.error("플랜 활성화 중 오류가 발생했습니다. 잠시 후 새로고침해주세요.");
+    }
+  };
+
   const handleSubscribe = async (planId: PlanId) => {
     if (planId === "free") return;
 
@@ -208,71 +232,31 @@ export default function PricingPage() {
       return;
     }
 
+    // Set up event listener BEFORE opening checkout
+    paddle.Update({
+      eventCallback: (event) => {
+        if (event.name === "checkout.completed") {
+          const transactionId = (event.data as { transaction_id?: string })?.transaction_id;
+          if (transactionId) {
+            // Store transaction ID for processing after checkout closes
+            sessionStorage.setItem("paddle_transaction_id", transactionId);
+          }
+        }
+        if (event.name === "checkout.closed") {
+          const txId = sessionStorage.getItem("paddle_transaction_id");
+          if (txId) {
+            sessionStorage.removeItem("paddle_transaction_id");
+            activatePlan(txId);
+          }
+        }
+      },
+    });
+
     paddle.Checkout.open({
       items: [{ priceId: paddlePriceId, quantity: 1 }],
       ...(session?.user?.email ? { customer: { email: session.user.email } } : {}),
       customData: {
         userId: session?.user?.id ?? "",
-      },
-      settings: {
-        successUrl: `${window.location.origin}/dashboard?upgraded=true`,
-      },
-    });
-
-    // Listen for checkout completion event
-    paddle.Update({
-      eventCallback: async (event) => {
-        if (event.name === "checkout.completed") {
-          toast.success("결제가 완료되었습니다! 플랜을 업그레이드하고 있습니다...");
-
-          // Extract transaction ID from checkout event
-          const transactionId = (event.data as { transaction_id?: string })?.transaction_id;
-
-          if (transactionId) {
-            try {
-              // Call activate API to upgrade plan directly
-              const res = await fetch("/api/paddle/activate", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ transactionId }),
-              });
-              const result = await res.json();
-
-              if (res.ok && result.success) {
-                await useUserStore.getState().refresh();
-                toast.success(`${result.plan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
-                router.push("/dashboard");
-                return;
-              } else {
-                console.error("[pricing] activate response:", result);
-                toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`);
-              }
-            } catch (err) {
-              console.error("[pricing] activate failed:", err);
-              toast.error("플랜 활성화 중 오류가 발생했습니다.");
-            }
-          }
-
-          // Fallback: poll for webhook-based update
-          let attempts = 0;
-          const pollInterval = setInterval(async () => {
-            attempts++;
-            try {
-              await useUserStore.getState().refresh();
-              const newPlan = useUserStore.getState().plan;
-              if (newPlan !== "free" && newPlan !== userPlan) {
-                clearInterval(pollInterval);
-                toast.success(`${newPlan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
-                router.push("/dashboard");
-              }
-            } catch {}
-            if (attempts >= 15) {
-              clearInterval(pollInterval);
-              toast.info("플랜 반영에 시간이 걸릴 수 있습니다. 잠시 후 새로고침해주세요.");
-              router.push("/dashboard");
-            }
-          }, 2000);
-        }
       },
     });
   };
