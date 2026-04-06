@@ -42,6 +42,7 @@ export const TurnstileWidget = forwardRef<TurnstileRef, TurnstileWidgetProps>(
           widgetIdRef.current = (window as any).turnstile.render(containerRef.current, {
             sitekey: siteKey,
             theme,
+            appearance: "interaction-only",
             callback: onVerify,
             "expired-callback": onExpire,
           });
