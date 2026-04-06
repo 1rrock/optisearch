@@ -61,7 +61,7 @@ export default function DashboardPage() {
   function handleSearch() {
     const q = query.trim();
     if (q) {
-      router.push(`/analyze?q=${encodeURIComponent(q)}`);
+      router.push(`/analyze?keyword=${encodeURIComponent(q)}`);
     } else {
       router.push("/analyze");
     }
