@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useCallback, Suspense } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useUserStore } from "@/shared/stores/user-store";
+import { useUsage, useUserPlan, useIncrementUsage } from "@/shared/hooks/use-user";
 import { useSearchParams } from "next/navigation";
 import { Sparkles, Zap, Edit3, Target } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -33,19 +34,9 @@ function AIToolsPageInner() {
   const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>(null);
   const [draftKeyword, setDraftKeyword] = useState(urlKeyword);
 
-  const queryClient = useQueryClient();
-  const { data: dashboardData } = useQuery<{ plan: PlanId; usage: { search: number; title: number; draft: number; score: number } }>({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) return { plan: "free" as PlanId, usage: { search: 0, title: 0, draft: 0, score: 0 } };
-      return res.json();
-    },
-    staleTime: 0,
-  });
-
-  const plan = (dashboardData?.plan ?? "free") as PlanId;
-  const usage = dashboardData?.usage ?? { search: 0, title: 0, draft: 0, score: 0 };
+  const plan = useUserPlan();
+  const { usage, limits: storeLimits } = useUsage();
+  const incrementUsage = useIncrementUsage();
   const limits = PLAN_LIMITS[plan];
 
   const handleGoToDraft = useCallback((title?: string) => {
@@ -53,7 +44,7 @@ function AIToolsPageInner() {
     setActiveTab("draft");
   }, []);
 
-  const invalidate = useCallback(() => queryClient.invalidateQueries({ queryKey: ["dashboard"] }), [queryClient]);
+  const invalidate = useCallback(() => { void useUserStore.getState().refresh(); }, []);
 
   return (
     <div className="space-y-8">

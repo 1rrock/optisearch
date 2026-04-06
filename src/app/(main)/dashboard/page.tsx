@@ -1,28 +1,11 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { Search, Bookmark, Verified, TrendingUp, Star, Minus, Flame, Zap, Plus, Sparkles, Settings, Download } from "lucide-react";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { useDashboardData } from "@/shared/hooks/use-user";
 import { exportToExcel } from "@/shared/lib/excel";
 import { useState } from "react";
 
-interface DashboardData {
-  plan: PlanId;
-  usage: {
-    search: number;
-    title: number;
-    draft: number;
-    score: number;
-  };
-  recentSearches: Array<{
-    keyword: string;
-    grade: string | null;
-    totalVolume: number;
-    createdAt: string;
-  }>;
-  savedKeywordsCount: number;
-  totalSearches: number;
-}
 
 function CircleProgress({ value, max, color }: { value: number; max: number; color: string }) {
   const circumference = 2 * Math.PI * 24;
@@ -59,19 +42,9 @@ function planLabel(plan: PlanId): string {
 export default function DashboardPage() {
   const [isExporting, setIsExporting] = useState(false);
 
-  const { data, isLoading, isError } = useQuery<DashboardData>({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to load dashboard");
-      }
-      return res.json();
-    },
-  });
+  const { plan, usage, limits: storeLimits, recentSearches, savedKeywordsCount, totalSearches, loading, initialized } = useDashboardData();
 
-  if (isLoading) {
+  if (!initialized || loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
@@ -82,19 +55,8 @@ export default function DashboardPage() {
     );
   }
 
-  if (isError || !data) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="bg-card border border-rose-500/20 rounded-xl p-8 text-center max-w-sm">
-          <p className="text-rose-500 font-bold mb-2">데이터를 불러올 수 없습니다.</p>
-          <p className="text-muted-foreground text-sm">잠시 후 다시 시도해 주세요.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const plan = data.plan;
   const limits = PLAN_LIMITS[plan];
+  const data = { plan, usage, recentSearches, savedKeywordsCount, totalSearches };
   const searchLimit = limits.dailySearch;
   const titleLimit = limits.dailyTitle;
 

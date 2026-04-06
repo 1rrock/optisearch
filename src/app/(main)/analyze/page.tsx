@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useUserStore } from "@/shared/stores/user-store";
 import {
   Search,
   TrendingUp,
@@ -464,12 +465,10 @@ function AnalyzePageInner() {
 
   function fireAllPhases(keyword: string, token?: string) {
     // Front-end usage limit check — avoid unnecessary API call
-    const cached = queryClient.getQueryData<{ usage?: { search: number }; limits?: { dailySearch: number } }>(["dashboard"]);
-    if (cached?.usage && cached?.limits && cached.limits.dailySearch !== -1) {
-      if (cached.usage.search >= cached.limits.dailySearch) {
-        setUpgradeModal({ used: cached.usage.search, limit: cached.limits.dailySearch });
-        return;
-      }
+    const storeState = useUserStore.getState();
+    if (storeState.limits.dailySearch !== -1 && storeState.usage.search >= storeState.limits.dailySearch) {
+      setUpgradeModal({ used: storeState.usage.search, limit: storeState.limits.dailySearch });
+      return;
     }
 
     setQuickData(null);
@@ -485,9 +484,9 @@ function AnalyzePageInner() {
       setQuickData(result);
       setQuickPending(false);
       queryClient.setQueryData(["analyze-quick", result.keyword], result);
+      useUserStore.getState().incrementUsage("search");
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["search-history"] });
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       }, 3000);
       setTurnstileToken(null);
       turnstileRef.current?.reset();

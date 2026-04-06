@@ -5,6 +5,7 @@ import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
 import { Toaster } from "@/shared/ui/sonner";
 import { PaddleProvider } from "@/shared/providers/paddle-provider";
+import { UserStoreSync } from "@/shared/providers/user-store-provider";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist } from "next/font/google";
@@ -80,6 +81,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SessionProvider>
+            <UserStoreSync />
             <PaddleProvider>
               <QueryProvider>{children}</QueryProvider>
             </PaddleProvider>

@@ -4,8 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useSession, signOut } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { signOut } from "next-auth/react";
 import {
   Home,
   Search,
@@ -21,25 +20,14 @@ import {
   CreditCard,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
-import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { PLAN_PRICING } from "@/shared/config/constants";
+import { useUserName, useUserPlan } from "@/shared/hooks/use-user";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-
-  // Fetch user's actual plan from dashboard API
-  const { data: dashboardData } = useQuery<{ plan: PlanId }>({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) return { plan: "free" as PlanId };
-      return res.json();
-    },
-    staleTime: 5 * 60 * 1000,
-  });
-  const userPlan = (dashboardData?.plan ?? "free") as PlanId;
+  const userPlan = useUserPlan();
 
   // Close menu on outside click
   useEffect(() => {
@@ -54,7 +42,7 @@ export function Sidebar() {
     }
   }, [menuOpen]);
 
-  const userName = session?.user?.name ?? "사용자";
+  const userName = useUserName() ?? "사용자";
   const userInitial = userName.charAt(0).toUpperCase();
 
   return (

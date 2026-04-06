@@ -1,7 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
+import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
 import { CheckCircle2, X } from "lucide-react";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
@@ -10,10 +10,6 @@ import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { usePaddle } from "@/shared/providers/paddle-provider";
 import { priceIdFromPlanId } from "@/shared/lib/paddle";
 import { toast } from "sonner";
-
-interface DashboardData {
-  plan: PlanId;
-}
 
 type FeatureValue = string | boolean;
 
@@ -182,21 +178,12 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
 }
 
 export default function PricingPage() {
-  const { status, data: session } = useSession();
-  const isAuthenticated = status === "authenticated";
+  const { isAuthenticated } = useIsAuthenticated();
+  const userPlan = useUserPlan();
+  const { data: session } = useSession();
   const paddle = usePaddle();
 
-  const { data } = useQuery<DashboardData>({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) throw new Error("Failed to load");
-      return res.json();
-    },
-    enabled: isAuthenticated,
-  });
-
-  const currentPlan: PlanId | null = data?.plan ?? (isAuthenticated ? "free" : null);
+  const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
   const handleSubscribe = async (planId: PlanId) => {
     if (planId === "free") return;

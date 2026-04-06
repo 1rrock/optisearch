@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useDashboardData } from "@/shared/hooks/use-user";
+import { useUserStore } from "@/shared/stores/user-store";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
@@ -9,24 +11,6 @@ import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, AlertTriangle } from
 import { toast } from "sonner";
 
 type Section = "subscription" | "danger";
-
-interface DashboardData {
-  plan: PlanId;
-  usage: {
-    search: number;
-    title: number;
-    draft: number;
-    score: number;
-  };
-  recentSearches: Array<{
-    keyword: string;
-    grade: string | null;
-    totalVolume: number;
-    createdAt: string;
-  }>;
-  savedKeywordsCount: number;
-  totalSearches: number;
-}
 
 interface SubscriptionData {
   plan: PlanId;
@@ -89,17 +73,9 @@ export default function SettingsPage() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery<DashboardData>({
-    queryKey: ["dashboard"],
-    queryFn: async () => {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "Failed to load dashboard");
-      }
-      return res.json();
-    },
-  });
+  const dashboardStore = useDashboardData();
+  const data = dashboardStore.initialized ? { plan: dashboardStore.plan, usage: dashboardStore.usage } : null;
+  const isLoading = !dashboardStore.initialized || dashboardStore.loading;
 
   const { data: subscription } = useQuery<SubscriptionData>({
     queryKey: ["subscription"],
@@ -124,6 +100,7 @@ export default function SettingsPage() {
       setShowCancelConfirm(false);
       void queryClient.invalidateQueries({ queryKey: ["subscription"] });
       void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void useUserStore.getState().refresh();
     },
     onError: (err: Error) => {
       toast.error(err.message);

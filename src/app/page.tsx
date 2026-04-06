@@ -12,7 +12,8 @@ import {
 import { Button } from "@/shared/ui/button";
 import Aurora from "@/components/Aurora"
 import { useEffect, useState } from "react";
-import { useSession, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
+import { useIsAuthenticated } from "@/shared/hooks/use-user";
 import { PLAN_PRICING } from "@/shared/config/constants";
 import Link from "next/link";
 import Image from "next/image";
@@ -20,8 +21,8 @@ import Image from "next/image";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
-  const { data: session, status } = useSession();
-  const isLoggedIn = status === "authenticated" && !!session;
+  const { isAuthenticated, loading: sessionLoading } = useIsAuthenticated();
+  const isLoggedIn = isAuthenticated && !sessionLoading;
 
   useEffect(() => {
     setMounted(true);
