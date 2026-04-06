@@ -91,7 +91,7 @@ async function handleSubscriptionChange(data: any) {
 
   const plan = planIdFromPriceId(priceId);
   if (!plan) {
-    console.warn("[paddle-webhook] Unknown priceId:", priceId);
+    console.error("[paddle-webhook] Unknown priceId:", priceId, "| BASIC env:", process.env.NEXT_PUBLIC_PADDLE_PRICE_BASIC ?? process.env.PADDLE_PRICE_BASIC ?? "NOT SET", "| PRO env:", process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO ?? process.env.PADDLE_PRICE_PRO ?? "NOT SET");
     return;
   }
 
@@ -107,11 +107,14 @@ async function handleSubscriptionChange(data: any) {
   // Update user plan
   const { error, count } = await supabase
     .from("user_profiles")
-    .update({
-      plan,
-      paddle_subscription_id: data.id,
-      paddle_customer_id: data.customerId,
-    })
+    .update(
+      {
+        plan,
+        paddle_subscription_id: data.id,
+        paddle_customer_id: data.customerId,
+      },
+      { count: "exact" }
+    )
     .eq("auth_user_id", userId);
 
   if (error) {
@@ -137,7 +140,7 @@ async function handleSubscriptionCanceled(data: any) {
   // Downgrade to free
   const { error, count } = await supabase
     .from("user_profiles")
-    .update({ plan: "free" })
+    .update({ plan: "free" }, { count: "exact" })
     .eq("paddle_subscription_id", subscriptionId);
 
   if (error) {

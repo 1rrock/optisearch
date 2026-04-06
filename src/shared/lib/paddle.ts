@@ -4,15 +4,21 @@ import type { PlanId } from "@/shared/config/constants";
  * Paddle price ID → PlanId mapping.
  * Values come from environment variables set in .env.local
  */
-const _map: Record<string, PlanId> = {};
-const _basicPrice = process.env.NEXT_PUBLIC_PADDLE_PRICE_BASIC;
-const _proPrice = process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO;
-if (_basicPrice) _map[_basicPrice] = "basic";
-if (_proPrice) _map[_proPrice] = "pro";
-export const PADDLE_PRICE_TO_PLAN: Record<string, PlanId> = _map;
+/**
+ * Lazy-evaluated price mapping to ensure env vars are available at call time.
+ * Uses both NEXT_PUBLIC_ (client) and non-prefixed (server) fallbacks.
+ */
+function getPriceMap(): Record<string, PlanId> {
+  const map: Record<string, PlanId> = {};
+  const basicPrice = process.env.NEXT_PUBLIC_PADDLE_PRICE_BASIC ?? process.env.PADDLE_PRICE_BASIC;
+  const proPrice = process.env.NEXT_PUBLIC_PADDLE_PRICE_PRO ?? process.env.PADDLE_PRICE_PRO;
+  if (basicPrice) map[basicPrice] = "basic";
+  if (proPrice) map[proPrice] = "pro";
+  return map;
+}
 
 export function planIdFromPriceId(priceId: string): PlanId | null {
-  return PADDLE_PRICE_TO_PLAN[priceId] ?? null;
+  return getPriceMap()[priceId] ?? null;
 }
 
 export function priceIdFromPlanId(planId: PlanId): string | null {
