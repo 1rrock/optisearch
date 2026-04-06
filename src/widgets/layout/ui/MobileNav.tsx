@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
-import { Logo } from "@/shared/ui/logo";
+
 import {
   Home,
   Search,
@@ -34,22 +34,28 @@ import {
 import { Button } from "@/shared/ui/button";
 
 const NAV_ITEMS = [
-  { section: "분석", items: [
-    { href: "/dashboard", icon: Home, label: "대시보드" },
-    { href: "/analyze", icon: Search, label: "키워드 분석" },
-    { href: "/keywords", icon: Bookmark, label: "저장된 키워드" },
-    { href: "/trends", icon: LineChart, label: "트렌드" },
-    { href: "/shopping", icon: ShoppingBag, label: "쇼핑 인사이트" },
-  ]},
-  { section: "고급 도구", items: [
-    { href: "/bulk", icon: Layers, label: "대량 분석" },
-    { href: "/compare", icon: ListPlus, label: "키워드 비교" },
-    { href: "/ai", icon: Sparkles, label: "AI 도구" },
-  ]},
-  { section: "계정", items: [
-    { href: "/pricing", icon: CreditCard, label: "요금제" },
-    { href: "/settings", icon: Settings, label: "설정" },
-  ]},
+  {
+    section: "분석", items: [
+      { href: "/dashboard", icon: Home, label: "대시보드" },
+      { href: "/analyze", icon: Search, label: "키워드 분석" },
+      { href: "/keywords", icon: Bookmark, label: "저장된 키워드" },
+      { href: "/trends", icon: LineChart, label: "트렌드" },
+      { href: "/shopping", icon: ShoppingBag, label: "쇼핑 인사이트" },
+    ]
+  },
+  {
+    section: "고급 도구", items: [
+      { href: "/bulk", icon: Layers, label: "대량 분석" },
+      { href: "/compare", icon: ListPlus, label: "키워드 비교" },
+      { href: "/ai", icon: Sparkles, label: "AI 도구" },
+    ]
+  },
+  {
+    section: "계정", items: [
+      { href: "/pricing", icon: CreditCard, label: "요금제" },
+      { href: "/settings", icon: Settings, label: "설정" },
+    ]
+  },
 ];
 
 export function MobileNav() {
@@ -81,7 +87,10 @@ export function MobileNav() {
       <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle className="flex items-center gap-2">
-            <Logo size={28} />
+            <div className="w-7 h-7 rounded-lg overflow-hidden">
+              <Image src="/logo.png" alt="옵티써치" width={28} height={28} className="w-full h-full object-cover" />
+            </div>
+
             <span className="text-lg font-extrabold tracking-tighter">옵티써치</span>
           </SheetTitle>
         </SheetHeader>

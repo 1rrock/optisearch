@@ -8,8 +8,6 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 
-import { Logo } from "@/shared/ui/logo";
-
 function LoginContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
@@ -20,7 +18,10 @@ function LoginContent() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-xl border-muted/80 shadow-2xl rounded-3xl p-8 sm:p-12 relative z-10">
         <div className="flex flex-col items-center mb-10 text-center">
           <Link href="/" className="flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
-            <Logo size={40} className="drop-shadow-md" />
+            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
+              <Image src="/logo.png" alt="옵티써치 로고" width={40} height={40} className="w-full h-full object-cover" />
+            </div>
+
             <span className="text-2xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
               옵티써치
             </span>
@@ -45,7 +46,7 @@ function LoginContent() {
             className="flex items-center justify-center w-full h-14 rounded-2xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-md transition-colors shadow-sm gap-3"
           >
             <svg viewBox="0 0 24 24" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.726 1.8 5.117 4.508 6.482-.144.522-.928 3.37-.962 3.581 0 0-.02.166.087.229.107.063.232.03.232.03.306-.043 3.548-2.326 4.11-2.72.652.096 1.326.147 2.025.147 5.523 0 10-3.463 10-7.749C22 6.463 17.523 3 12 3" fill="#191919"/>
+              <path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.726 1.8 5.117 4.508 6.482-.144.522-.928 3.37-.962 3.581 0 0-.02.166.087.229.107.063.232.03.232.03.306-.043 3.548-2.326 4.11-2.72.652.096 1.326.147 2.025.147 5.523 0 10-3.463 10-7.749C22 6.463 17.523 3 12 3" fill="#191919" />
             </svg>
             카카오로 시작하기
           </Button>
