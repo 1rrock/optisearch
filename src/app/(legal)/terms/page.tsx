@@ -167,10 +167,13 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <div className="pt-6 border-t border-muted/50">
+      <div className="pt-6 border-t border-muted/50 space-y-3">
         <p className="text-sm text-muted-foreground">
           문의사항이 있으시면 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 연락해 주세요.
         </p>
+        <div className="text-xs text-muted-foreground space-y-0.5">
+          <p>상호: 알에이케이랩스 | 사업자등록번호: 570-01-03731 | 대표자: 최원락</p>
+        </div>
       </div>
     </article>
   );

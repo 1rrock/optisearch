@@ -348,18 +348,25 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-background py-12 border-t border-muted/30">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="옵티써치 로고" width={20} height={20} className="w-5 h-5 object-cover rounded" />
-            <span className="font-bold text-lg">옵티써치</span>
-            <span className="text-muted-foreground text-sm font-medium ml-4">© 2026. All rights reserved.</span>
+        <div className="max-w-7xl mx-auto px-6 space-y-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-3">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="옵티써치 로고" width={20} height={20} className="w-5 h-5 object-cover rounded" />
+              <span className="font-bold text-lg">옵티써치</span>
+              <span className="text-muted-foreground text-sm font-medium ml-4">© 2026. All rights reserved.</span>
+            </div>
+
+            <div className="flex items-center gap-8 text-sm font-bold text-muted-foreground">
+              <a href="/terms" className="hover:text-foreground transition-colors">이용약관</a>
+              <a href="/privacy" className="hover:text-foreground transition-colors">개인정보처리방침</a>
+              <a href="/support" className="hover:text-foreground transition-colors">고객센터</a>
+            </div>
           </div>
 
-          <div className="flex items-center gap-8 text-sm font-bold text-muted-foreground">
-            <a href="/terms" className="hover:text-foreground transition-colors">이용약관</a>
-            <a href="/privacy" className="hover:text-foreground transition-colors">개인정보처리방침</a>
-            <a href="/support" className="hover:text-foreground transition-colors">고객센터</a>
+          <div className="border-t border-muted/30 pt-6 text-xs text-muted-foreground space-y-1">
+            <p>알에이케이랩스 | 사업자등록번호: 570-01-03731 | 대표자: 최원락</p>
+            <p>고객문의: <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a></p>
           </div>
         </div>
       </footer>

@@ -113,6 +113,9 @@ export default function PrivacyPage() {
         <h2 className="text-xl font-bold mb-4">7. 개인정보보호 책임자 및 연락처</h2>
         <div className="bg-muted/20 rounded-2xl p-6 text-muted-foreground space-y-1">
           <p><span className="font-semibold text-foreground">서비스명:</span> 옵티써치 (OptiSearch)</p>
+          <p><span className="font-semibold text-foreground">사업자명:</span> 알에이케이랩스</p>
+          <p><span className="font-semibold text-foreground">사업자등록번호:</span> 570-01-03731</p>
+          <p><span className="font-semibold text-foreground">대표자:</span> 최원락</p>
           <p><span className="font-semibold text-foreground">고객지원:</span>{" "}
             <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>
           </p>
