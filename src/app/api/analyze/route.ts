@@ -74,7 +74,8 @@ export async function POST(request: Request) {
       searchWeb(effectiveKeyword, 3).catch(() => null),
       searchEncyclopedia(effectiveKeyword, 3).catch(() => null),
     ]);
-    await recordUsage(user.userId, "search", effectiveKeyword);
+    // Record usage (non-blocking)
+    void recordUsage(user.userId, "search", effectiveKeyword).catch(() => {});
     // Save search history (non-blocking), enforce plan-based history limit
     const planLimits = PLAN_LIMITS[user.plan];
     const historyLimit = planLimits.historyLimit;

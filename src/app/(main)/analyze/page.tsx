@@ -935,9 +935,9 @@ function AnalyzePageInner() {
                   </button>
                 )}
               </div>
-              <div className="flex-1 overflow-auto">
+              <div className="flex-1 overflow-x-auto">
                 {relatedKeywords.length > 0 ? (
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full min-w-[360px] text-left border-collapse">
                     <thead className="bg-muted/30 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-b border-muted/50">
                       <tr>
                         <th className="px-6 py-3">키워드</th>

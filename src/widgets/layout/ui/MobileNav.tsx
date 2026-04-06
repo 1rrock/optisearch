@@ -70,7 +70,7 @@ export function MobileNav() {
       if (!res.ok) return { plan: "free" as PlanId };
       return res.json();
     },
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   });
   const userPlan = (dashboardData?.plan ?? "free") as PlanId;
   const userName = session?.user?.name ?? "사용자";
