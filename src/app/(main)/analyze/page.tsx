@@ -463,6 +463,15 @@ function AnalyzePageInner() {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
 
   function fireAllPhases(keyword: string, token?: string) {
+    // Front-end usage limit check — avoid unnecessary API call
+    const cached = queryClient.getQueryData<{ usage?: { search: number }; limits?: { dailySearch: number } }>(["dashboard"]);
+    if (cached?.usage && cached?.limits && cached.limits.dailySearch !== -1) {
+      if (cached.usage.search >= cached.limits.dailySearch) {
+        setUpgradeModal({ used: cached.usage.search, limit: cached.limits.dailySearch });
+        return;
+      }
+    }
+
     setQuickData(null);
     setFullData(null);
     setExtraData(null);
