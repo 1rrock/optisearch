@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ShoppingBag, Search, Loader2, AlertCircle, TrendingUp, ChevronDown } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Popover, PopoverTrigger, PopoverContent } from "@/shared/ui/popover";
@@ -248,8 +248,13 @@ export default function ShoppingInsightPage() {
   const [categoryOpen, setCategoryOpen] = useState(false);
   const [categorySearch, setCategorySearch] = useState("");
 
+  const queryClient = useQueryClient();
   const { mutate, data, isPending, error, isIdle } = useMutation({
     mutationFn: fetchShopping,
+    onSuccess: (result, params) => {
+      const cacheKey = `${params.category}_${params.keyword ?? ""}_${params.months}_${params.device ?? ""}_${params.gender ?? ""}`;
+      queryClient.setQueryData(["shopping", cacheKey], result);
+    },
   });
 
   function handleSearch() {

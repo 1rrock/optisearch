@@ -402,10 +402,14 @@ function AnalyzePageInner() {
   const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileRef>(null);
+  // Restored from query cache when navigating back to a previously analyzed keyword
+  const [restoredData, setRestoredData] = useState<AnalyzeResponse | null>(null);
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
     mutationFn: (keyword: string) => analyzeKeyword(keyword, turnstileToken ?? undefined),
-    onSuccess: () => {
+    onSuccess: (result, keyword) => {
+      // Cache the result so navigating away and back restores it
+      queryClient.setQueryData(["analyze", keyword], result);
       // Refresh search history so the dropdown shows the new entry
       queryClient.invalidateQueries({ queryKey: ["search-history"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -443,16 +447,40 @@ function AnalyzePageInner() {
   }, [data?.analysis?.keyword]);
 
   // Auto-analyze from URL param: /analyze?keyword=검색어
+  // Check cache first; only fetch if no cached data exists (stale after 5 min)
   useEffect(() => {
     const keyword = searchParams.get("keyword");
     if (keyword && !autoTriggered.current) {
       autoTriggered.current = true;
       setInputValue(keyword);
       setSubmittedKeyword(keyword);
-      setTrendData(null);
-      setTrendError(false);
-      reset();
-      mutate(keyword);
+      const cached = queryClient.getQueryData<AnalyzeResponse>(["analyze", keyword]);
+      if (cached) {
+        // Restore from cache without re-fetching
+        setRestoredData(cached);
+        reset();
+        setIsSaved(false);
+        fetchIsKeywordSaved(keyword).then(setIsSaved).catch(() => { });
+        // Also restore trend/gender data from cache if available
+        const cachedTrend = queryClient.getQueryData<TrendPoint[]>(["trend", keyword]);
+        if (cachedTrend !== undefined) {
+          setTrendData(cachedTrend);
+          setTrendError(false);
+        } else {
+          setTrendData(null);
+          setTrendError(false);
+          fetchTrendData(keyword, cached.plan !== "free");
+        }
+        const cachedGender = queryClient.getQueryData<{ male: number; female: number } | null>(["gender", keyword]);
+        if (cachedGender !== undefined) {
+          setGenderRatio(cachedGender);
+        }
+      } else {
+        setTrendData(null);
+        setTrendError(false);
+        reset();
+        mutate(keyword);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -460,7 +488,7 @@ function AnalyzePageInner() {
   // Fetch trend data whenever analysis result changes
   useEffect(() => {
     if (!data?.analysis?.keyword) return;
-    fetchTrendData(data.analysis.keyword, data.plan !== "free");
+    fetchTrendData(data.analysis.keyword, activeData?.plan !== "free");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.analysis?.keyword]);
 
@@ -499,6 +527,8 @@ function AnalyzePageInner() {
       const trendJson = await trendRes.json();
       const points: TrendPoint[] = trendJson.trends?.[0]?.data ?? [];
       setTrendData(points);
+      // Cache trend data (5 min stale time managed via cache entry timestamp)
+      queryClient.setQueryData(["trend", keyword], points);
 
       // Gender ratio calculation (paid plans only)
       if (demographicsEnabled && responses.length === 3) {
@@ -513,10 +543,14 @@ function AnalyzePageInner() {
           const femaleAvg = femaleData.length > 0 ? femaleData.reduce((s, d) => s + d.ratio, 0) / femaleData.length : 0;
           const total = maleAvg + femaleAvg;
           if (total > 0) {
-            setGenderRatio({
+            const ratio = {
               male: Math.round((maleAvg / total) * 100),
               female: Math.round((femaleAvg / total) * 100),
-            });
+            };
+            setGenderRatio(ratio);
+            queryClient.setQueryData(["gender", keyword], ratio);
+          } else {
+            queryClient.setQueryData(["gender", keyword], null);
           }
         }
       }
@@ -532,19 +566,22 @@ function AnalyzePageInner() {
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
+    setRestoredData(null);
     reset();
     mutate(keyword);
   }
 
-  const analysis = data?.analysis ?? null;
-  const relatedKeywords = data?.relatedKeywords ?? [];
-  const correctedKeyword = data?.correctedKeyword ?? null;
+  const activeData = data ?? restoredData;
+  const analysis = activeData?.analysis ?? null;
+  const relatedKeywords = activeData?.relatedKeywords ?? [];
+  const correctedKeyword = activeData?.correctedKeyword ?? null;
 
   function handleRelatedKeywordClick(keyword: string) {
     setInputValue(keyword);
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
+    setRestoredData(null);
     reset();
     mutate(keyword);
     window.scrollTo({ top: 0, behavior: "smooth" });

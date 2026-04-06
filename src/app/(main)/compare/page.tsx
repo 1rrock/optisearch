@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, X, ArrowRightLeft } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
@@ -98,6 +98,7 @@ export default function ComparePage() {
 }
 
 function ComparePageInner() {
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const [entries, setEntries] = useState<KeywordEntry[]>([]);
   const [inputValue, setInputValue] = useState("");
@@ -124,6 +125,8 @@ function ComparePageInner() {
       );
     },
     onSuccess: (data, keyword) => {
+      // Cache result for 5 minutes so navigating away and back restores it
+      queryClient.setQueryData(["analyze", keyword], data);
       setEntries((prev) =>
         prev.map((e) =>
           e.keyword === keyword
@@ -144,18 +147,29 @@ function ComparePageInner() {
   });
 
   // Auto-add keywords from URL params
+  // Check query cache first; only fetch if no cached data exists
   useEffect(() => {
     const param = searchParams.get("keywords");
     if (!param) return;
     const keywords = param.split(",").map(k => decodeURIComponent(k.trim())).filter(Boolean);
     keywords.forEach(kw => {
-      const newEntry: KeywordEntry = { keyword: kw, data: null, loading: true, error: null };
-      setEntries(prev => {
-        if (prev.some(e => e.keyword === kw)) return prev;
-        if (prev.length >= MAX_KEYWORDS) return prev;
-        return [...prev, newEntry];
-      });
-      analyzeMutation.mutate(kw);
+      const cached = queryClient.getQueryData<AnalyzeResponse>(["analyze", kw]);
+      if (cached) {
+        // Restore from cache without re-fetching
+        setEntries(prev => {
+          if (prev.some(e => e.keyword === kw)) return prev;
+          if (prev.length >= MAX_KEYWORDS) return prev;
+          return [...prev, { keyword: kw, data: cached.analysis, loading: false, error: null }];
+        });
+      } else {
+        const newEntry: KeywordEntry = { keyword: kw, data: null, loading: true, error: null };
+        setEntries(prev => {
+          if (prev.some(e => e.keyword === kw)) return prev;
+          if (prev.length >= MAX_KEYWORDS) return prev;
+          return [...prev, newEntry];
+        });
+        analyzeMutation.mutate(kw);
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
