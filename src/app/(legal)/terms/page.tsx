@@ -48,9 +48,9 @@ export default function TermsPage() {
           <div className="bg-muted/20 rounded-2xl p-5">
             <h3 className="font-bold mb-2">무료 플랜 (Free)</h3>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
-              <li>키워드 검색 5회/일</li>
-              <li>AI 제목 생성 1회/일</li>
-              <li>트렌드 차트 열람</li>
+              <li>키워드 검색 10회/일</li>
+              <li>AI 제목 생성 3회/일, 초안 1회/일, 점수 1회/일</li>
+              <li>인기글 TOP3, 트렌드 차트 3개월</li>
             </ul>
           </div>
           <div className="bg-muted/20 rounded-2xl p-5">

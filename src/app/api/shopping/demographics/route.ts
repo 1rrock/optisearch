@@ -4,10 +4,11 @@ import {
   getShoppingGenderTrend,
   getShoppingAgeTrend,
 } from "@/shared/lib/naver-datalab";
-import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { cached } from "@/services/cache-service";
 import { formatDate } from "@/shared/lib/utils";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   category: z.string().min(1),
@@ -50,15 +51,17 @@ export async function POST(request: Request) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+  }
+
   if (!PLAN_LIMITS[user.plan].shoppingInsightEnabled) {
     return Response.json(
       { error: "쇼핑 인사이트는 베이직 이상 플랜에서 이용 가능합니다.", code: "PLAN_UPGRADE_REQUIRED" },
       { status: 403 }
     );
   }
-
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
-  if (limitError) return limitError;
 
   try {
     const { category, keyword, months } = parsed.data;
@@ -112,7 +115,6 @@ export async function POST(request: Request) {
       }
     );
 
-    await recordUsage(user.userId, "search", keyword ?? category);
     return Response.json(result);
   } catch (err) {
     console.error("[api/shopping/demographics] Error:", err);

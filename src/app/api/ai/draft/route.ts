@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { generateDraft } from "@/services/ai-service";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -24,6 +25,11 @@ export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
   const limitError = await enforceUsageLimit(user.userId, user.plan, "draft");

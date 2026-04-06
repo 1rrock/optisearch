@@ -38,30 +38,33 @@ export interface PlanLimit {
   trendPeriodMonths: number;
   /** Whether demographic (gender/age) filter is available */
   demographicsEnabled: boolean;
-  /** Whether top posts (인기글 TOP7) is available */
-  topPostsEnabled: boolean;
+  /** Max number of top posts shown (0 = disabled) */
+  topPostsLimit: number;
   /** Whether section analysis is available */
   sectionAnalysisEnabled: boolean;
   /** Whether shopping insight is available */
   shoppingInsightEnabled: boolean;
   /** Whether search history export to Excel is available */
   historyExcelEnabled: boolean;
+  /** Max saved keywords (-1 = unlimited) */
+  savedKeywordLimit: number;
   /** Max search history entries stored (-1 = unlimited) */
   historyLimit: number;
 }
 
 export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
   free: {
-    dailySearch: 5,
-    dailyTitle: 1,
-    dailyDraft: 0,
-    dailyScore: 0,
+    dailySearch: 10,
+    dailyTitle: 3,
+    dailyDraft: 1,
+    dailyScore: 1,
     bulkKeywordsPerRun: -1,
-    trendPeriodMonths: 1,
+    trendPeriodMonths: 3,
     demographicsEnabled: false,
-    topPostsEnabled: false,
+    topPostsLimit: 3,
     sectionAnalysisEnabled: false,
     shoppingInsightEnabled: false,
+    savedKeywordLimit: 10,
     historyExcelEnabled: false,
     historyLimit: 10,
   },
@@ -73,9 +76,10 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     bulkKeywordsPerRun: 50,
     trendPeriodMonths: 12,
     demographicsEnabled: true,
-    topPostsEnabled: true,
+    topPostsLimit: 7,
     sectionAnalysisEnabled: true,
     shoppingInsightEnabled: true,
+    savedKeywordLimit: -1,
     historyExcelEnabled: true,
     historyLimit: -1,
   },
@@ -87,9 +91,10 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     bulkKeywordsPerRun: 500,
     trendPeriodMonths: -1,
     demographicsEnabled: true,
-    topPostsEnabled: true,
+    topPostsLimit: 7,
     sectionAnalysisEnabled: true,
     shoppingInsightEnabled: true,
+    savedKeywordLimit: -1,
     historyExcelEnabled: true,
     historyLimit: -1,
   },

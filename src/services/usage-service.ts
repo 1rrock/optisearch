@@ -23,7 +23,8 @@ export async function checkUsageLimit(
   if (limit === -1) return { allowed: true, used: 0, limit: -1 };
 
   const supabase = await createServerClient();
-  const today = new Date().toISOString().split("T")[0];
+  // Use KST (UTC+9) for daily reset so Korean users see midnight reset
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split("T")[0];
 
   const { count, error } = await supabase
     .from("ai_usage")

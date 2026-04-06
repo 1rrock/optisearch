@@ -1,11 +1,12 @@
 import { z } from "zod";
-import { getAuthenticatedUser, enforceUsageLimit } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import {
   getEstimatePerformance,
   getExposureMinimumBid,
   getAveragePositionBid,
 } from "@/shared/lib/naver-searchad";
 import { cached } from "@/services/cache-service";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -56,8 +57,13 @@ export async function POST(request: Request) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
-  if (limitError) return limitError;
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+  }
+
+  // No usage counting — estimate uses SearchAd API (no daily quota) and
+  // is supplementary data. Usage is already counted by /api/analyze.
 
   try {
     const { keyword } = parsed.data;

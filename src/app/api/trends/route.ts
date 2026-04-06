@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { getKeywordTrend } from "@/services/trend-service";
-import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
+import { PLAN_LIMITS } from "@/shared/config/constants";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keywords: z.array(z.string().min(1)).min(1).max(5),
@@ -31,13 +33,26 @@ export async function POST(request: Request) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
-  if (limitError) return limitError;
+  // No usage counting — trends are supplementary data. But rate limit
+  // to prevent abuse of Naver DataLab API quota.
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+  }
 
   try {
-    const { keywords, months, device, gender, ages } = parsed.data;
-    const trends = await getKeywordTrend(keywords, months, device, gender, ages);
-    await recordUsage(user.userId, "search", keywords.join(","));
+    const { keywords, device, gender, ages } = parsed.data;
+    const limits = PLAN_LIMITS[user.plan];
+
+    // Enforce plan-based trend period limit
+    const maxMonths = limits.trendPeriodMonths === -1 ? 24 : limits.trendPeriodMonths;
+    const months = Math.min(parsed.data.months, maxMonths);
+
+    // Enforce demographics filter restriction
+    const effectiveGender = limits.demographicsEnabled ? gender : undefined;
+    const effectiveAges = limits.demographicsEnabled ? ages : undefined;
+
+    const trends = await getKeywordTrend(keywords, months, device, effectiveGender, effectiveAges);
     return Response.json({ trends });
   } catch (err) {
     console.error("[api/trends] Error:", err);

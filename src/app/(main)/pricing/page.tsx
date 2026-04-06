@@ -25,21 +25,21 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
-  { label: "키워드 검색", free: "5회/일", basic: "무제한", pro: "무제한" },
+  { label: "키워드 검색", free: "10회/일", basic: "무제한", pro: "무제한" },
   { label: "연관 키워드", free: true, basic: true, pro: true },
   { label: "콘텐츠 포화 지수", free: true, basic: true, pro: true },
   { label: "키워드 등급", free: true, basic: true, pro: true },
-  { label: "인기글 TOP7", free: false, basic: true, pro: true },
+  { label: "인기글", free: "TOP3", basic: "TOP7", pro: "TOP7" },
   { label: "섹션 분석", free: false, basic: true, pro: true },
   { label: "쇼핑 인사이트", free: false, basic: true, pro: true },
-  { label: "트렌드", free: "기본(1개월)", basic: "1년", pro: "전체" },
+  { label: "트렌드", free: "3개월", basic: "1년", pro: "전체" },
   { label: "성별/연령 필터", free: false, basic: true, pro: true },
   { label: "대량 키워드", free: false, basic: "50개/회", pro: "500개/회" },
   { label: "태그 복사", free: true, basic: true, pro: true },
   { label: "검색 기록/엑셀", free: "최근 10개", basic: "무제한+엑셀", pro: "무제한+엑셀" },
-  { label: "AI 제목 추천", free: "1회/일", basic: "20회/일", pro: "100회/일" },
-  { label: "AI 글 초안", free: false, basic: "5회/일", pro: "30회/일" },
-  { label: "AI 콘텐츠 점수", free: false, basic: "10회/일", pro: "50회/일" },
+  { label: "AI 제목 추천", free: "3회/일", basic: "20회/일", pro: "100회/일" },
+  { label: "AI 글 초안", free: "1회/일", basic: "5회/일", pro: "30회/일" },
+  { label: "AI 콘텐츠 점수", free: "1회/일", basic: "10회/일", pro: "50회/일" },
   { label: "오타 교정", free: true, basic: true, pro: true },
 ];
 

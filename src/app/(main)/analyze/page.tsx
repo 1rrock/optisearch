@@ -38,6 +38,7 @@ interface AnalyzeResponse {
   analysis: KeywordSearchResult;
   relatedKeywords: RelatedKeyword[];
   correctedKeyword: string | null;
+  plan?: "free" | "basic" | "pro";
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,28 @@ async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
 
 function stripHtml(str: string): string {
   return str.replace(/<[^>]*>/g, "");
+}
+
+// ---------------------------------------------------------------------------
+// Competition helpers
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Volatility (이슈성 지수) helper
+// ---------------------------------------------------------------------------
+
+function getVolatilityInfo(data: TrendPoint[] | null) {
+  if (!data || data.length < 3) return null;
+  const ratios = data.map((d) => d.ratio);
+  const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  if (mean === 0) return null;
+  const variance = ratios.reduce((sum, r) => sum + (r - mean) ** 2, 0) / ratios.length;
+  const std = Math.sqrt(variance);
+  const cv = std / mean; // coefficient of variation
+
+  if (cv < 0.15) return { label: "안정", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400", description: "에버그린 키워드" };
+  if (cv < 0.30) return { label: "보통", color: "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400", description: "일반적 변동" };
+  return { label: "이슈성", color: "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400", description: "일시적 유행/바이럴" };
 }
 
 // ---------------------------------------------------------------------------
@@ -375,6 +398,7 @@ function AnalyzePageInner() {
   const [isSaved, setIsSaved] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const [upgradeModal, setUpgradeModal] = useState<{ used: number; limit: number } | null>(null);
+  const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
     mutationFn: analyzeKeyword,
@@ -427,23 +451,66 @@ function AnalyzePageInner() {
   // Fetch trend data whenever analysis result changes
   useEffect(() => {
     if (!data?.analysis?.keyword) return;
-    fetchTrendData(data.analysis.keyword);
+    fetchTrendData(data.analysis.keyword, data.plan !== "free");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.analysis?.keyword]);
 
-  async function fetchTrendData(keyword: string) {
+  async function fetchTrendData(keyword: string, demographicsEnabled: boolean) {
     setTrendData(null);
     setTrendError(false);
+    setGenderRatio(null);
     try {
-      const res = await fetch("/api/trends", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keywords: [keyword], months: 12 }),
-      });
-      if (!res.ok) throw new Error();
-      const json = await res.json();
-      const points: TrendPoint[] = json.trends?.[0]?.data ?? [];
+      const fetches: Promise<Response>[] = [
+        fetch("/api/trends", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keywords: [keyword], months: 12 }),
+        }),
+      ];
+
+      if (demographicsEnabled) {
+        fetches.push(
+          fetch("/api/trends", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords: [keyword], months: 1, gender: "m" }),
+          }),
+          fetch("/api/trends", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keywords: [keyword], months: 1, gender: "f" }),
+          }),
+        );
+      }
+
+      const responses = await Promise.all(fetches);
+      const trendRes = responses[0];
+
+      if (!trendRes.ok) throw new Error();
+      const trendJson = await trendRes.json();
+      const points: TrendPoint[] = trendJson.trends?.[0]?.data ?? [];
       setTrendData(points);
+
+      // Gender ratio calculation (paid plans only)
+      if (demographicsEnabled && responses.length === 3) {
+        const maleRes = responses[1];
+        const femaleRes = responses[2];
+        if (maleRes.ok && femaleRes.ok) {
+          const maleJson = await maleRes.json();
+          const femaleJson = await femaleRes.json();
+          const maleData: TrendPoint[] = maleJson.trends?.[0]?.data ?? [];
+          const femaleData: TrendPoint[] = femaleJson.trends?.[0]?.data ?? [];
+          const maleAvg = maleData.length > 0 ? maleData.reduce((s, d) => s + d.ratio, 0) / maleData.length : 0;
+          const femaleAvg = femaleData.length > 0 ? femaleData.reduce((s, d) => s + d.ratio, 0) / femaleData.length : 0;
+          const total = maleAvg + femaleAvg;
+          if (total > 0) {
+            setGenderRatio({
+              male: Math.round((maleAvg / total) * 100),
+              female: Math.round((femaleAvg / total) * 100),
+            });
+          }
+        }
+      }
     } catch {
       setTrendError(true);
     }
@@ -742,11 +809,48 @@ function AnalyzePageInner() {
             </section>
           )}
 
+          {/* Gender Distribution */}
+          {genderRatio && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4">
+                <Gauge className="size-5 text-primary" />
+                <h3 className="text-lg font-bold">검색자 성별 분포</h3>
+              </div>
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                <div className="flex items-center gap-4 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="size-3 rounded-full bg-blue-500" />
+                    <span className="text-sm font-semibold">남성 {genderRatio.male}%</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="size-3 rounded-full bg-pink-500" />
+                    <span className="text-sm font-semibold">여성 {genderRatio.female}%</span>
+                  </div>
+                </div>
+                <div className="w-full h-3 bg-muted rounded-full flex overflow-hidden">
+                  <div className="h-full bg-blue-500 transition-all" style={{ width: `${genderRatio.male}%` }} />
+                  <div className="h-full bg-pink-500 transition-all" style={{ width: `${genderRatio.female}%` }} />
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Row 2: Charts & Tables */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Trend Chart */}
             <div className="lg:col-span-2 bg-card p-8 rounded-xl shadow-sm border border-muted/50">
-              <h3 className="text-lg font-bold mb-6">검색량 트렌드</h3>
+              <div className="flex items-center gap-3 mb-6">
+                <h3 className="text-lg font-bold">검색량 트렌드</h3>
+                {(() => {
+                  const vol = getVolatilityInfo(trendData);
+                  if (!vol) return null;
+                  return (
+                    <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${vol.color}`} title={vol.description}>
+                      {vol.label}
+                    </span>
+                  );
+                })()}
+              </div>
               <KeywordTrendChart data={trendData} error={trendError} />
             </div>
 

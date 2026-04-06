@@ -4,6 +4,7 @@ import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { getSeasonalSeeds, MONTH_LABELS } from "@/shared/config/seasonal-keywords";
 import { cached, CacheTTL } from "@/services/cache-service";
 import { formatDate } from "@/shared/lib/utils";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 export interface SeasonalKeywordItem {
   keyword: string;
@@ -31,6 +32,11 @@ export async function GET(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);

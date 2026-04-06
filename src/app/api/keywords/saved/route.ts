@@ -6,8 +6,7 @@ import {
   unsaveKeyword,
   countSavedKeywords,
 } from "@/services/saved-keyword-service";
-
-const FREE_PLAN_SAVED_LIMIT = 10;
+import { PLAN_LIMITS } from "@/shared/config/constants";
 
 // ---------------------------------------------------------------------------
 // GET: List saved keywords (paginated)
@@ -61,14 +60,15 @@ export async function POST(request: Request) {
     );
   }
 
-  // Enforce free plan limit
-  if (user.plan === "free") {
+  // Enforce plan-based saved keyword limit
+  const savedLimit = PLAN_LIMITS[user.plan].savedKeywordLimit;
+  if (savedLimit !== -1) {
     try {
       const count = await countSavedKeywords(user.userId);
-      if (count >= FREE_PLAN_SAVED_LIMIT) {
+      if (count >= savedLimit) {
         return Response.json(
           {
-            error: `무료 플랜은 최대 ${FREE_PLAN_SAVED_LIMIT}개까지 저장할 수 있습니다.`,
+            error: `현재 플랜은 최대 ${savedLimit}개까지 저장할 수 있습니다.`,
             code: "SAVED_LIMIT_EXCEEDED",
           },
           { status: 429 }

@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getDatalabQuotaUsage } from "@/shared/lib/naver-datalab";
+import { PLAN_LIMITS } from "@/shared/config/constants";
 
 const EMPTY_DASHBOARD = {
   plan: "free" as const,
@@ -20,8 +21,8 @@ export async function GET() {
     const { userId, plan } = user;
     const supabase = await createServerClient();
 
-    // Get today's usage counts
-    const today = new Date().toISOString().split("T")[0];
+    // Get today's usage counts (KST for Korean users)
+    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split("T")[0];
     const { data: usageData } = await supabase
       .from("ai_usage")
       .select("feature")
@@ -57,9 +58,17 @@ export async function GET() {
 
     const quotaUsage = await getDatalabQuotaUsage();
 
+    const limits = PLAN_LIMITS[plan];
+
     return Response.json({
       plan,
       usage,
+      limits: {
+        dailySearch: limits.dailySearch,
+        dailyTitle: limits.dailyTitle,
+        dailyDraft: limits.dailyDraft,
+        dailyScore: limits.dailyScore,
+      },
       recentSearches: (recentSearches ?? []).map((s) => ({
         keyword: s.keyword,
         grade: s.keyword_grade,

@@ -263,9 +263,9 @@ export default function LandingPage() {
                 ₩{PLAN_PRICING.free.monthly.toLocaleString()}
               </div>
               <ul className="space-y-4 mb-10 flex-1 font-semibold text-muted-foreground">
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 5회/일 키워드 검색</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> AI 제목 1회/일</li>
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 트렌드 차트 열람</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 10회/일 키워드 검색</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> AI 제목 3회, 초안·점수 각 1회</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 인기글 TOP3 · 트렌드 3개월</li>
               </ul>
               <a href="/login">
                 <Button variant="outline" size="lg" className="w-full rounded-xl font-bold h-12">무료로 시작하기</Button>

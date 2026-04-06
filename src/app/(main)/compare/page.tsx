@@ -21,6 +21,7 @@ interface AnalyzeResponse {
   analysis: KeywordSearchResult;
   relatedKeywords: unknown[];
   correctedKeyword: string | null;
+  plan?: string;
 }
 
 interface KeywordEntry {

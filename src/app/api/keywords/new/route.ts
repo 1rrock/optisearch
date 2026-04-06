@@ -1,5 +1,6 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 export interface NewKeywordItem {
   keyword: string;
@@ -32,6 +33,11 @@ export async function GET(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const rateLimitResult = await checkRateLimit(user.userId);
+  if (!rateLimitResult.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
   const { searchParams } = new URL(request.url);
@@ -81,7 +87,8 @@ async function fetchFromCorpus(
     .select("keyword, pc_volume, mobile_volume, first_seen_at")
     .gte("first_seen_at", startStr)
     .lte("first_seen_at", endStr)
-    .order("first_seen_at", { ascending: false });
+    .order("first_seen_at", { ascending: false })
+    .limit(1000);
 
   if (error) {
     // Table doesn't exist or other error — fall back
@@ -118,7 +125,8 @@ async function fetchFromSearches(
     .select("keyword, pc_search_volume, mobile_search_volume, created_at")
     .gte("created_at", startStr + "T00:00:00")
     .lte("created_at", endStr + "T23:59:59")
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(1000);
 
   if (!data || data.length === 0) {
     return buildResponse([], days, endDate, "searches");

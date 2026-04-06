@@ -24,6 +24,7 @@ export const metadata: Metadata = {
     siteName: "옵티써치",
     locale: "ko_KR",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   robots: {
     index: true,
