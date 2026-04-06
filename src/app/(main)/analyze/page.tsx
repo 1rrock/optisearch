@@ -471,47 +471,46 @@ function AnalyzePageInner() {
     setFullPending(true);
     setExtraPending(true);
 
+    // Phase 1: quick must succeed before firing full+extra
     fetchQuick(keyword, token).then((result) => {
       setQuickData(result);
       setQuickPending(false);
-      // Cache
       queryClient.setQueryData(["analyze-quick", result.keyword], result);
-      // Also cache for compare page compatibility
-      // Delayed refresh for DB writes
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["search-history"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       }, 3000);
-      // Reset Turnstile
       setTurnstileToken(null);
       turnstileRef.current?.reset();
+
+      // Phase 2+3: fire full and extra in parallel after quick succeeds
+      const effectiveKeyword = result.keyword;
+
+      fetchFull(effectiveKeyword).then((fullResult) => {
+        setFullData(fullResult);
+        setFullPending(false);
+        queryClient.setQueryData(["analyze-full", effectiveKeyword], fullResult);
+      }).catch(() => {
+        setFullPending(false);
+      });
+
+      fetchExtra(effectiveKeyword).then((extraResult) => {
+        setExtraData(extraResult);
+        setExtraPending(false);
+        queryClient.setQueryData(["analyze-extra", effectiveKeyword], extraResult);
+      }).catch(() => {
+        setExtraPending(false);
+      });
     }).catch((err) => {
       setQuickPending(false);
+      setFullPending(false);
+      setExtraPending(false);
       if (err instanceof UsageLimitError) {
         setUpgradeModal({ used: err.used, limit: err.limit });
       }
       setAnalyzeError(err.message ?? "분석 중 오류가 발생했습니다.");
-      // Cancel other pending states on auth/rate limit failure
-      setFullPending(false);
-      setExtraPending(false);
       setTurnstileToken(null);
       turnstileRef.current?.reset();
-    });
-
-    fetchFull(keyword).then((result) => {
-      setFullData(result);
-      setFullPending(false);
-      queryClient.setQueryData(["analyze-full", keyword], result);
-    }).catch(() => {
-      setFullPending(false);
-    });
-
-    fetchExtra(keyword).then((result) => {
-      setExtraData(result);
-      setExtraPending(false);
-      queryClient.setQueryData(["analyze-extra", keyword], result);
-    }).catch(() => {
-      setExtraPending(false);
     });
   }
 
