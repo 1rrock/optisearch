@@ -1,10 +1,11 @@
 "use client";
 
-import { Search, Bookmark, Verified, TrendingUp, Star, Minus, Flame, Zap, Plus, Sparkles, Settings, Download } from "lucide-react";
+import { Search, Bookmark, Verified, Minus, Flame, Zap, Plus, Sparkles, Settings, Download } from "lucide-react";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { useDashboardData } from "@/shared/hooks/use-user";
 import { exportToExcel } from "@/shared/lib/excel";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 
 function CircleProgress({ value, max, color }: { value: number; max: number; color: string }) {
@@ -35,30 +36,40 @@ function CircleProgress({ value, max, color }: { value: number; max: number; col
   );
 }
 
+function SkeletonBlock({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded bg-muted/50 ${className ?? ""}`} />;
+}
+
 function planLabel(plan: PlanId): string {
   return PLAN_PRICING[plan]?.label ?? plan;
 }
 
 export default function DashboardPage() {
   const [isExporting, setIsExporting] = useState(false);
+  const [query, setQuery] = useState("");
+  const router = useRouter();
+  const { plan, usage, recentSearches, savedKeywordsCount, initialized } = useDashboardData();
 
-  const { plan, usage, limits: storeLimits, recentSearches, savedKeywordsCount, totalSearches, loading, initialized } = useDashboardData();
+  const effectivePlan = plan;
 
-  if (!initialized || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm font-medium">대시보드 불러오는 중...</p>
-        </div>
-      </div>
-    );
-  }
-
-  const limits = PLAN_LIMITS[plan];
-  const data = { plan, usage, recentSearches, savedKeywordsCount, totalSearches };
+  const limits = PLAN_LIMITS[effectivePlan];
   const searchLimit = limits.dailySearch;
   const titleLimit = limits.dailyTitle;
+  const aiUsed = usage.title + usage.draft + usage.score;
+  const aiLimit = titleLimit + limits.dailyDraft + limits.dailyScore;
+
+  function handleSearch() {
+    const q = query.trim();
+    if (q) {
+      router.push(`/analyze?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push("/analyze");
+    }
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleSearch();
+  }
 
   async function handleExportHistory() {
     setIsExporting(true);
@@ -91,10 +102,6 @@ export default function DashboardPage() {
     }
   }
 
-  // AI usage = title + draft + score combined for the "AI 사용" card
-  const aiUsed = data.usage.title + data.usage.draft + data.usage.score;
-  const aiLimit = titleLimit + limits.dailyDraft + limits.dailyScore;
-
   return (
     <div className="space-y-8">
 
@@ -105,17 +112,23 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">오늘 검색</p>
             <div className="flex items-baseline gap-1">
-              <h3 className="text-2xl font-bold text-foreground">{data.usage.search}</h3>
-              <span className="text-muted-foreground text-sm font-medium">
-                / {searchLimit === -1 ? "∞" : searchLimit}
-              </span>
+              {initialized ? (
+                <>
+                  <h3 className="text-2xl font-bold text-foreground">{usage.search}</h3>
+                  <span className="text-muted-foreground text-sm font-medium">
+                    / {searchLimit === -1 ? "∞" : searchLimit}
+                  </span>
+                </>
+              ) : (
+                <SkeletonBlock className="h-8 w-20" />
+              )}
             </div>
           </div>
-          <CircleProgress
-            value={data.usage.search}
-            max={searchLimit}
-            color="hsl(var(--primary))"
-          />
+          {initialized ? (
+            <CircleProgress value={usage.search} max={searchLimit} color="hsl(var(--primary))" />
+          ) : (
+            <SkeletonBlock className="h-14 w-14 rounded-full" />
+          )}
         </div>
 
         {/* AI 사용 */}
@@ -123,13 +136,23 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">AI 사용</p>
             <div className="flex items-baseline gap-1">
-              <h3 className="text-2xl font-bold text-foreground">{aiUsed}</h3>
-              <span className="text-muted-foreground text-sm font-medium">
-                / {aiLimit === -1 ? "∞" : aiLimit}
-              </span>
+              {initialized ? (
+                <>
+                  <h3 className="text-2xl font-bold text-foreground">{aiUsed}</h3>
+                  <span className="text-muted-foreground text-sm font-medium">
+                    / {aiLimit === -1 ? "∞" : aiLimit}
+                  </span>
+                </>
+              ) : (
+                <SkeletonBlock className="h-8 w-20" />
+              )}
             </div>
           </div>
-          <CircleProgress value={aiUsed} max={aiLimit} color="#10b981" />
+          {initialized ? (
+            <CircleProgress value={aiUsed} max={aiLimit} color="#10b981" />
+          ) : (
+            <SkeletonBlock className="h-14 w-14 rounded-full" />
+          )}
         </div>
 
         {/* 저장 키워드 */}
@@ -137,8 +160,14 @@ export default function DashboardPage() {
           <div>
             <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">저장 키워드</p>
             <div className="flex items-baseline gap-1">
-              <h3 className="text-2xl font-bold text-foreground">{data.savedKeywordsCount}</h3>
-              <span className="text-muted-foreground text-sm font-medium">개</span>
+              {initialized ? (
+                <>
+                  <h3 className="text-2xl font-bold text-foreground">{savedKeywordsCount}</h3>
+                  <span className="text-muted-foreground text-sm font-medium">개</span>
+                </>
+              ) : (
+                <SkeletonBlock className="h-8 w-16" />
+              )}
             </div>
           </div>
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -146,12 +175,16 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* 현재 플랜 */}
+        {/* 현재 플랜 - available immediately from store defaults or session */}
         <div className="bg-card p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
           <div>
             <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">현재 플랜</p>
             <div className="flex items-baseline gap-1">
-              <h3 className="text-2xl font-bold text-foreground">{planLabel(plan)}</h3>
+              {initialized ? (
+                <h3 className="text-2xl font-bold text-foreground">{planLabel(effectivePlan)}</h3>
+              ) : (
+                <SkeletonBlock className="h-8 w-24" />
+              )}
             </div>
           </div>
           <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
@@ -172,15 +205,21 @@ export default function DashboardPage() {
               className="flex-1 bg-transparent border-none outline-none ring-0 px-4 text-lg font-medium placeholder:text-muted-foreground"
               placeholder="키워드를 입력하세요..."
               type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
             />
-            <button className="bg-primary text-primary-foreground px-5 sm:px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all shrink-0">
-              검색하기
+            <button
+              onClick={handleSearch}
+              className="bg-primary text-primary-foreground px-5 sm:px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all shrink-0"
+            >
+              키워드 검색하기
             </button>
           </div>
-          {data.recentSearches.length > 0 && (
+          {recentSearches.length > 0 && (
             <div className="flex items-center gap-3 mt-6 justify-center flex-wrap">
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest mr-2">최근 검색</span>
-              {data.recentSearches.slice(0, 3).map((s) => (
+              {recentSearches.slice(0, 3).map((s) => (
                 <a
                   key={s.keyword + s.createdAt}
                   href={`/analyze?q=${encodeURIComponent(s.keyword)}`}
@@ -214,7 +253,18 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          {data.recentSearches.length === 0 ? (
+          {!initialized ? (
+            <div className="p-6 space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <SkeletonBlock className="h-5 flex-1" />
+                  <SkeletonBlock className="h-5 w-20" />
+                  <SkeletonBlock className="h-5 w-12" />
+                  <SkeletonBlock className="h-5 w-16" />
+                </div>
+              ))}
+            </div>
+          ) : recentSearches.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
               <Search className="size-10 mb-3 opacity-30" />
               <p className="text-sm font-medium">아직 검색 기록이 없습니다.</p>
@@ -231,7 +281,7 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30">
-                  {data.recentSearches.map((s) => (
+                  {recentSearches.map((s) => (
                     <tr key={s.keyword + s.createdAt} className="hover:bg-muted/20 transition-colors">
                       <td className="px-6 py-4 font-semibold">{s.keyword}</td>
                       <td className="px-6 py-4 text-sm text-right font-medium text-muted-foreground">
@@ -271,11 +321,15 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold">키워드 검색</p>
-                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  {data.usage.search} / {searchLimit === -1 ? "무제한" : searchLimit} 회
-                </p>
+                {initialized ? (
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {usage.search} / {searchLimit === -1 ? "무제한" : searchLimit} 회
+                  </p>
+                ) : (
+                  <SkeletonBlock className="h-3 w-24 mt-1" />
+                )}
               </div>
-              {searchLimit !== -1 && data.usage.search >= searchLimit && (
+              {initialized && searchLimit !== -1 && usage.search >= searchLimit && (
                 <div className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-bold rounded-full">
                   한도 도달
                 </div>
@@ -289,11 +343,15 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold">AI 제목 추천</p>
-                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  {data.usage.title} / {titleLimit === -1 ? "무제한" : titleLimit} 회
-                </p>
+                {initialized ? (
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {usage.title} / {titleLimit === -1 ? "무제한" : titleLimit} 회
+                  </p>
+                ) : (
+                  <SkeletonBlock className="h-3 w-24 mt-1" />
+                )}
               </div>
-              {titleLimit !== -1 && data.usage.title >= titleLimit && (
+              {initialized && titleLimit !== -1 && usage.title >= titleLimit && (
                 <div className="px-3 py-1 bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 text-xs font-bold rounded-full">
                   한도 도달
                 </div>
@@ -307,9 +365,13 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold">AI 초안 생성</p>
-                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  {data.usage.draft} / {limits.dailyDraft === -1 ? "무제한" : limits.dailyDraft === 0 ? "미지원" : limits.dailyDraft} 회
-                </p>
+                {initialized ? (
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {usage.draft} / {limits.dailyDraft === -1 ? "무제한" : limits.dailyDraft === 0 ? "미지원" : limits.dailyDraft} 회
+                  </p>
+                ) : (
+                  <SkeletonBlock className="h-3 w-24 mt-1" />
+                )}
               </div>
             </div>
 
@@ -320,9 +382,13 @@ export default function DashboardPage() {
               </div>
               <div className="flex-1">
                 <p className="text-sm font-bold">SEO 점수 분석</p>
-                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  {data.usage.score} / {limits.dailyScore === -1 ? "무제한" : limits.dailyScore === 0 ? "미지원" : limits.dailyScore} 회
-                </p>
+                {initialized ? (
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    {usage.score} / {limits.dailyScore === -1 ? "무제한" : limits.dailyScore === 0 ? "미지원" : limits.dailyScore} 회
+                  </p>
+                ) : (
+                  <SkeletonBlock className="h-3 w-24 mt-1" />
+                )}
               </div>
             </div>
           </div>
@@ -330,8 +396,12 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* FAB Contextual */}
-      <button className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50">
+      {/* FAB: Navigate to analyze */}
+      <button
+        onClick={() => router.push("/analyze")}
+        className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 w-12 h-12 sm:w-14 sm:h-14 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 flex items-center justify-center hover:scale-110 active:scale-95 transition-all z-50"
+        title="키워드 검색하기"
+      >
         <Plus className="size-6 sm:size-8" />
       </button>
 
