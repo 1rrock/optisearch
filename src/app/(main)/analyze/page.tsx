@@ -46,12 +46,13 @@ interface AnalyzeResponse {
 // ---------------------------------------------------------------------------
 
 import { UsageLimitError, parseUsageLimitError } from "@/shared/lib/errors";
+import { TurnstileWidget, type TurnstileRef } from "@/shared/components/TurnstileWidget";
 
-async function analyzeKeyword(keyword: string): Promise<AnalyzeResponse> {
+async function analyzeKeyword(keyword: string, turnstileToken?: string): Promise<AnalyzeResponse> {
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keyword }),
+    body: JSON.stringify({ keyword, turnstileToken }),
   });
 
   if (!res.ok) {
@@ -399,18 +400,26 @@ function AnalyzePageInner() {
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const [upgradeModal, setUpgradeModal] = useState<{ used: number; limit: number } | null>(null);
   const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   const { mutate, data, isPending, isError, error, reset } = useMutation({
-    mutationFn: analyzeKeyword,
+    mutationFn: (keyword: string) => analyzeKeyword(keyword, turnstileToken ?? undefined),
     onSuccess: () => {
       // Refresh search history so the dropdown shows the new entry
       queryClient.invalidateQueries({ queryKey: ["search-history"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Reset Turnstile for next search
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     },
     onError: (err) => {
       if (err instanceof UsageLimitError) {
         setUpgradeModal({ used: err.used, limit: err.limit });
       }
+      // Reset Turnstile so user can retry
+      setTurnstileToken(null);
+      turnstileRef.current?.reset();
     },
   });
 
@@ -607,6 +616,17 @@ function AnalyzePageInner() {
               disabled={isPending}
               placeholder="키워드를 입력하세요"
             />
+            {/* Turnstile CAPTCHA — managed 모드, 대부분 자동 통과 */}
+            {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+              <div className="flex justify-center mt-3">
+                <TurnstileWidget
+                  ref={turnstileRef}
+                  siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken(null)}
+                />
+              </div>
+            )}
           </form>
         </div>
       </section>

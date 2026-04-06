@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, X, ArrowRightLeft } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
@@ -12,6 +12,7 @@ import { SavedKeywordsPopover } from "@/shared/ui/saved-keywords-popover";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
+import { TurnstileWidget, type TurnstileRef } from "@/shared/components/TurnstileWidget";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -102,13 +103,20 @@ function ComparePageInner() {
   const [entries, setEntries] = useState<KeywordEntry[]>([]);
   const [inputValue, setInputValue] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileRef>(null);
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken(null);
+    turnstileRef.current?.reset();
+  }, []);
 
   const analyzeMutation = useMutation<AnalyzeResponse, Error, string>({
     mutationFn: async (keyword: string) => {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword }),
+        body: JSON.stringify({ keyword, turnstileToken }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -131,6 +139,7 @@ function ComparePageInner() {
             : e
         )
       );
+      resetTurnstile();
     },
     onError: (error, keyword) => {
       setEntries((prev) =>
@@ -140,6 +149,7 @@ function ComparePageInner() {
             : e
         )
       );
+      resetTurnstile();
     },
   });
 
@@ -186,7 +196,7 @@ function ComparePageInner() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") addKeyword();
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) addKeyword();
   }
 
   // Compute best indices for highlight
@@ -348,6 +358,15 @@ function ComparePageInner() {
                     triggerClassName="flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-full border border-muted/60 bg-muted/30 text-muted-foreground hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
                   />
                 </div>
+                {/* Turnstile CAPTCHA */}
+                {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+                  <TurnstileWidget
+                    ref={turnstileRef}
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken(null)}
+                  />
+                )}
               </div>
             )}
           </div>
