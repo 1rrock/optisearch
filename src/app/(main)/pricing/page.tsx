@@ -243,9 +243,13 @@ export default function PricingPage() {
                 toast.success(`${result.plan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
                 router.push("/dashboard");
                 return;
+              } else {
+                console.error("[pricing] activate response:", result);
+                toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`);
               }
             } catch (err) {
               console.error("[pricing] activate failed:", err);
+              toast.error("플랜 활성화 중 오류가 발생했습니다.");
             }
           }
 
