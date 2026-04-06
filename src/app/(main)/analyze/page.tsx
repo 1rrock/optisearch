@@ -410,9 +410,11 @@ function AnalyzePageInner() {
     onSuccess: (result, keyword) => {
       // Cache the result so navigating away and back restores it
       queryClient.setQueryData(["analyze", keyword], result);
-      // Refresh search history so the dropdown shows the new entry
-      queryClient.invalidateQueries({ queryKey: ["search-history"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      // Delayed refresh: wait for fire-and-forget DB writes to complete
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["search-history"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      }, 3000);
       // Reset Turnstile for next search
       setTurnstileToken(null);
       turnstileRef.current?.reset();
