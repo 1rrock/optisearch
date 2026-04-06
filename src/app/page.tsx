@@ -14,6 +14,8 @@ import Aurora from "@/components/Aurora"
 import { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { PLAN_PRICING } from "@/shared/config/constants";
+import Link from "next/link";
+import Image from "next/image";
 
 
 export default function LandingPage() {
@@ -32,13 +34,14 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-muted/30 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="옵티써치 로고" width={32} height={32} className="w-full h-full object-cover" />
-            </div>
-            <span className="text-xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-              옵티써치
-            </span>
+            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+              <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
+                <Image src="/logo.png" alt="옵티써치 로고" width={32} height={32} className="w-full h-full object-cover" />
+              </div>
+              <span className="text-xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+                옵티써치
+              </span>
+            </Link>
           </div>
 
           <div className="hidden md:flex items-center gap-8">
