@@ -42,6 +42,7 @@ export async function POST(req: Request) {
     switch (event.eventType) {
       case EventName.SubscriptionCreated:
       case EventName.SubscriptionUpdated:
+      case EventName.SubscriptionActivated:
         await handleSubscriptionChange(event.data);
         break;
       case EventName.SubscriptionCanceled:
