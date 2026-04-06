@@ -221,10 +221,35 @@ export default function PricingPage() {
 
     // Listen for checkout completion event
     paddle.Update({
-      eventCallback: (event) => {
+      eventCallback: async (event) => {
         if (event.name === "checkout.completed") {
           toast.success("결제가 완료되었습니다! 플랜을 업그레이드하고 있습니다...");
-          // Poll for plan update (webhook may take a few seconds)
+
+          // Extract transaction ID from checkout event
+          const transactionId = (event.data as { transaction_id?: string })?.transaction_id;
+
+          if (transactionId) {
+            try {
+              // Call activate API to upgrade plan directly
+              const res = await fetch("/api/paddle/activate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ transactionId }),
+              });
+              const result = await res.json();
+
+              if (res.ok && result.success) {
+                await useUserStore.getState().refresh();
+                toast.success(`${result.plan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
+                router.push("/dashboard");
+                return;
+              }
+            } catch (err) {
+              console.error("[pricing] activate failed:", err);
+            }
+          }
+
+          // Fallback: poll for webhook-based update
           let attempts = 0;
           const pollInterval = setInterval(async () => {
             attempts++;
