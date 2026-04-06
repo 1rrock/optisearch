@@ -3,12 +3,10 @@ import { analyzeKeyword } from "@/services/keyword-service";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { saveSearchHistory } from "@/services/history-service";
-import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
-  turnstileToken: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -49,17 +47,7 @@ export async function POST(request: Request) {
   const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
   if (limitError) return limitError;
 
-  // Turnstile verification for free plan users (when secret key is configured)
-  if (user.plan === "free" && process.env.TURNSTILE_SECRET_KEY) {
-    const { turnstileToken } = parsed.data;
-    if (!turnstileToken) {
-      return Response.json({ error: "CAPTCHA 검증이 필요합니다." }, { status: 403 });
-    }
-    const valid = await verifyTurnstileToken(turnstileToken);
-    if (!valid) {
-      return Response.json({ error: "CAPTCHA 검증에 실패했습니다." }, { status: 403 });
-    }
-  }
+  // TODO: Turnstile CAPTCHA — 프론트 위젯 구현 후 활성화
 
   try {
     const { keyword } = parsed.data;

@@ -153,6 +153,9 @@ export function SearchInputWithHistory({
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // Ignore Enter during Korean IME composition to prevent partial text submission
+    if (e.nativeEvent.isComposing) return;
+
     if (!open || displayItems.length === 0) return;
 
     switch (e.key) {

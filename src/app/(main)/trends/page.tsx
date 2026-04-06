@@ -980,32 +980,29 @@ export default function TrendsPage() {
       const pcAvg = avgRatio(pcData?.trends);
       const moAvg = avgRatio(moData?.trends);
 
-      // Age demographics — fetch each age group
-      const ageResults: { group: string; ratio: number }[] = [];
-      for (const ag of AGE_GROUPS) {
-        try {
-          const ageRes = await fetch("/api/trends", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              keywords: [keyword],
-              months: period,
-              ages: ag.values,
-            }),
-          });
-          if (ageRes.ok) {
-            const ageData = await ageRes.json();
-            ageResults.push({
-              group: ag.label,
-              ratio: avgRatio(ageData?.trends),
+      // Age demographics — fetch all age groups in parallel
+      const ageResults = await Promise.all(
+        AGE_GROUPS.map(async (ag) => {
+          try {
+            const ageRes = await fetch("/api/trends", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                keywords: [keyword],
+                months: period,
+                ages: ag.values,
+              }),
             });
-          } else {
-            ageResults.push({ group: ag.label, ratio: 0 });
+            if (ageRes.ok) {
+              const ageData = await ageRes.json();
+              return { group: ag.label, ratio: avgRatio(ageData?.trends) };
+            }
+            return { group: ag.label, ratio: 0 };
+          } catch {
+            return { group: ag.label, ratio: 0 };
           }
-        } catch {
-          ageResults.push({ group: ag.label, ratio: 0 });
-        }
-      }
+        })
+      );
 
       // Normalize age ratios to percentages
       const totalAge = ageResults.reduce((sum, a) => sum + a.ratio, 0) || 1;
@@ -1061,7 +1058,7 @@ export default function TrendsPage() {
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     handlePrimarySearch();
                   }
@@ -1141,7 +1138,7 @@ export default function TrendsPage() {
               value={compareInput}
               onChange={(e) => setCompareInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   addCompareKeyword();
                 }

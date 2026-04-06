@@ -5,11 +5,9 @@ import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/l
 import { saveSearchHistory } from "@/services/history-service";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
-import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
-  turnstileToken: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -38,17 +36,8 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  // Turnstile verification for free plan users (when secret key is configured)
-  if (user.plan === "free" && process.env.TURNSTILE_SECRET_KEY) {
-    const { turnstileToken } = parsed.data;
-    if (!turnstileToken) {
-      return Response.json({ error: "CAPTCHA 검증이 필요합니다." }, { status: 403 });
-    }
-    const valid = await verifyTurnstileToken(turnstileToken);
-    if (!valid) {
-      return Response.json({ error: "CAPTCHA 검증에 실패했습니다." }, { status: 403 });
-    }
-  }
+  // TODO: Turnstile CAPTCHA — 프론트 위젯 구현 후 활성화
+  // 현재 rate limit + daily usage limit으로 남용 방지
 
   const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
   if (limitError) return limitError;
