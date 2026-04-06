@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { Logo } from "@/shared/ui/logo";
 import {
   Home,
   Search,
@@ -61,9 +62,7 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-10 hidden w-64 flex-col border-r bg-card/60 backdrop-blur-md md:flex">
       <div className="flex h-16 shrink-0 items-center px-6">
         <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-          <div className="w-8 h-8 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
-            <Image src="/logo.png" alt="옵티써치 로고" width={32} height={32} className="w-full h-full object-cover" />
-          </div>
+          <Logo size={32} />
           <span className="text-xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
             옵티써치
           </span>

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useQuery } from "@tanstack/react-query";
+import { Logo } from "@/shared/ui/logo";
 import {
   Home,
   Search,
@@ -80,9 +81,7 @@ export function MobileNav() {
       <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg overflow-hidden">
-              <Image src="/logo.png" alt="옵티써치" width={28} height={28} className="w-full h-full object-cover" />
-            </div>
+            <Logo size={28} />
             <span className="text-lg font-extrabold tracking-tighter">옵티써치</span>
           </SheetTitle>
         </SheetHeader>

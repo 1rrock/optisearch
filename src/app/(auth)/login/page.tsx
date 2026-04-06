@@ -8,6 +8,8 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/shared/ui/button";
 import { Card } from "@/shared/ui/card";
 
+import { Logo } from "@/shared/ui/logo";
+
 function LoginContent() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
@@ -18,9 +20,7 @@ function LoginContent() {
       <Card className="w-full max-w-md bg-card/80 backdrop-blur-xl border-muted/80 shadow-2xl rounded-3xl p-8 sm:p-12 relative z-10">
         <div className="flex flex-col items-center mb-10 text-center">
           <Link href="/" className="flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
-            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-primary/20">
-              <Image src="/logo.png" alt="옵티써치 로고" width={40} height={40} className="w-full h-full object-cover" />
-            </div>
+            <Logo size={40} className="drop-shadow-md" />
             <span className="text-2xl font-extrabold tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
               옵티써치
             </span>
