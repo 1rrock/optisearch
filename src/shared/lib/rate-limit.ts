@@ -53,15 +53,6 @@ function checkMemory(userId: string): { allowed: boolean; remaining: number } {
 // Redis-backed (accurate across serverless instances)
 // ---------------------------------------------------------------------------
 
-// Lua script: atomic INCR + conditional EXPIRE (no race window)
-const RATE_LIMIT_SCRIPT = `
-local count = redis.call('INCR', KEYS[1])
-if count == 1 then
-  redis.call('EXPIRE', KEYS[1], ARGV[1])
-end
-return count
-`;
-
 async function checkRedis(
   userId: string
 ): Promise<{ allowed: boolean; remaining: number }> {
@@ -71,15 +62,28 @@ async function checkRedis(
   const key = `rl:${userId}`;
 
   try {
-    const count = (await redis.eval(
-      RATE_LIMIT_SCRIPT,
-      [key],           // KEYS
-      [WINDOW_SEC]     // ARGV
-    )) as number;
+    // Use simple INCR + conditional EXPIRE instead of eval/Lua for
+    // maximum compatibility with Upstash Redis.
+    const count = await redis.incr(key);
+
+    // Set expiry only on first increment (new window)
+    if (count === 1) {
+      await redis.expire(key, WINDOW_SEC);
+    }
+
+    // Safety: if the key somehow lost its TTL, re-set it
+    if (count > MAX_REQUESTS) {
+      const ttl = await redis.ttl(key);
+      if (ttl === -1) {
+        // Key exists without expiry — force a reset
+        await redis.expire(key, WINDOW_SEC);
+      }
+    }
 
     const remaining = Math.max(0, MAX_REQUESTS - count);
     return { allowed: count <= MAX_REQUESTS, remaining };
-  } catch {
+  } catch (err) {
+    console.error("[rate-limit] Redis error, falling back to memory:", err);
     // Redis failure — fall back to in-memory so the app keeps working
     return checkMemory(userId);
   }
