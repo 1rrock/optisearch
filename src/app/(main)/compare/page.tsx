@@ -19,7 +19,7 @@ import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils"
 
 interface AnalyzeResponse {
   analysis: KeywordSearchResult;
-  relatedKeywords: unknown[];
+  relatedKeywords?: unknown[];
   correctedKeyword: string | null;
   plan?: string;
 }

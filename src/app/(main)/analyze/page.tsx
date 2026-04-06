@@ -34,6 +34,32 @@ import { competitionBadgeClass } from "@/shared/lib/keyword-utils";
 // API types
 // ---------------------------------------------------------------------------
 
+interface QuickResponse {
+  keyword: string;
+  correctedKeyword: string | null;
+  pcSearchVolume: number;
+  mobileSearchVolume: number;
+  totalSearchVolume: number;
+  competition: string;
+  clickRate: number;
+  plan: "free" | "basic" | "pro";
+}
+
+interface FullResponse {
+  analysis: KeywordSearchResult;
+  correctedKeyword: string | null;
+  plan: "free" | "basic" | "pro";
+}
+
+interface ExtraResponse {
+  relatedKeywords: RelatedKeyword[];
+  news: { items: Array<{ title: string; link: string; description: string }>; total: number } | null;
+  webDocuments: { items: Array<{ title: string; link: string; description: string }>; total: number } | null;
+  encyclopediaWall: boolean;
+  encyclopediaCount: number;
+}
+
+// Legacy type kept for compare page cache compatibility
 interface AnalyzeResponse {
   analysis: KeywordSearchResult;
   relatedKeywords: RelatedKeyword[];
@@ -42,26 +68,50 @@ interface AnalyzeResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Inline fetch function (W4에서 feature hook으로 이전 예정)
+// Inline fetch functions
 // ---------------------------------------------------------------------------
 
 import { UsageLimitError, parseUsageLimitError } from "@/shared/lib/errors";
 import { TurnstileWidget, type TurnstileRef } from "@/shared/components/TurnstileWidget";
 
-async function analyzeKeyword(keyword: string, turnstileToken?: string): Promise<AnalyzeResponse> {
-  const res = await fetch("/api/analyze", {
+async function fetchQuick(keyword: string, turnstileToken?: string): Promise<QuickResponse> {
+  const res = await fetch("/api/analyze/quick", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ keyword, turnstileToken }),
   });
-
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     const limitErr = parseUsageLimitError(res.status, data);
     if (limitErr) throw limitErr;
     throw new Error(data.error ?? `분석 실패 (${res.status})`);
   }
+  return res.json();
+}
 
+async function fetchFull(keyword: string): Promise<FullResponse> {
+  const res = await fetch("/api/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keyword }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? `분석 실패 (${res.status})`);
+  }
+  return res.json();
+}
+
+async function fetchExtra(keyword: string): Promise<ExtraResponse> {
+  const res = await fetch("/api/analyze/extra", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keyword }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error ?? `분석 실패 (${res.status})`);
+  }
   return res.json();
 }
 
@@ -402,32 +452,73 @@ function AnalyzePageInner() {
   const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileRef>(null);
-  // Restored from query cache when navigating back to a previously analyzed keyword
-  const [restoredData, setRestoredData] = useState<AnalyzeResponse | null>(null);
 
-  const { mutate, data, isPending, isError, error, reset } = useMutation({
-    mutationFn: (keyword: string) => analyzeKeyword(keyword, turnstileToken ?? undefined),
-    onSuccess: (result, keyword) => {
-      // Cache the result so navigating away and back restores it
-      queryClient.setQueryData(["analyze", keyword], result);
-      // Delayed refresh: wait for fire-and-forget DB writes to complete
+  // Progressive rendering: 3 separate data phases
+  const [quickData, setQuickData] = useState<QuickResponse | null>(null);
+  const [fullData, setFullData] = useState<FullResponse | null>(null);
+  const [extraData, setExtraData] = useState<ExtraResponse | null>(null);
+  const [quickPending, setQuickPending] = useState(false);
+  const [fullPending, setFullPending] = useState(false);
+  const [extraPending, setExtraPending] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+
+  function fireAllPhases(keyword: string, token?: string) {
+    setQuickData(null);
+    setFullData(null);
+    setExtraData(null);
+    setAnalyzeError(null);
+    setQuickPending(true);
+    setFullPending(true);
+    setExtraPending(true);
+
+    fetchQuick(keyword, token).then((result) => {
+      setQuickData(result);
+      setQuickPending(false);
+      // Cache
+      queryClient.setQueryData(["analyze-quick", result.keyword], result);
+      // Also cache for compare page compatibility
+      // Delayed refresh for DB writes
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["search-history"] });
         queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       }, 3000);
-      // Reset Turnstile for next search
+      // Reset Turnstile
       setTurnstileToken(null);
       turnstileRef.current?.reset();
-    },
-    onError: (err) => {
+    }).catch((err) => {
+      setQuickPending(false);
       if (err instanceof UsageLimitError) {
         setUpgradeModal({ used: err.used, limit: err.limit });
       }
-      // Reset Turnstile so user can retry
+      setAnalyzeError(err.message ?? "분석 중 오류가 발생했습니다.");
+      // Cancel other pending states on auth/rate limit failure
+      setFullPending(false);
+      setExtraPending(false);
       setTurnstileToken(null);
       turnstileRef.current?.reset();
-    },
-  });
+    });
+
+    fetchFull(keyword).then((result) => {
+      setFullData(result);
+      setFullPending(false);
+      queryClient.setQueryData(["analyze-full", keyword], result);
+    }).catch(() => {
+      setFullPending(false);
+    });
+
+    fetchExtra(keyword).then((result) => {
+      setExtraData(result);
+      setExtraPending(false);
+      queryClient.setQueryData(["analyze-extra", keyword], result);
+    }).catch(() => {
+      setExtraPending(false);
+    });
+  }
+
+  // Derived data for rendering (backward-compatible with existing UI code)
+  const isPending = quickPending && fullPending && extraPending;
+  const isError = !!analyzeError && !quickData && !fullData;
+  const error = analyzeError ? new Error(analyzeError) : null;
 
   const bookmarkMutation = useMutation({
     mutationFn: ({ keyword, saved }: { keyword: string; saved: boolean }) =>
@@ -441,29 +532,32 @@ function AnalyzePageInner() {
     },
   });
 
-  // Check saved state whenever analysis result changes
+  // Check saved state whenever full analysis result changes
   useEffect(() => {
-    if (!data?.analysis?.keyword) return;
+    const kw = fullData?.analysis?.keyword ?? quickData?.keyword;
+    if (!kw) return;
     setIsSaved(false);
-    fetchIsKeywordSaved(data.analysis.keyword).then(setIsSaved).catch(() => { });
-  }, [data?.analysis?.keyword]);
+    fetchIsKeywordSaved(kw).then(setIsSaved).catch(() => { });
+  }, [fullData?.analysis?.keyword, quickData?.keyword]);
 
   // Auto-analyze from URL param: /analyze?keyword=검색어
-  // Check cache first; only fetch if no cached data exists (stale after 5 min)
+  // Check cache first; only fetch if no cached data exists
   useEffect(() => {
     const keyword = searchParams.get("keyword");
     if (keyword && !autoTriggered.current) {
       autoTriggered.current = true;
       setInputValue(keyword);
       setSubmittedKeyword(keyword);
-      const cached = queryClient.getQueryData<AnalyzeResponse>(["analyze", keyword]);
-      if (cached) {
-        // Restore from cache without re-fetching
-        setRestoredData(cached);
-        reset();
+      // Try restoring from 3-phase cache
+      const cachedQuick = queryClient.getQueryData<QuickResponse>(["analyze-quick", keyword]);
+      const cachedFull = queryClient.getQueryData<FullResponse>(["analyze-full", keyword]);
+      const cachedExtra = queryClient.getQueryData<ExtraResponse>(["analyze-extra", keyword]);
+      if (cachedQuick || cachedFull) {
+        if (cachedQuick) setQuickData(cachedQuick);
+        if (cachedFull) setFullData(cachedFull);
+        if (cachedExtra) setExtraData(cachedExtra);
         setIsSaved(false);
         fetchIsKeywordSaved(keyword).then(setIsSaved).catch(() => { });
-        // Also restore trend/gender data from cache if available
         const cachedTrend = queryClient.getQueryData<TrendPoint[]>(["trend", keyword]);
         if (cachedTrend !== undefined) {
           setTrendData(cachedTrend);
@@ -471,7 +565,8 @@ function AnalyzePageInner() {
         } else {
           setTrendData(null);
           setTrendError(false);
-          fetchTrendData(keyword, cached.plan !== "free");
+          const plan = cachedQuick?.plan ?? cachedFull?.plan;
+          fetchTrendData(keyword, plan !== "free");
         }
         const cachedGender = queryClient.getQueryData<{ male: number; female: number } | null>(["gender", keyword]);
         if (cachedGender !== undefined) {
@@ -480,19 +575,19 @@ function AnalyzePageInner() {
       } else {
         setTrendData(null);
         setTrendError(false);
-        reset();
-        mutate(keyword);
+        fireAllPhases(keyword);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Fetch trend data whenever analysis result changes
+  // Fetch trend data whenever full analysis result changes
   useEffect(() => {
-    if (!data?.analysis?.keyword) return;
-    fetchTrendData(data.analysis.keyword, activeData?.plan !== "free");
+    if (!fullData?.analysis?.keyword) return;
+    const plan = quickData?.plan ?? fullData?.plan;
+    fetchTrendData(fullData.analysis.keyword, plan !== "free");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.analysis?.keyword]);
+  }, [fullData?.analysis?.keyword]);
 
   async function fetchTrendData(keyword: string, demographicsEnabled: boolean) {
     setTrendData(null);
@@ -568,24 +663,20 @@ function AnalyzePageInner() {
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
-    setRestoredData(null);
-    reset();
-    mutate(keyword);
+    fireAllPhases(keyword, turnstileToken ?? undefined);
   }
 
-  const activeData = data ?? restoredData;
-  const analysis = activeData?.analysis ?? null;
-  const relatedKeywords = activeData?.relatedKeywords ?? [];
-  const correctedKeyword = activeData?.correctedKeyword ?? null;
+  const analysis = fullData?.analysis ?? null;
+  const relatedKeywords = extraData?.relatedKeywords ?? [];
+  const correctedKeyword = quickData?.correctedKeyword ?? fullData?.correctedKeyword ?? null;
+  const hasAnyData = !!(quickData || fullData);
 
   function handleRelatedKeywordClick(keyword: string) {
     setInputValue(keyword);
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
-    setRestoredData(null);
-    reset();
-    mutate(keyword);
+    fireAllPhases(keyword);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -611,15 +702,24 @@ function AnalyzePageInner() {
     }
   }
 
-  const pcRatio = analysis
-    ? Math.round((analysis.pcSearchVolume / Math.max(analysis.totalSearchVolume, 1)) * 100)
+  // Use quickData for early rendering, fall back to full analysis
+  const displayVolume = quickData ?? (analysis ? {
+    pcSearchVolume: analysis.pcSearchVolume,
+    mobileSearchVolume: analysis.mobileSearchVolume,
+    totalSearchVolume: analysis.totalSearchVolume,
+    competition: analysis.competition,
+    clickRate: analysis.clickRate,
+  } : null);
+
+  const pcRatio = displayVolume
+    ? Math.round((displayVolume.pcSearchVolume / Math.max(displayVolume.totalSearchVolume, 1)) * 100)
     : 27;
   const mobileRatio = 100 - pcRatio;
 
   const gradeConfig = analysis ? getKeywordGradeConfig(analysis.keywordGrade) : null;
 
-  const monthlyClicks = analysis
-    ? Math.round(analysis.totalSearchVolume * analysis.clickRate)
+  const monthlyClicks = displayVolume
+    ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate)
     : 0;
 
   return (
@@ -649,10 +749,9 @@ function AnalyzePageInner() {
                 setSubmittedKeyword(keyword);
                 setTrendData(null);
                 setTrendError(false);
-                reset();
-                mutate(keyword);
+                fireAllPhases(keyword, turnstileToken ?? undefined);
               }}
-              disabled={isPending}
+              disabled={quickPending}
               placeholder="키워드를 입력하세요"
             />
             {/* Turnstile CAPTCHA — managed 모드, 대부분 자동 통과 */}
@@ -690,14 +789,14 @@ function AnalyzePageInner() {
         </div>
       )}
 
-      {/* Loading State */}
-      {isPending && <LoadingSkeleton />}
+      {/* Loading State — only show full skeleton when nothing has arrived yet */}
+      {isPending && !hasAnyData && <LoadingSkeleton />}
 
       {/* Empty State */}
-      {!isPending && !analysis && !isError && <EmptyState />}
+      {!quickPending && !fullPending && !hasAnyData && !isError && <EmptyState />}
 
-      {/* Results */}
-      {!isPending && analysis && (
+      {/* Results — render progressively as data arrives */}
+      {hasAnyData && (
         <>
           {/* Results Header with Tag Copy and Bookmark */}
           <div className="flex items-center justify-between mb-4">
@@ -707,10 +806,10 @@ function AnalyzePageInner() {
             <div className="flex items-center gap-2">
               {/* Bookmark button */}
               <button
-                onClick={() =>
-                  analysis &&
-                  bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
-                }
+                onClick={() => {
+                  const kw = analysis?.keyword ?? quickData?.keyword;
+                  if (kw) bookmarkMutation.mutate({ keyword: kw, saved: isSaved });
+                }}
                 disabled={bookmarkMutation.isPending}
                 className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-colors disabled:opacity-60 ${isSaved
                   ? "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50"
@@ -750,83 +849,102 @@ function AnalyzePageInner() {
             </div>
           )}
 
-          {/* Row 1: Key Metrics */}
+          {/* Row 1: Key Metrics (renders with quickData) */}
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {/* Monthly Volume */}
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-              <p className="text-sm font-bold text-muted-foreground mb-2">월간 검색량</p>
-              <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-3xl font-extrabold tracking-tight">
-                  {analysis.totalSearchVolume.toLocaleString("ko-KR")}
-                </h2>
-                {gradeConfig && (
-                  <span
-                    className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white"
-                    style={{ backgroundColor: gradeConfig.color }}
-                  >
-                    {analysis.keywordGrade}
-                  </span>
-                )}
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-medium">
-                  <span className="text-muted-foreground">PC: {analysis.pcSearchVolume.toLocaleString("ko-KR")}</span>
-                  <span className="text-muted-foreground">모바일: {analysis.mobileSearchVolume.toLocaleString("ko-KR")}</span>
+            {displayVolume ? (
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                <p className="text-sm font-bold text-muted-foreground mb-2">월간 검색량</p>
+                <div className="flex items-center gap-3 mb-4">
+                  <h2 className="text-3xl font-extrabold tracking-tight">
+                    {displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
+                  </h2>
+                  {gradeConfig && (
+                    <span
+                      className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white"
+                      style={{ backgroundColor: gradeConfig.color }}
+                    >
+                      {analysis!.keywordGrade}
+                    </span>
+                  )}
                 </div>
-                <div className="w-full h-1.5 bg-muted rounded-full flex overflow-hidden">
-                  <div className="h-full bg-blue-600" style={{ width: `${pcRatio}%` }}></div>
-                  <div className="h-full bg-emerald-500" style={{ width: `${mobileRatio}%` }}></div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-medium">
+                    <span className="text-muted-foreground">PC: {displayVolume.pcSearchVolume.toLocaleString("ko-KR")}</span>
+                    <span className="text-muted-foreground">모바일: {displayVolume.mobileSearchVolume.toLocaleString("ko-KR")}</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-muted rounded-full flex overflow-hidden">
+                    <div className="h-full bg-blue-600" style={{ width: `${pcRatio}%` }}></div>
+                    <div className="h-full bg-emerald-500" style={{ width: `${mobileRatio}%` }}></div>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : <SkeletonCard />}
 
             {/* Competition */}
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-              <p className="text-sm font-bold text-muted-foreground mb-2">경쟁도</p>
-              <div className="flex items-center gap-2 mb-4">
-                <h2 className="text-3xl font-extrabold tracking-tight">{analysis.competition}</h2>
-                <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${competitionBadgeClass(analysis.competition)}`}>
-                  {analysis.competition}
-                </span>
+            {displayVolume ? (
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                <p className="text-sm font-bold text-muted-foreground mb-2">경쟁도</p>
+                <div className="flex items-center gap-2 mb-4">
+                  <h2 className="text-3xl font-extrabold tracking-tight">{displayVolume.competition}</h2>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${competitionBadgeClass(displayVolume.competition)}`}>
+                    {displayVolume.competition}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${competitionBarClass(displayVolume.competition)}`}
+                    style={{ width: competitionBarWidth(displayVolume.competition) }}
+                  ></div>
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-2">{competitionDescription(displayVolume.competition)}</p>
               </div>
-              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                <div
-                  className={`h-full ${competitionBarClass(analysis.competition)}`}
-                  style={{ width: competitionBarWidth(analysis.competition) }}
-                ></div>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-2">{competitionDescription(analysis.competition)}</p>
-            </div>
+            ) : <SkeletonCard />}
 
             {/* Monthly Clicks */}
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-              <p className="text-sm font-bold text-muted-foreground mb-2">월간 클릭수</p>
-              <h2 className="text-3xl font-extrabold tracking-tight mb-2">
-                {monthlyClicks.toLocaleString("ko-KR")}
-              </h2>
-              <div className="flex items-center gap-2 mt-4">
-                <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                  {(analysis.clickRate * 100).toFixed(1)}%
-                </span>
-                <span className="text-[11px] text-muted-foreground">CTR (Click Through Rate)</span>
+            {displayVolume ? (
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                <p className="text-sm font-bold text-muted-foreground mb-2">월간 클릭수</p>
+                <h2 className="text-3xl font-extrabold tracking-tight mb-2">
+                  {monthlyClicks.toLocaleString("ko-KR")}
+                </h2>
+                <div className="flex items-center gap-2 mt-4">
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    {(displayVolume.clickRate * 100).toFixed(1)}%
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">CTR (Click Through Rate)</span>
+                </div>
               </div>
-            </div>
+            ) : <SkeletonCard />}
 
-            {/* Blog Posts */}
-            <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-              <p className="text-sm font-bold text-muted-foreground mb-2">블로그 글 수</p>
-              <h2 className="text-3xl font-extrabold tracking-tight mb-4">
-                {analysis.blogPostCount.toLocaleString("ko-KR")}개
-              </h2>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                <TrendingUp className="size-4 text-emerald-500" />
-                포화도: {analysis.saturationIndex.label}
+            {/* Blog Posts — requires full analysis data */}
+            {analysis ? (
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                <p className="text-sm font-bold text-muted-foreground mb-2">블로그 글 수</p>
+                <h2 className="text-3xl font-extrabold tracking-tight mb-4">
+                  {analysis.blogPostCount.toLocaleString("ko-KR")}개
+                </h2>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                  <TrendingUp className="size-4 text-emerald-500" />
+                  포화도: {analysis.saturationIndex.label}
+                </div>
               </div>
-            </div>
+            ) : <SkeletonCard />}
           </section>
 
-          {/* Section Analysis */}
-          {analysis.sectionData && (
+          {/* Section Analysis — skeleton while full data loads */}
+          {!analysis && fullPending && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4">
+                <LayoutGrid className="size-5 text-primary" />
+                <h3 className="text-lg font-bold">섹션 분석</h3>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              </div>
+            </section>
+          )}
+          {analysis?.sectionData && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-4">
                 <LayoutGrid className="size-5 text-primary" />
@@ -938,7 +1056,13 @@ function AnalyzePageInner() {
                 )}
               </div>
               <div className="flex-1 overflow-x-auto">
-                {relatedKeywords.length > 0 ? (
+                {extraPending && relatedKeywords.length === 0 ? (
+                  <div className="p-6 space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-10 bg-muted/50 rounded animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : relatedKeywords.length > 0 ? (
                   <table className="w-full min-w-[360px] text-left border-collapse">
                     <thead className="bg-muted/30 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-b border-muted/50">
                       <tr>
@@ -957,7 +1081,8 @@ function AnalyzePageInner() {
                           comp={rk.competition}
                           onClick={() => handleRelatedKeywordClick(rk.keyword)}
                           onCompare={() => {
-                            window.location.href = `/compare?keywords=${encodeURIComponent(analysis!.keyword)},${encodeURIComponent(rk.keyword)}`;
+                            const mainKw = analysis?.keyword ?? quickData?.keyword ?? "";
+                            window.location.href = `/compare?keywords=${encodeURIComponent(mainKw)},${encodeURIComponent(rk.keyword)}`;
                           }}
                         />
                       ))}
@@ -971,7 +1096,7 @@ function AnalyzePageInner() {
           </section>
 
           {/* Top Posts */}
-          {analysis.topPosts && analysis.topPosts.length > 0 && (
+          {analysis?.topPosts && analysis.topPosts.length > 0 && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-4">
                 <BookOpen className="size-5 text-primary" />
@@ -1011,12 +1136,13 @@ function AnalyzePageInner() {
           )}
 
           {/* Row 3: Quick Actions */}
+          {(analysis || quickData) && (
           <section className="mb-12">
             <h3 className="text-lg font-bold mb-6">빠른 실행</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Compare */}
               <a
-                href={`/compare?keywords=${encodeURIComponent(analysis.keyword)}`}
+                href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
                 className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-4">
@@ -1033,7 +1159,7 @@ function AnalyzePageInner() {
 
               {/* AI Title */}
               <a
-                href={`/ai?keyword=${encodeURIComponent(analysis.keyword)}&tab=title`}
+                href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=title`}
                 className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-4">
@@ -1050,7 +1176,7 @@ function AnalyzePageInner() {
 
               {/* AI Draft */}
               <a
-                href={`/ai?keyword=${encodeURIComponent(analysis.keyword)}&tab=draft`}
+                href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=draft`}
                 className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
               >
                 <div className="flex items-center gap-4">
@@ -1066,14 +1192,16 @@ function AnalyzePageInner() {
               </a>
             </div>
           </section>
+          )}
 
           {/* Bottom Actions */}
+          {(analysis || quickData) && (
           <footer className="flex justify-center gap-4 border-t border-muted/50 pt-10">
             <button
-              onClick={() =>
-                analysis &&
-                bookmarkMutation.mutate({ keyword: analysis.keyword, saved: isSaved })
-              }
+              onClick={() => {
+                const kw = analysis?.keyword ?? quickData?.keyword;
+                if (kw) bookmarkMutation.mutate({ keyword: kw, saved: isSaved });
+              }}
               disabled={bookmarkMutation.isPending}
               className={`px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
                 ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
@@ -1086,13 +1214,14 @@ function AnalyzePageInner() {
               </span>
             </button>
             <a
-              href={`/compare?keywords=${encodeURIComponent(analysis.keyword)}`}
+              href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
               className="px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center gap-2"
             >
               <ArrowRightLeft className="size-5" />
               비교에 추가
             </a>
           </footer>
+          )}
         </>
       )}
     </div>
