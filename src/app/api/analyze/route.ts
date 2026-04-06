@@ -28,12 +28,25 @@ export async function POST(request: Request) {
     );
   }
 
-  const user = await getAuthenticatedUser();
+  const { keyword } = parsed.data;
+
+  // Phase 1: Auth + keyword validation in parallel (saves ~0.5s)
+  const [user, adultResult, typoResult] = await Promise.all([
+    getAuthenticatedUser(),
+    checkAdult(keyword),
+    correctTypo(keyword),
+  ]);
+
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const rateLimitResult = await checkRateLimit(user.userId);
+  // Phase 2: Rate limit + usage limit in parallel
+  const [rateLimitResult, limitError] = await Promise.all([
+    checkRateLimit(user.userId),
+    enforceUsageLimit(user.userId, user.plan, "search"),
+  ]);
+
   if (!rateLimitResult.allowed) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
@@ -46,16 +59,9 @@ export async function POST(request: Request) {
     }
   }
 
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "search");
   if (limitError) return limitError;
 
   try {
-    const { keyword } = parsed.data;
-
-    const [adultResult, typoResult] = await Promise.all([
-      checkAdult(keyword),
-      correctTypo(keyword),
-    ]);
 
     if (adultResult.adult === "1") {
       return Response.json(
