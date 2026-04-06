@@ -291,7 +291,7 @@ export default function LandingPage() {
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> SEO 점수 분석 + 엑셀 추출</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 쇼핑 인사이트 + 트렌드 1년</li>
               </ul>
-              <a href="/login">
+              <a href="/pricing">
                 <Button size="lg" className="w-full rounded-xl font-bold h-12 bg-primary shadow-lg shadow-primary/20 hover:scale-105 transition-transform">1개월 무료 체험 시작하기</Button>
               </a>
             </div>
@@ -299,16 +299,17 @@ export default function LandingPage() {
             {/* Pro */}
             <div className="bg-card p-10 rounded-3xl border border-muted/50 hover:border-primary/30 transition-all flex flex-col">
               <h3 className="text-xl font-bold text-muted-foreground mb-2">{PLAN_PRICING.pro.label} (Pro)</h3>
-              <div className="text-4xl font-black mb-8">
+              <div className="text-4xl font-black mb-1">
                 ₩{PLAN_PRICING.pro.monthly.toLocaleString()}
               </div>
+              <p className="text-sm font-bold text-muted-foreground mb-8">월 결제</p>
               <ul className="space-y-4 mb-10 flex-1 font-semibold text-muted-foreground">
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 베이직 플랜의 모든 기능</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> AI 제목 100회/일, 초안 30회/일</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary/60" /> 대량 분석 500개, 전체 트렌드</li>
               </ul>
               <a href="/pricing">
-                <Button variant="outline" size="lg" className="w-full rounded-xl font-bold h-12">1개월 무료 체험 시작하기</Button>
+                <Button variant="outline" size="lg" className="w-full rounded-xl font-bold h-12">프로 시작하기</Button>
               </a>
             </div>
           </div>

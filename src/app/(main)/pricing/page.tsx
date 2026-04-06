@@ -73,17 +73,19 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
   const pricing = PLAN_PRICING[planId];
   const isCurrent = currentPlan === planId;
 
-  // Determine if user already has a higher or same paid plan
+  // Determine plan rank to disable buttons for current or lower plans
   const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
   const currentRank = currentPlan ? planRank[currentPlan] : -1;
   const thisRank = planRank[planId];
-  const isDowngrade = currentRank > thisRank;
-  const isUpgrade = currentRank < thisRank;
+  const isSubscribed = currentRank >= thisRank && currentRank > 0;
+  const canUpgrade = !isCurrent && thisRank > currentRank;
 
   const ctaLabel = isCurrent
     ? "현재 플랜"
-    : isDowngrade
-    ? "다운그레이드"
+    : isSubscribed
+    ? "현재 플랜"
+    : planId === "free"
+    ? "무료로 시작하기"
     : planId === "basic"
     ? "베이직 시작하기"
     : "프로 시작하기";
@@ -148,8 +150,8 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
           })}
         </ul>
 
-        {/* Trial info */}
-        {planId !== "free" && !isCurrent && isUpgrade && (
+        {/* Trial info — only Basic has 1-month free trial */}
+        {planId === "basic" && canUpgrade && (
           <p className="text-center text-xs text-muted-foreground font-medium">
             첫 1개월 무료 체험 후 월 ₩{pricing.monthly.toLocaleString()}
           </p>
@@ -158,16 +160,16 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
         {/* CTA */}
         <Button
           size="lg"
-          variant={planId === "free" || isDowngrade ? "outline" : "default"}
-          disabled={isCurrent || isLoading}
+          variant={planId === "free" || !canUpgrade ? "outline" : "default"}
+          disabled={isCurrent || isSubscribed || isLoading}
           className={[
             "w-full rounded-xl font-bold h-12",
-            isPopular && !isCurrent
+            isPopular && canUpgrade
               ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
               : "",
           ].join(" ")}
           onClick={() => {
-            if (planId !== "free" && !isCurrent) {
+            if (canUpgrade && planId !== "free") {
               void onSubscribe(planId);
             }
           }}
