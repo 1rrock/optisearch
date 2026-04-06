@@ -5,6 +5,8 @@ import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
 import { Toaster } from "@/shared/ui/sonner";
 import { PaddleProvider } from "@/shared/providers/paddle-provider";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist } from "next/font/google";
 import { cn } from "@/shared/lib/utils";
 
@@ -43,6 +45,12 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   manifest: "/site.webmanifest",
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
+    other: {
+      "naver-site-verification": process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION ? [process.env.NEXT_PUBLIC_NAVER_SITE_VERIFICATION] : [],
+    },
+  },
 };
 
 export default function RootLayout({
@@ -52,6 +60,18 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={cn("antialiased", "font-sans", geist.variable)} suppressHydrationWarning>
+      <head>
+        {process.env.NEXT_PUBLIC_GA_ID && (
+          <>
+            <script async src={`https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_ID}`} />
+            <script
+              dangerouslySetInnerHTML={{
+                __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}');`,
+              }}
+            />
+          </>
+        )}
+      </head>
       <body>
         <ThemeProvider
           attribute="class"
@@ -66,6 +86,8 @@ export default function RootLayout({
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
