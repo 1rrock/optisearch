@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // Routes that do not require authentication.
-const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/terms", "/support"])
+const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/terms", "/support", "/pricing"])
 
 // API route prefixes that handle their own auth (webhooks, cron, etc.)
 const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/", "/api/webhooks/"]
@@ -55,5 +55,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|css|js)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon\\.ico|sitemap\\.xml|robots\\.txt|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?|ttf|css|js|xml|html)$).*)"],
 }
