@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
+import { useUserStore } from "@/shared/stores/user-store";
 import { CheckCircle2, X } from "lucide-react";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
@@ -10,6 +11,7 @@ import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { usePaddle } from "@/shared/providers/paddle-provider";
 import { priceIdFromPlanId } from "@/shared/lib/paddle";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 type FeatureValue = string | boolean;
 
@@ -182,6 +184,7 @@ export default function PricingPage() {
   const userPlan = useUserPlan();
   const { data: session } = useSession();
   const paddle = usePaddle();
+  const router = useRouter();
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
@@ -210,6 +213,37 @@ export default function PricingPage() {
       ...(session?.user?.email ? { customer: { email: session.user.email } } : {}),
       customData: {
         userId: session?.user?.id ?? "",
+      },
+      settings: {
+        successUrl: `${window.location.origin}/dashboard?upgraded=true`,
+      },
+    });
+
+    // Listen for checkout completion event
+    paddle.Update({
+      eventCallback: (event) => {
+        if (event.name === "checkout.completed") {
+          toast.success("결제가 완료되었습니다! 플랜을 업그레이드하고 있습니다...");
+          // Poll for plan update (webhook may take a few seconds)
+          let attempts = 0;
+          const pollInterval = setInterval(async () => {
+            attempts++;
+            try {
+              await useUserStore.getState().refresh();
+              const newPlan = useUserStore.getState().plan;
+              if (newPlan !== "free" && newPlan !== userPlan) {
+                clearInterval(pollInterval);
+                toast.success(`${newPlan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
+                router.push("/dashboard");
+              }
+            } catch {}
+            if (attempts >= 15) {
+              clearInterval(pollInterval);
+              toast.info("플랜 반영에 시간이 걸릴 수 있습니다. 잠시 후 새로고침해주세요.");
+              router.push("/dashboard");
+            }
+          }, 2000);
+        }
       },
     });
   };
