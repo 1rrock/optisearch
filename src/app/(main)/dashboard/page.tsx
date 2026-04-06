@@ -200,9 +200,9 @@ export default function DashboardPage() {
           <p className="text-muted-foreground text-sm">실시간 네이버 검색량과 AI 기반 경쟁 강도를 즉시 확인하세요.</p>
         </div>
         <div className="max-w-2xl mx-auto">
-          <div className="flex gap-3 p-2 bg-muted/30 rounded-2xl border-2 border-transparent focus-within:border-primary/20 focus-within:bg-card transition-all">
+          <div className="flex flex-col sm:flex-row gap-3 p-2 sm:bg-muted/30 sm:rounded-2xl sm:border-2 sm:border-transparent focus-within:border-primary/20 focus-within:bg-card transition-all">
             <input
-              className="flex-1 bg-transparent border-none outline-none ring-0 px-4 text-lg font-medium placeholder:text-muted-foreground"
+              className="w-full sm:flex-1 bg-muted/30 sm:bg-transparent border-2 border-transparent sm:border-none rounded-2xl sm:rounded-none outline-none ring-0 px-4 py-4 sm:py-0 text-lg font-medium placeholder:text-muted-foreground"
               placeholder="키워드를 입력하세요..."
               type="text"
               value={query}
@@ -211,7 +211,7 @@ export default function DashboardPage() {
             />
             <button
               onClick={handleSearch}
-              className="bg-primary text-primary-foreground px-5 sm:px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all shrink-0"
+              className="w-full sm:w-auto bg-primary text-primary-foreground px-5 sm:px-8 py-4 sm:py-3 rounded-xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all shrink-0"
             >
               키워드 검색하기
             </button>

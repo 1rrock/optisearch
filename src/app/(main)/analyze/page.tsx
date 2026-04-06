@@ -806,11 +806,11 @@ function AnalyzePageInner() {
       {hasAnyData && (
         <>
           {/* Results Header with Tag Copy and Bookmark */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 mb-4">
             <h2 className="text-base font-bold text-muted-foreground">
               <span className="text-foreground">&apos;{submittedKeyword}&apos;</span> 분석 결과
             </h2>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Bookmark button */}
               <button
                 onClick={() => {
@@ -1203,26 +1203,26 @@ function AnalyzePageInner() {
 
           {/* Bottom Actions */}
           {(analysis || quickData) && (
-          <footer className="flex justify-center gap-4 border-t border-muted/50 pt-10">
+          <footer className="flex flex-col sm:flex-row justify-center gap-4 border-t border-muted/50 pt-10">
             <button
               onClick={() => {
                 const kw = analysis?.keyword ?? quickData?.keyword;
                 if (kw) bookmarkMutation.mutate({ keyword: kw, saved: isSaved });
               }}
               disabled={bookmarkMutation.isPending}
-              className={`px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
+              className={`w-full sm:w-auto px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
                 ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
                 : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
                 }`}
             >
-              <span className="flex items-center gap-2">
+              <span className="flex items-center justify-center gap-2">
                 <Star className={`size-5 ${isSaved ? "fill-white" : ""}`} />
                 {bookmarkMutation.isPending ? "처리 중…" : isSaved ? "저장됨" : "키워드 저장"}
               </span>
             </button>
             <a
               href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
-              className="px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center gap-2"
+              className="w-full sm:w-auto px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center justify-center gap-2"
             >
               <ArrowRightLeft className="size-5" />
               비교에 추가

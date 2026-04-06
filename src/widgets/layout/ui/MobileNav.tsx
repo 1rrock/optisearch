@@ -73,7 +73,7 @@ export function MobileNav() {
           <span className="sr-only">메뉴 열기</span>
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" className="w-72 p-0" showCloseButton={false}>
+      <SheetContent side="left" className="w-72 p-0 flex flex-col" showCloseButton={false}>
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg overflow-hidden">
