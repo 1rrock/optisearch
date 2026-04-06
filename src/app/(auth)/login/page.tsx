@@ -26,7 +26,7 @@ function LoginContent() {
             </span>
           </Link>
           <h1 className="text-2xl font-extrabold tracking-tight mb-2">옵티써치에 오신 것을 환영합니다!</h1>
-          <p className="text-sm text-muted-foreground">네이버 계정으로 로그인하고 분석을 시작하세요.</p>
+          <p className="text-sm text-muted-foreground">소셜 계정으로 로그인하고 분석을 시작하세요.</p>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -38,6 +38,16 @@ function LoginContent() {
               <path d="M16 12.674L8.217 1H1v22h7V10.326L15.783 23H23V1h-7z" />
             </svg>
             네이버로 시작하기
+          </Button>
+
+          <Button
+            onClick={() => signIn("kakao", { callbackUrl })}
+            className="flex items-center justify-center w-full h-14 rounded-2xl bg-[#FEE500] hover:bg-[#FDD800] text-[#191919] font-bold text-md transition-colors shadow-sm gap-3"
+          >
+            <svg viewBox="0 0 24 24" className="w-6 h-6" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3C6.477 3 2 6.463 2 10.691c0 2.726 1.8 5.117 4.508 6.482-.144.522-.928 3.37-.962 3.581 0 0-.02.166.087.229.107.063.232.03.232.03.306-.043 3.548-2.326 4.11-2.72.652.096 1.326.147 2.025.147 5.523 0 10-3.463 10-7.749C22 6.463 17.523 3 12 3" fill="#191919"/>
+            </svg>
+            카카오로 시작하기
           </Button>
         </div>
 

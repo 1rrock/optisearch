@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Naver from "next-auth/providers/naver"
+import Kakao from "next-auth/providers/kakao"
 import type { NextAuthConfig } from "next-auth"
 import type { JWT } from "@auth/core/jwt"
 import type { Session } from "@auth/core/types"
@@ -9,7 +10,7 @@ import type { Session } from "@auth/core/types"
 // ---------------------------------------------------------------------------
 declare module "@auth/core/jwt" {
   interface JWT {
-    naverId?: string
+    providerId?: string
   }
 }
 
@@ -22,6 +23,10 @@ const config: NextAuthConfig = {
     Naver({
       clientId: process.env.AUTH_NAVER_ID!,
       clientSecret: process.env.AUTH_NAVER_SECRET!,
+    }),
+    Kakao({
+      clientId: process.env.KAKAO_CLIENT_ID!,
+      clientSecret: process.env.KAKAO_CLIENT_SECRET!,
     }),
   ],
 
@@ -38,29 +43,37 @@ const config: NextAuthConfig = {
 
   callbacks: {
     /**
-     * Persist Naver profile info into the JWT on sign-in.
+     * Persist provider profile info into the JWT on sign-in.
      */
-    async jwt({ token, user, account, profile }): Promise<JWT> {
-      // On initial sign-in, persist provider account id and profile data
+    async jwt({ token, account, profile }): Promise<JWT> {
       if (account && profile) {
-        // Naver profile is nested under response
-        const naverProfile = (profile as any).response ?? profile
-        token.naverId = naverProfile.id ?? account.providerAccountId
-        token.name = naverProfile.name ?? naverProfile.nickname ?? token.name
-        token.email = naverProfile.email ?? token.email
-        token.picture = naverProfile.profile_image ?? token.picture
+        const provider = account.provider
+
+        if (provider === "naver") {
+          const naverProfile = (profile as any).response ?? profile
+          token.providerId = `naver_${naverProfile.id ?? account.providerAccountId}`
+          token.name = naverProfile.name ?? naverProfile.nickname ?? token.name
+          token.email = naverProfile.email ?? token.email
+          token.picture = naverProfile.profile_image ?? token.picture
+        } else if (provider === "kakao") {
+          token.providerId = `kakao_${account.providerAccountId}`
+          const kakaoAccount = (profile as any).kakao_account
+          token.name = (profile as any).properties?.nickname ?? token.name
+          token.email = kakaoAccount?.email ?? token.email
+          token.picture = (profile as any).properties?.profile_image ?? token.picture
+        }
       }
 
       return token
     },
 
     /**
-     * Expose user info and Supabase token on the session object.
+     * Expose user info on the session object.
      */
     async session({ session, token }): Promise<Session> {
       const jwt = token as JWT
       if (session.user) {
-        session.user.id = (jwt.naverId as string) ?? jwt.sub ?? ""
+        session.user.id = (jwt.providerId as string) ?? jwt.sub ?? ""
         session.user.name = (jwt.name as string) ?? ""
         session.user.email = (jwt.email as string) ?? ""
         session.user.image = (jwt.picture as string) ?? ""
