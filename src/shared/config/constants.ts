@@ -8,7 +8,7 @@ export const APP_CONFIG = {
   serviceName: "옵티써치",
   serviceNameEn: "OptiSearch",
   version: "0.1.0",
-  supportEmail: "support@optisearch.kr",
+  supportChannel: "http://pf.kakao.com/_CupuX",
   /** Naver keyword data is cached for this many hours before re-fetching */
   keywordCacheTtlHours: 24,
   /** Top-posts data is cached for this many hours */

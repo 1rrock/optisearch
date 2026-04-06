@@ -3,10 +3,8 @@
 import {
   BarChart3,
   Sparkles,
-  Zap,
   CheckCircle2,
   X,
-  ChevronRight,
   TrendingUp,
   Target,
   ArrowRight
