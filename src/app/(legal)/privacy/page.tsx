@@ -22,7 +22,6 @@ export default function PrivacyPage() {
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
           <li>이메일 주소</li>
           <li>이름(닉네임)</li>
-          <li>프로필 이미지 URL</li>
         </ul>
         <p className="text-muted-foreground mt-3">서비스 이용 과정에서 다음 정보가 자동으로 생성·수집될 수 있습니다.</p>
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground mt-1">
@@ -114,8 +113,8 @@ export default function PrivacyPage() {
         <h2 className="text-xl font-bold mb-4">7. 개인정보보호 책임자 및 연락처</h2>
         <div className="bg-muted/20 rounded-2xl p-6 text-muted-foreground space-y-1">
           <p><span className="font-semibold text-foreground">서비스명:</span> 옵티써치 (OptiSearch)</p>
-          <p><span className="font-semibold text-foreground">이메일:</span>{" "}
-            <a href="mailto:support@optisearch.kr" className="underline hover:text-foreground">support@optisearch.kr</a>
+          <p><span className="font-semibold text-foreground">고객지원:</span>{" "}
+            <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>
           </p>
         </div>
         <p className="text-sm text-muted-foreground mt-3">

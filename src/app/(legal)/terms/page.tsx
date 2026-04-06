@@ -56,18 +56,22 @@ export default function TermsPage() {
           <div className="bg-muted/20 rounded-2xl p-5">
             <h3 className="font-bold mb-2">베이직 플랜 (Basic)</h3>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
-              <li>키워드 대량 분석 무제한</li>
-              <li>AI 글 초안 무제한 생성</li>
-              <li>프리미엄 SEO 점수 리포트</li>
+              <li>무제한 키워드 검색</li>
+              <li>AI 제목 20회/일, 초안 5회/일</li>
+              <li>SEO 점수 분석 10회/일</li>
+              <li>대량 키워드 분석 50개/회</li>
               <li>검색량 데이터 엑셀 추출</li>
+              <li>첫 1개월 무료 체험</li>
             </ul>
           </div>
           <div className="bg-muted/20 rounded-2xl p-5">
             <h3 className="font-bold mb-2">프로 플랜 (Pro)</h3>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
               <li>베이직 플랜의 모든 기능</li>
-              <li>팀 워크스페이스 공유</li>
-              <li>통합 API 액세스</li>
+              <li>AI 제목 100회/일, 초안 30회/일</li>
+              <li>SEO 점수 분석 50회/일</li>
+              <li>대량 키워드 분석 500개/회</li>
+              <li>전체 기간 트렌드 분석</li>
             </ul>
           </div>
         </div>
@@ -86,7 +90,7 @@ export default function TermsPage() {
           </li>
           <li>
             결제 후 14일 이내이며 서비스를 실질적으로 이용하지 않은 경우, 환불을 요청할 수 있습니다.
-            환불 요청은 <a href="mailto:support@optisearch.kr" className="underline hover:text-foreground">support@optisearch.kr</a>로 문의하시기 바랍니다.
+            환불 요청은 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 문의하시기 바랍니다.
           </li>
           <li>구독 취소 후에는 해당 결제 기간 종료 시까지 서비스를 이용할 수 있으며, 이후 무료 플랜으로 전환됩니다.</li>
           <li>결제 오류 또는 이중 청구 발생 시 즉시 전액 환불 처리합니다.</li>
@@ -114,7 +118,7 @@ export default function TermsPage() {
         <h2 className="text-xl font-bold mb-4">제7조 (서비스 변경 및 중단)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>서비스는 운영 및 기술적 필요에 의해 기능 일부 또는 전부를 변경·추가·제거할 수 있습니다.</li>
-          <li>서비스 종료 시 최소 30일 전 서비스 내 공지사항 및 이메일을 통해 사전 고지합니다.</li>
+          <li>서비스 종료 시 최소 30일 전 서비스 내 공지사항을 통해 사전 고지합니다.</li>
           <li>서버 점검·장애·천재지변 등 불가피한 사유로 일시적 서비스 중단이 발생할 수 있으며, 이 경우 별도 보상은 제공되지 않습니다.</li>
           <li>유료 플랜 이용자에 대해서는 서비스 중단 기간에 비례하여 이용 기간 연장 또는 환불을 검토합니다.</li>
         </ul>
@@ -149,7 +153,7 @@ export default function TermsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제10조 (분쟁 해결)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-          <li>서비스 이용과 관련한 분쟁은 먼저 <a href="mailto:support@optisearch.kr" className="underline hover:text-foreground">support@optisearch.kr</a>을 통한 협의로 해결을 시도합니다.</li>
+          <li>서비스 이용과 관련한 분쟁은 먼저 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>을 통한 협의로 해결을 시도합니다.</li>
           <li>협의가 이루어지지 않을 경우, 소비자분쟁조정위원회에 조정을 신청하거나 소 제기를 통해 해결할 수 있습니다.</li>
           <li>본 약관에 관한 소송은 대한민국 법률을 준거법으로 하며, 관할 법원은 서울중앙지방법원으로 합니다.</li>
         </ul>
@@ -165,7 +169,7 @@ export default function TermsPage() {
 
       <div className="pt-6 border-t border-muted/50">
         <p className="text-sm text-muted-foreground">
-          문의사항이 있으시면 <a href="mailto:support@optisearch.kr" className="underline hover:text-foreground">support@optisearch.kr</a>로 연락해 주세요.
+          문의사항이 있으시면 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 연락해 주세요.
         </p>
       </div>
     </article>
