@@ -38,13 +38,9 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  // Turnstile CAPTCHA for free plan users
-  if (user.plan === "free" && process.env.TURNSTILE_SECRET_KEY) {
-    const { turnstileToken } = parsed.data;
-    if (!turnstileToken) {
-      return Response.json({ error: "CAPTCHA 검증이 필요합니다.", code: "CAPTCHA_REQUIRED" }, { status: 403 });
-    }
-    const valid = await verifyTurnstileToken(turnstileToken);
+  // Turnstile CAPTCHA for free plan users (verify only when token is provided)
+  if (user.plan === "free" && process.env.TURNSTILE_SECRET_KEY && parsed.data.turnstileToken) {
+    const valid = await verifyTurnstileToken(parsed.data.turnstileToken);
     if (!valid) {
       return Response.json({ error: "CAPTCHA 검증에 실패했습니다.", code: "CAPTCHA_FAILED" }, { status: 403 });
     }
