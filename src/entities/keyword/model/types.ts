@@ -62,6 +62,10 @@ export interface KeywordSearchResult {
   shoppingData: ShoppingInsight | null;
   /** Timestamp from keyword_searches.created_at */
   createdAt: string;
+  /** True when search volume was estimated via DataLab reverse-calculation (censored keywords) */
+  isEstimated?: boolean;
+  /** Estimated monthly click count (PC + Mobile) derived from SearchAd CTR data */
+  estimatedClicks?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +117,7 @@ export interface SectionAnalysis {
   cafe: SectionCount;
   kin: SectionCount; // 지식iN
   shopping: SectionCount;
+  news?: SectionCount;
 }
 
 // ---------------------------------------------------------------------------

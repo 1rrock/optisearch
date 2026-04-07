@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getKeywordTrend } from "@/services/trend-service";
+import { getKeywordTrend, detectSeasonality } from "@/services/trend-service";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
@@ -52,8 +52,22 @@ export async function POST(request: Request) {
     const effectiveGender = limits.demographicsEnabled ? gender : undefined;
     const effectiveAges = limits.demographicsEnabled ? ages : undefined;
 
+    // Fetch requested period for display
     const trends = await getKeywordTrend(keywords, months, device, effectiveGender, effectiveAges);
-    return Response.json({ trends });
+
+    // Detect seasonality using 36-month data (reuses cache if same keyword)
+    // Only for single-keyword requests to save DataLab quota
+    let seasonality = null;
+    if (keywords.length === 1 && months >= 12) {
+      const longTrend = months >= 24
+        ? trends[0]
+        : (await getKeywordTrend(keywords, 36))[0];
+      if (longTrend) {
+        seasonality = detectSeasonality(longTrend.data);
+      }
+    }
+
+    return Response.json({ trends, seasonality });
   } catch (err) {
     console.error("[api/trends] Error:", err);
     return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });

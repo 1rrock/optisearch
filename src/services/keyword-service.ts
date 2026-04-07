@@ -7,7 +7,9 @@ import {
   searchCafe,
   searchKin,
   searchShopping,
+  searchNews,
 } from "@/shared/lib/naver-search";
+import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
 import type {
   KeywordSearchResult,
   RelatedKeyword,
@@ -77,23 +79,47 @@ export async function analyzeKeyword(
   keyword: string
 ): Promise<KeywordSearchResult> {
   return cached(CacheKeys.keywordAnalysis(keyword), CacheTTL.KEYWORD, async () => {
-    const [statsResults, blogResponse, cafeResponse, kinResponse, shoppingResponse] =
+    const [statsResults, blogResponse, cafeResponse, kinResponse, shoppingResponse, newsResponse] =
       await Promise.all([
         getKeywordStats([keyword]),
         searchBlog(keyword, 7),
         searchCafe(keyword),
         searchKin(keyword),
         searchShopping(keyword),
+        searchNews(keyword, 5).catch(() => ({ items: [], total: 0 })),
       ]);
 
     const stat = statsResults.find((s) => s.relKeyword === keyword) ?? statsResults[0];
 
-    const pcSearchVolume = stat?.monthlyPcQcCnt ?? 0;
-    const mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
-    const totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+    let pcSearchVolume = stat?.monthlyPcQcCnt ?? 0;
+    let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
+    let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+    let isEstimated = false;
+
+    // Reverse-estimate volume for censored keywords (SearchAd returns 0)
+    if (totalSearchVolume === 0) {
+      const estimated = await estimateVolumeFromDataLab(keyword, async () => {
+        const refStats = await getKeywordStats(["네이버"]);
+        const ref = refStats[0];
+        return { pc: ref?.monthlyPcQcCnt ?? 0, mobile: ref?.monthlyMobileQcCnt ?? 0 };
+      });
+      if (estimated) {
+        pcSearchVolume = estimated.pcSearchVolume;
+        mobileSearchVolume = estimated.mobileSearchVolume;
+        totalSearchVolume = estimated.totalSearchVolume;
+        isEstimated = true;
+      }
+    }
+
     const competition = toCompetitionLevel(stat?.compIdx ?? "높음");
-    const clickRate =
-      ((stat?.monthlyAvePcCtr ?? 0) + (stat?.monthlyAveMobileCtr ?? 0)) / 2;
+    const pcCtr = stat?.monthlyAvePcCtr ?? 0;
+    const mobileCtr = stat?.monthlyAveMobileCtr ?? 0;
+    const clickRate = (pcCtr + mobileCtr) / 2;
+
+    // Estimated monthly clicks from CTR data
+    const estimatedClicks = Math.round(
+      pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
+    );
 
     const blogPostCount = blogResponse.total;
     const saturationRatio =
@@ -120,6 +146,7 @@ export async function analyzeKeyword(
       cafe: { total: cafeResponse.total, isVisible: cafeResponse.total > 0 },
       kin: { total: kinResponse.total, isVisible: kinResponse.total > 0 },
       shopping: { total: shoppingResponse.total, isVisible: shoppingResponse.total > 0 },
+      news: { total: newsResponse.total, isVisible: newsResponse.total > 0 },
     };
 
     return {
@@ -136,6 +163,8 @@ export async function analyzeKeyword(
       topPosts,
       shoppingData: null,
       createdAt: new Date().toISOString(),
+      isEstimated: isEstimated || undefined,
+      estimatedClicks,
     };
   });
 }

@@ -375,6 +375,94 @@ export async function getShoppingAgeTrend(
 }
 
 // ---------------------------------------------------------------------------
+// Censored keyword volume estimation via DataLab reverse-calculation
+// ---------------------------------------------------------------------------
+
+/** Reference keyword with known stable search volume from SearchAd */
+const REFERENCE_KEYWORD = "네이버";
+
+/** Cached reference keyword volume (singleton promise pattern to prevent race conditions) */
+let refVolumeCache: { pc: number; mobile: number; fetchedAt: number } | null = null;
+let refVolumePending: Promise<{ pc: number; mobile: number }> | null = null;
+const REF_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+export interface EstimatedVolume {
+  pcSearchVolume: number;
+  mobileSearchVolume: number;
+  totalSearchVolume: number;
+  isEstimated: true;
+}
+
+/**
+ * Estimate search volume for a keyword that SearchAd reports as 0 (censored).
+ * Compares the target keyword's DataLab relative ratio against a reference keyword
+ * with known absolute volume.
+ *
+ * DataLab cost: 1 call (+ 0–1 for reference keyword SearchAd lookup, cached 24h).
+ * Returns null if estimation is not possible.
+ */
+export async function estimateVolumeFromDataLab(
+  targetKeyword: string,
+  getRefVolume: () => Promise<{ pc: number; mobile: number }>
+): Promise<EstimatedVolume | null> {
+  // 1. Get reference keyword absolute volume (singleton promise to prevent race conditions)
+  if (!refVolumeCache || Date.now() - refVolumeCache.fetchedAt > REF_CACHE_TTL) {
+    if (!refVolumePending) {
+      refVolumePending = getRefVolume().finally(() => { refVolumePending = null; });
+    }
+    try {
+      const vol = await refVolumePending;
+      if (vol.pc === 0 && vol.mobile === 0) return null;
+      refVolumeCache = { ...vol, fetchedAt: Date.now() };
+    } catch {
+      return null;
+    }
+  }
+
+  // 2. Call DataLab with both reference and target keyword
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 12);
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  try {
+    const response = await postDatalab<SearchTrendResponse>("/search", {
+      startDate: fmt(startDate),
+      endDate: fmt(endDate),
+      timeUnit: "month",
+      keywordGroups: [
+        { groupName: "ref", keywords: [REFERENCE_KEYWORD] },
+        { groupName: "target", keywords: [targetKeyword] },
+      ],
+    });
+
+    const refResult = response.results.find((r) => r.title === "ref");
+    const targetResult = response.results.find((r) => r.title === "target");
+    if (!refResult?.data?.length || !targetResult?.data?.length) return null;
+
+    // 3. Use last month's ratio for estimation
+    const refRatio = refResult.data[refResult.data.length - 1]?.ratio ?? 0;
+    const targetRatio = targetResult.data[targetResult.data.length - 1]?.ratio ?? 0;
+
+    if (refRatio === 0 || targetRatio === 0) return null;
+
+    const scale = targetRatio / refRatio;
+    const estPc = Math.round(refVolumeCache.pc * scale);
+    const estMobile = Math.round(refVolumeCache.mobile * scale);
+
+    return {
+      pcSearchVolume: estPc,
+      mobileSearchVolume: estMobile,
+      totalSearchVolume: estPc + estMobile,
+      isEstimated: true,
+    };
+  } catch (err) {
+    console.warn("[datalab] Volume estimation failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Batch search trend — 5 keywords per API call (80% quota savings)
 // ---------------------------------------------------------------------------
 

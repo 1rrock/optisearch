@@ -2,6 +2,7 @@ import { z } from "zod";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
+import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
@@ -74,15 +75,34 @@ export async function POST(request: Request) {
       (s) => s.relKeyword.toLowerCase() === effectiveKeyword.toLowerCase()
     ) ?? stats[0];
 
-    const pcSearchVolume = stat?.monthlyPcQcCnt ?? 0;
-    const mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
-    const totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+    let pcSearchVolume = stat?.monthlyPcQcCnt ?? 0;
+    let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
+    let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+    let isEstimated = false;
+
+    // Reverse-estimate volume for censored keywords
+    if (totalSearchVolume === 0) {
+      const estimated = await estimateVolumeFromDataLab(effectiveKeyword, async () => {
+        const refStats = await getKeywordStats(["네이버"]);
+        const ref = refStats[0];
+        return { pc: ref?.monthlyPcQcCnt ?? 0, mobile: ref?.monthlyMobileQcCnt ?? 0 };
+      });
+      if (estimated) {
+        pcSearchVolume = estimated.pcSearchVolume;
+        mobileSearchVolume = estimated.mobileSearchVolume;
+        totalSearchVolume = estimated.totalSearchVolume;
+        isEstimated = true;
+      }
+    }
+
     const competition = stat?.compIdx ?? "중간";
 
-    const pcClicks = stat?.monthlyAvePcClkCnt ?? 0;
-    const mobileClicks = stat?.monthlyAveMobileClkCnt ?? 0;
-    const totalClicks = pcClicks + mobileClicks;
-    const clickRate = totalSearchVolume > 0 ? totalClicks / totalSearchVolume : 0;
+    const pcCtr = stat?.monthlyAvePcCtr ?? 0;
+    const mobileCtr = stat?.monthlyAveMobileCtr ?? 0;
+    const clickRate = (pcCtr + mobileCtr) / 2;
+    const estimatedClicks = Math.round(
+      pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
+    );
 
     // Record usage (non-blocking)
     void recordUsage(user.userId, "search", effectiveKeyword).catch(() => {});
@@ -144,6 +164,8 @@ export async function POST(request: Request) {
       totalSearchVolume,
       competition,
       clickRate,
+      estimatedClicks,
+      isEstimated: isEstimated || undefined,
       plan: user.plan,
     });
   } catch (err) {

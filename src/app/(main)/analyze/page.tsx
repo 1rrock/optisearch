@@ -25,7 +25,7 @@ import {
 import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/model/types";
-import type { TrendPoint } from "@/services/trend-service";
+import type { TrendPoint, SeasonalityInfo } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
 import { SearchInputWithHistory } from "@/shared/components/SearchInputWithHistory";
@@ -43,6 +43,8 @@ interface QuickResponse {
   totalSearchVolume: number;
   competition: string;
   clickRate: number;
+  estimatedClicks?: number;
+  isEstimated?: boolean;
   plan: "free" | "basic" | "pro";
 }
 
@@ -58,6 +60,17 @@ interface ExtraResponse {
   webDocuments: { items: Array<{ title: string; link: string; description: string }>; total: number } | null;
   encyclopediaWall: boolean;
   encyclopediaCount: number;
+  contentSpec?: { avgTitleLength: number; avgDescLength: number; count: number } | null;
+  intent?: { intent: string; confidence: number; reason: string } | null;
+  strategy?: { verdict: string; reason: string; tips: string[] } | null;
+  clusters?: Array<{ label: string; keywords: string[] }> | null;
+}
+
+interface DemographicsResponse {
+  keyword: string;
+  gender: Array<{ group: string; ratio: number }>;
+  device: Array<{ group: string; ratio: number }>;
+  age: Array<{ group: string; ratio: number }>;
 }
 
 // Legacy type kept for compare page cache compatibility
@@ -103,11 +116,17 @@ async function fetchFull(keyword: string): Promise<FullResponse> {
   return res.json();
 }
 
-async function fetchExtra(keyword: string): Promise<ExtraResponse> {
+async function fetchExtra(keyword: string, analysisContext?: {
+  totalSearchVolume?: number;
+  competition?: string;
+  saturationLabel?: string;
+  saturationScore?: number;
+  clickRate?: number;
+}): Promise<ExtraResponse> {
   const res = await fetch("/api/analyze/extra", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keyword }),
+    body: JSON.stringify({ keyword, analysisContext }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -446,8 +465,11 @@ function AnalyzePageInner() {
   const [tagCopied, setTagCopied] = useState(false);
   const [trendData, setTrendData] = useState<TrendPoint[] | null>(null);
   const [trendError, setTrendError] = useState(false);
+  const [seasonality, setSeasonality] = useState<SeasonalityInfo | null>(null);
   const [allTagsCopied, setAllTagsCopied] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [demographics, setDemographics] = useState<DemographicsResponse | null>(null);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [bookmarkError, setBookmarkError] = useState<string | null>(null);
   const [upgradeModal, setUpgradeModal] = useState<{ used: number; limit: number } | null>(null);
   const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
@@ -502,7 +524,11 @@ function AnalyzePageInner() {
         setFullPending(false);
       });
 
-      fetchExtra(effectiveKeyword).then((extraResult) => {
+      fetchExtra(effectiveKeyword, {
+        totalSearchVolume: result.totalSearchVolume,
+        competition: result.competition,
+        clickRate: result.clickRate,
+      }).then((extraResult) => {
         setExtraData(extraResult);
         setExtraPending(false);
         queryClient.setQueryData(["analyze-extra", effectiveKeyword], extraResult);
@@ -600,6 +626,7 @@ function AnalyzePageInner() {
     setTrendData(null);
     setTrendError(false);
     setGenderRatio(null);
+    setSeasonality(null);
     try {
       const fetches: Promise<Response>[] = [
         fetch("/api/trends", {
@@ -631,7 +658,7 @@ function AnalyzePageInner() {
       const trendJson = await trendRes.json();
       const points: TrendPoint[] = trendJson.trends?.[0]?.data ?? [];
       setTrendData(points);
-      // Cache trend data (5 min stale time managed via cache entry timestamp)
+      if (trendJson.seasonality) setSeasonality(trendJson.seasonality);
       queryClient.setQueryData(["trend", keyword], points);
 
       // Gender ratio calculation (paid plans only)
@@ -725,9 +752,9 @@ function AnalyzePageInner() {
 
   const gradeConfig = analysis ? getKeywordGradeConfig(analysis.keywordGrade) : null;
 
-  const monthlyClicks = displayVolume
-    ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate)
-    : 0;
+  const monthlyClicks = quickData?.estimatedClicks
+    ?? (displayVolume ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate) : 0);
+  const isEstimated = quickData?.isEstimated || analysis?.isEstimated;
 
   return (
     <div className="space-y-12">
@@ -864,14 +891,19 @@ function AnalyzePageInner() {
                 <p className="text-sm font-bold text-muted-foreground mb-2">월간 검색량</p>
                 <div className="flex items-center gap-3 mb-4">
                   <h2 className="text-3xl font-extrabold tracking-tight">
-                    {displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
+                    {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
                   </h2>
+                  {isEstimated && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" title="SearchAd API가 차단한 키워드로, DataLab 데이터 기반 추정치입니다">
+                      추정
+                    </span>
+                  )}
                   {gradeConfig && (
                     <span
                       className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white"
                       style={{ backgroundColor: gradeConfig.color }}
                     >
-                      {analysis!.keywordGrade}
+                      {analysis?.keywordGrade}
                     </span>
                   )}
                 </div>
@@ -911,15 +943,15 @@ function AnalyzePageInner() {
             {/* Monthly Clicks */}
             {displayVolume ? (
               <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-                <p className="text-sm font-bold text-muted-foreground mb-2">월간 클릭수</p>
+                <p className="text-sm font-bold text-muted-foreground mb-2">월간 예상 유입량</p>
                 <h2 className="text-3xl font-extrabold tracking-tight mb-2">
                   {monthlyClicks.toLocaleString("ko-KR")}
                 </h2>
                 <div className="flex items-center gap-2 mt-4">
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
-                    {(displayVolume.clickRate * 100).toFixed(1)}%
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                    CTR {(displayVolume.clickRate * 100).toFixed(1)}%
                   </span>
-                  <span className="text-[11px] text-muted-foreground">CTR (Click Through Rate)</span>
+                  <span className="text-[11px] text-muted-foreground">검색량 x 클릭률</span>
                 </div>
               </div>
             ) : <SkeletonCard />}
@@ -946,8 +978,8 @@ function AnalyzePageInner() {
                 <LayoutGrid className="size-5 text-primary" />
                 <h3 className="text-lg font-bold">섹션 분석</h3>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
               </div>
             </section>
           )}
@@ -957,16 +989,18 @@ function AnalyzePageInner() {
                 <LayoutGrid className="size-5 text-primary" />
                 <h3 className="text-lg font-bold">섹션 분석</h3>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 {(
                   [
                     { key: "blog", label: "블로그" },
                     { key: "cafe", label: "카페" },
                     { key: "kin", label: "지식iN" },
                     { key: "shopping", label: "쇼핑" },
+                    { key: "news", label: "뉴스" },
                   ] as const
                 ).map(({ key, label }) => {
-                  const section = analysis.sectionData![key];
+                  const section = analysis.sectionData![key as keyof typeof analysis.sectionData];
+                  if (!section) return null;
                   return (
                     <div
                       key={key}
@@ -1023,7 +1057,7 @@ function AnalyzePageInner() {
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
             {/* Trend Chart */}
             <div className="lg:col-span-2 bg-card p-8 rounded-xl shadow-sm border border-muted/50">
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-6 flex-wrap">
                 <h3 className="text-lg font-bold">검색량 트렌드</h3>
                 {(() => {
                   const vol = getVolatilityInfo(trendData);
@@ -1034,6 +1068,14 @@ function AnalyzePageInner() {
                     </span>
                   );
                 })()}
+                {seasonality && (
+                  <span
+                    className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400"
+                    title={`매년 ${seasonality.peakMonthLabels.join(", ")}에 급상승 (${seasonality.strength === "strong" ? "강한" : seasonality.strength === "moderate" ? "보통" : "약한"} 계절성)`}
+                  >
+                    계절성 {seasonality.peakMonthLabels.join("·")}
+                  </span>
+                )}
               </div>
               <KeywordTrendChart data={trendData} error={trendError} />
             </div>
@@ -1139,6 +1181,213 @@ function AnalyzePageInner() {
                   );
                 })}
               </div>
+            </section>
+          )}
+
+          {/* Demographics (On-demand) */}
+          {hasAnyData && quickData?.plan !== "free" && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4">
+                <Gauge className="size-5 text-primary" />
+                <h3 className="text-lg font-bold">인구통계 분석</h3>
+                {!demographics && !demoLoading && (
+                  <button
+                    onClick={async () => {
+                      const kw = analysis?.keyword ?? quickData?.keyword;
+                      if (!kw) return;
+                      setDemoLoading(true);
+                      try {
+                        const res = await fetch("/api/analyze/demographics", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ keyword: kw }),
+                        });
+                        if (res.ok) setDemographics(await res.json());
+                      } catch { /* ignore */ }
+                      setDemoLoading(false);
+                    }}
+                    className="ml-2 px-3 py-1 text-xs font-bold rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  >
+                    데이터 불러오기
+                  </button>
+                )}
+              </div>
+              {demoLoading && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+                </div>
+              )}
+              {demographics && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Gender */}
+                  {demographics.gender.length > 0 && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-3">성별</p>
+                      <div className="space-y-2">
+                        {demographics.gender.map((g) => (
+                          <div key={g.group} className="flex items-center gap-3">
+                            <span className={`size-3 rounded-full ${g.group === "남성" ? "bg-blue-500" : "bg-pink-500"}`} />
+                            <span className="text-sm font-semibold flex-1">{g.group}</span>
+                            <span className="text-sm font-bold">{g.ratio}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Device */}
+                  {demographics.device.length > 0 && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-3">기기</p>
+                      <div className="space-y-2">
+                        {demographics.device.map((d) => (
+                          <div key={d.group} className="flex items-center gap-3">
+                            <span className={`size-3 rounded-full ${d.group === "PC" ? "bg-indigo-500" : "bg-emerald-500"}`} />
+                            <span className="text-sm font-semibold flex-1">{d.group}</span>
+                            <span className="text-sm font-bold">{d.ratio}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Age */}
+                  {demographics.age.length > 0 && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-3">연령대</p>
+                      <div className="space-y-2">
+                        {demographics.age.map((a) => (
+                          <div key={a.group}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-semibold">{a.group}</span>
+                              <span className="font-bold">{a.ratio}%</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-muted rounded-full">
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${a.ratio}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              {!demographics && !demoLoading && (
+                <p className="text-xs text-muted-foreground">성별, 기기, 연령대별 검색 비율을 확인하세요. (DataLab API 9회 소비)</p>
+              )}
+            </section>
+          )}
+          {hasAnyData && quickData?.plan === "free" && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-2">
+                <Gauge className="size-5 text-muted-foreground/50" />
+                <h3 className="text-lg font-bold text-muted-foreground/50">인구통계 분석</h3>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">PRO</span>
+              </div>
+              <p className="text-xs text-muted-foreground">베이직/프로 플랜에서 성별, 기기, 연령대별 검색 비율을 확인할 수 있습니다.</p>
+            </section>
+          )}
+
+          {/* AI Insights */}
+          {(extraData?.intent || extraData?.strategy || extraData?.clusters) && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="size-5 text-primary" />
+                <h3 className="text-lg font-bold">AI 인사이트</h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Intent */}
+                {extraData.intent && (
+                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                    <p className="text-sm font-bold text-muted-foreground mb-2">검색 의도</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${
+                        extraData.intent.intent === "구매성"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : extraData.intent.intent === "탐색성"
+                          ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                      }`}>
+                        {extraData.intent.intent}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {Math.round(extraData.intent.confidence * 100)}% 확신
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{extraData.intent.reason}</p>
+                  </div>
+                )}
+
+                {/* Strategy */}
+                {extraData.strategy && (
+                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                    <p className="text-sm font-bold text-muted-foreground mb-2">콘텐츠 전략</p>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${
+                        extraData.strategy.verdict === "추천"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : extraData.strategy.verdict === "비추천"
+                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                      }`}>
+                        {extraData.strategy.verdict}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{extraData.strategy.reason}</p>
+                    {extraData.strategy.tips.length > 0 && (
+                      <ul className="space-y-1">
+                        {extraData.strategy.tips.map((tip, i) => (
+                          <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                            <span className="text-primary shrink-0">•</span>
+                            {tip}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+                {/* Content Spec */}
+                {extraData.contentSpec && (
+                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                    <p className="text-sm font-bold text-muted-foreground mb-2">상위 노출 콘텐츠 스펙</p>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">평균 제목 길이</p>
+                        <p className="text-lg font-bold">{extraData.contentSpec.avgTitleLength}자</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">평균 설명 길이</p>
+                        <p className="text-lg font-bold">{extraData.contentSpec.avgDescLength}자</p>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">상위 {extraData.contentSpec.count}개 결과 기준</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Keyword Clusters */}
+              {extraData.clusters && extraData.clusters.length > 0 && (
+                <div className="mt-4 bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                  <p className="text-sm font-bold text-muted-foreground mb-3">연관 키워드 클러스터</p>
+                  <div className="flex flex-wrap gap-4">
+                    {extraData.clusters.map((cluster, ci) => (
+                      <div key={ci} className="flex-1 min-w-[200px]">
+                        <p className="text-xs font-bold text-primary mb-2">{cluster.label}</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {cluster.keywords.map((kw) => (
+                            <button
+                              key={kw}
+                              onClick={() => handleRelatedKeywordClick(kw)}
+                              className="px-2 py-0.5 text-xs rounded-full bg-muted/50 hover:bg-primary/10 hover:text-primary transition-colors cursor-pointer"
+                            >
+                              {kw}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           )}
 
