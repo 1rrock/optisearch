@@ -204,11 +204,23 @@ export default function PricingPage() {
         router.push("/dashboard");
       } else {
         console.error("[pricing] activate response:", result);
-        toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`);
+        toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`, {
+          description: `고객센터로 문의해주세요. (거래 번호: ${transactionId})`,
+          action: {
+            label: "다시 시도",
+            onClick: () => activatePlan(transactionId),
+          },
+        });
       }
     } catch (err) {
       console.error("[pricing] activate failed:", err);
-      toast.error("플랜 활성화 중 오류가 발생했습니다. 잠시 후 새로고침해주세요.");
+      toast.error("플랜 활성화 중 오류가 발생했습니다.", {
+        description: `잠시 후 다시 시도하거나 고객센터로 문의해주세요. (거래 번호: ${transactionId})`,
+        action: {
+          label: "다시 시도",
+          onClick: () => activatePlan(transactionId),
+        },
+      });
     }
   };
 
@@ -247,7 +259,20 @@ export default function PricingPage() {
           if (txId) {
             sessionStorage.removeItem("paddle_transaction_id");
             activatePlan(txId);
+          } else {
+            toast.info("결제가 취소되었거나 정상적으로 완료되지 않았습니다.", {
+              description: "결제 과정에서 문제가 있었다면 다시 시도해주세요.",
+            });
           }
+        }
+        if (
+          event.name === "checkout.error" || 
+          event.name === "checkout.failed" || 
+          event.name === "checkout.payment.failed"
+        ) {
+          toast.error("결제 처리 중 오류가 발생했습니다.", {
+            description: "잠시 후 다시 시도하거나 고객센터로 문의해주세요.",
+          });
         }
       },
     });
