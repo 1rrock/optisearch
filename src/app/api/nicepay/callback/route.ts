@@ -28,6 +28,7 @@ export async function POST(request: Request) {
     const amount = formData.get("amount") as string;
     const authToken = formData.get("authToken") as string;
     const signature = formData.get("signature") as string;
+    const mallReserved = formData.get("mallReserved") as string; // userId
 
     // 1. 인증 결과 확인
     if (authResultCode !== "0000") {
@@ -44,12 +45,14 @@ export async function POST(request: Request) {
       return NextResponse.redirect(`${origin}/pricing?error=signature_failed`, { status: 302 });
     }
 
-    // 3. orderId 파싱 → planId, userId 추출
+    // 3. orderId 파싱 → planId 추출, userId는 mallReserved에서
     const parsed = parseOrderId(orderId);
     if (!parsed) {
       console.error("[nicepay/callback] Invalid orderId:", orderId);
       return NextResponse.redirect(`${origin}/pricing?error=invalid_order`, { status: 302 });
     }
+    // mallReserved에 원본 userId가 들어있음
+    const userId = mallReserved || parsed.userId;
 
     // 4. 금액 검증 (변조 방지)
     const expectedAmount = PLAN_AMOUNT_MAP[parsed.planId];
@@ -90,7 +93,7 @@ export async function POST(request: Request) {
         plan: parsed.planId,
         updated_at: new Date().toISOString(),
       })
-      .eq("id", parsed.userId)
+      .eq("id", userId)
       .single();
 
     // id로 못 찾으면 auth_user_id로 시도
@@ -101,7 +104,7 @@ export async function POST(request: Request) {
           plan: parsed.planId,
           updated_at: new Date().toISOString(),
         })
-        .eq("auth_user_id", parsed.userId)
+        .eq("auth_user_id", userId)
         .single();
 
       if (fallbackError) {
@@ -132,7 +135,7 @@ export async function POST(request: Request) {
       tid,
       orderId,
       planId: parsed.planId,
-      userId: parsed.userId,
+      userId,
       amount,
     });
 

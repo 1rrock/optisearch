@@ -22,6 +22,7 @@ declare global {
         amount: number;
         goodsName: string;
         returnUrl: string;
+        mallReserved?: string;
         fnError?: (result: { msg?: string; errorMsg?: string }) => void;
       }) => void;
     };
@@ -248,7 +249,9 @@ function PricingContent() {
     }
 
     const userId = session?.user?.id ?? "";
-    const orderId = `optisearch_${planId}_${userId}_${Date.now()}`;
+    // orderId 최대 64자 제한 — userId 해시 8자 + timestamp로 압축
+    const userHash = userId.split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36).replace("-", "n");
+    const orderId = `os_${planId}_${userHash}_${Date.now()}`;
 
     window.AUTHNICE.requestPay({
       clientId: process.env.NEXT_PUBLIC_NICEPAY_CLIENT_ID ?? "",
@@ -257,6 +260,7 @@ function PricingContent() {
       amount,
       goodsName: `옵티써치 ${PLAN_PRICING[planId].label} 플랜`,
       returnUrl: `${window.location.origin}/api/nicepay/callback`,
+      mallReserved: userId,
       fnError: (result) => {
         toast.error(`결제 오류: ${result.msg ?? result.errorMsg ?? "알 수 없는 오류"}`);
       },

@@ -54,12 +54,12 @@ export function parseOrderId(orderId: string): {
   timestamp: string;
 } | null {
   const parts = orderId.split("_");
-  if (parts.length < 4 || parts[0] !== "optisearch") return null;
+  // Format: os_{planId}_{userHash}_{timestamp}
+  if (parts.length < 4 || parts[0] !== "os") return null;
 
   const planId = parts[1] as PlanId;
   if (planId !== "basic" && planId !== "pro") return null;
 
-  // userId may contain underscores, so rejoin everything between planId and last part (timestamp)
   const timestamp = parts[parts.length - 1];
   const userId = parts.slice(2, parts.length - 1).join("_");
 
