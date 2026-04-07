@@ -167,7 +167,7 @@ export default function SettingsPage() {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-bold text-foreground">더 많은 기능이 필요하신가요?</span>
-                        <span className="text-xs text-muted-foreground">베이직 플랜부터 무제한 검색과 AI 기능을 사용하세요.</span>
+                        <span className="text-xs text-muted-foreground">베이직 플랜부터 일 300회 검색과 AI 기능을 사용하세요.</span>
                       </div>
                       <Button asChild className="rounded-xl font-bold shrink-0 w-full sm:w-auto">
                         <a href="/pricing">업그레이드</a>

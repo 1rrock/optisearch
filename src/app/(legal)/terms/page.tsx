@@ -56,7 +56,7 @@ export default function TermsPage() {
           <div className="bg-muted/20 rounded-2xl p-5">
             <h3 className="font-bold mb-2">베이직 플랜 (Basic)</h3>
             <ul className="list-disc pl-5 space-y-1 text-muted-foreground text-sm">
-              <li>무제한 키워드 검색</li>
+              <li>일 300회 키워드 검색</li>
               <li>AI 제목 20회/일, 초안 5회/일</li>
               <li>SEO 점수 분석 10회/일</li>
               <li>대량 키워드 분석 50개/회</li>

@@ -87,7 +87,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     historyLimit: 10,
   },
   basic: {
-    dailySearch: -1,
+    dailySearch: 300,
     dailyTitle: 20,
     dailyDraft: 5,
     dailyScore: 10,
@@ -212,9 +212,9 @@ export const SATURATION_THRESHOLDS: SaturationThreshold[] = [
 
 /** Helper: classify a saturation ratio into its threshold bucket */
 export function getSaturationThreshold(ratio: number): SaturationThreshold {
-  for (const threshold of SATURATION_THRESHOLDS) {
-    if (ratio >= threshold.maxRatio) {
-      return threshold;
+  for (let i = 1; i < SATURATION_THRESHOLDS.length; i++) {
+    if (ratio >= SATURATION_THRESHOLDS[i].maxRatio) {
+      return SATURATION_THRESHOLDS[i - 1];
     }
   }
   return SATURATION_THRESHOLDS[SATURATION_THRESHOLDS.length - 1];

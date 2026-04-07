@@ -6,7 +6,7 @@ import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keywords: z.array(z.string().min(1)).min(1).max(5),
-  months: z.number().min(1).max(24).optional().default(12),
+  months: z.union([z.literal(-1), z.number().int().min(1).max(120)]).optional().default(12),
   device: z.enum(["pc", "mo"]).optional(),
   gender: z.enum(["m", "f"]).optional(),
   ages: z.array(z.string()).optional(),
@@ -45,9 +45,12 @@ export async function POST(request: Request) {
     const { keywords, device, gender, ages, timeUnit } = parsed.data;
     const limits = PLAN_LIMITS[user.plan];
 
-    // Enforce plan-based trend period limit
-    const maxMonths = limits.trendPeriodMonths === -1 ? 24 : limits.trendPeriodMonths;
-    const months = Math.min(parsed.data.months, maxMonths);
+    const requestedMonths = parsed.data.months;
+    const months = limits.trendPeriodMonths === -1
+      ? requestedMonths
+      : requestedMonths === -1
+        ? limits.trendPeriodMonths
+        : Math.min(requestedMonths, limits.trendPeriodMonths);
 
     // Enforce demographics filter restriction
     const effectiveGender = limits.demographicsEnabled ? gender : undefined;
@@ -59,8 +62,8 @@ export async function POST(request: Request) {
     // Detect seasonality using 36-month data (reuses cache if same keyword)
     // Only for single-keyword requests to save DataLab quota
     let seasonality = null;
-    if (keywords.length === 1 && months >= 12) {
-      const longTrend = months >= 24
+    if (keywords.length === 1 && (months === -1 || months >= 18)) {
+      const longTrend = (months === -1 || months >= 24)
         ? trends[0]
         : (await getKeywordTrend(keywords, 36))[0];
       if (longTrend) {

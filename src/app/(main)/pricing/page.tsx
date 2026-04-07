@@ -44,7 +44,7 @@ interface Feature {
 }
 
 const FEATURES: Feature[] = [
-  { label: "키워드 검색", free: "10회/일", basic: "무제한", pro: "무제한" },
+  { label: "키워드 검색", free: "10회/일", basic: "300회/일", pro: "무제한" },
   { label: "연관 키워드", free: true, basic: true, pro: true },
   { label: "콘텐츠 포화 지수", free: true, basic: true, pro: true },
   { label: "키워드 등급", free: true, basic: true, pro: true },

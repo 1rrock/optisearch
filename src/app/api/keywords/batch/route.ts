@@ -6,7 +6,7 @@ import { checkUsageLimit } from "@/services/usage-service";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 
 const bodySchema = z.object({
-  keywords: z.array(z.string().min(1)).min(1).max(50),
+  keywords: z.array(z.string().min(1)).min(1).max(PLAN_LIMITS.pro.bulkKeywordsPerRun),
 });
 
 export async function POST(request: Request) {

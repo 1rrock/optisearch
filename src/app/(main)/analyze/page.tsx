@@ -1029,25 +1029,25 @@ function AnalyzePageInner() {
       if (trendJson.seasonality) setSeasonality(trendJson.seasonality);
       queryClient.setQueryData(["trend", keyword], points);
 
-      // Gender ratio calculation (paid plans only)
+      // Gender ratio: use demographics API (returns actual proportions, not relative indices)
       if (demographicsEnabled) {
-        const [maleData, femaleData] = await Promise.all([
-          fetchTrendPoints([keyword], 1, undefined, "m"),
-          fetchTrendPoints([keyword], 1, undefined, "f"),
-        ]);
-        const maleAvg = maleData.length > 0 ? maleData.reduce((s, d) => s + d.ratio, 0) / maleData.length : 0;
-        const femaleAvg = femaleData.length > 0 ? femaleData.reduce((s, d) => s + d.ratio, 0) / femaleData.length : 0;
-        const total = maleAvg + femaleAvg;
-        if (total > 0) {
-          const ratio = {
-            male: Math.round((maleAvg / total) * 100),
-            female: Math.round((femaleAvg / total) * 100),
-          };
-          setGenderRatio(ratio);
-          queryClient.setQueryData(["gender", keyword], ratio);
-        } else {
-          queryClient.setQueryData(["gender", keyword], null);
-        }
+        try {
+          const demoRes = await fetch("/api/analyze/demographics", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ keyword }),
+          });
+          if (demoRes.ok) {
+            const demoJson = await demoRes.json();
+            const maleEntry = demoJson.gender?.find((g: { group: string; ratio: number }) => g.group === "남성");
+            const femaleEntry = demoJson.gender?.find((g: { group: string; ratio: number }) => g.group === "여성");
+            if (maleEntry && femaleEntry) {
+              const ratio = { male: maleEntry.ratio, female: femaleEntry.ratio };
+              setGenderRatio(ratio);
+              queryClient.setQueryData(["gender", keyword], ratio);
+            }
+          }
+        } catch { /* demographics unavailable, skip gender ratio */ }
       }
     } catch {
       setTrendError(true);

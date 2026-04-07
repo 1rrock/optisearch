@@ -288,7 +288,7 @@ export default function LandingPage() {
               <p className="text-sm font-bold text-muted-foreground mb-8">첫 1개월 무료 · 이후 월 결제</p>
 
               <ul className="space-y-4 mb-10 flex-1 font-semibold text-foreground">
-                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 무제한 키워드 검색</li>
+                <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 일 300회 키워드 검색</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> AI 제목 20회/일, 초안 5회/일</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> SEO 점수 분석 + 엑셀 추출</li>
                 <li className="flex items-center gap-3"><CheckCircle2 className="size-5 text-primary" /> 쇼핑 인사이트 + 트렌드 1년</li>

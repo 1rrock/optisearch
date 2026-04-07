@@ -114,7 +114,9 @@ export async function analyzeKeyword(
     const competition = toCompetitionLevel(stat?.compIdx ?? "높음");
     const pcCtr = stat?.monthlyAvePcCtr ?? 0;
     const mobileCtr = stat?.monthlyAveMobileCtr ?? 0;
-    const clickRate = (pcCtr + mobileCtr) / 2;
+    const clickRate = totalSearchVolume > 0
+      ? (pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr) / totalSearchVolume
+      : 0;
 
     // Estimated monthly clicks from CTR data
     const estimatedClicks = Math.round(
@@ -179,13 +181,15 @@ export async function getRelatedKeywords(
   return cached(CacheKeys.relatedKeywords(keyword), CacheTTL.RELATED, async () => {
     const stats = await getRelatedKeywordsRaw(keyword);
 
+    const neutralSaturation = buildSaturationIndex(0.25);
+
     return stats
       .map((s) => {
         const pc = s.monthlyPcQcCnt;
         const mobile = s.monthlyMobileQcCnt;
         const total = pc + mobile;
         const competition = toCompetitionLevel(s.compIdx);
-        const saturationIndex = buildSaturationIndex(total > 0 ? total : 0);
+        const saturationIndex = neutralSaturation;
         const compositeScore = calcCompositeScore(total, saturationIndex.score, competition);
         return {
           keyword: s.relKeyword,

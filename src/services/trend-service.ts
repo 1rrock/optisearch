@@ -88,7 +88,11 @@ export async function getKeywordTrend(
 ): Promise<TrendResult[]> {
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setMonth(startDate.getMonth() - months);
+  if (months === -1) {
+    startDate.setFullYear(2016, 0, 1);
+  } else {
+    startDate.setMonth(startDate.getMonth() - months);
+  }
 
   const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
