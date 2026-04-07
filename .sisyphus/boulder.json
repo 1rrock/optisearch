@@ -1,29 +1,13 @@
 {
-  "active_plan": "/Users/1rrock/opencodeproject/optisearch/.sisyphus/plans/trends-executive-dashboard-redesign.md",
-  "started_at": "2026-04-04T12:18:21.851Z",
+  "active_plan": "/Users/1rrock/opencodeproject/optisearch/.sisyphus/plans/optisearch-system-remediation.md",
+  "started_at": "2026-04-07T00:45:40.296Z",
   "session_ids": [
-    "ses_2a7b29a80ffeb7dEA4WC5A7Qsp",
-    "ses_2a79108a9ffeBN5TzU1ROxTA4M",
-    "ses_2a77561a1ffe6mr0pIhcEIkoVq",
-    "ses_2a77250a3ffe3IXVlFqXIMuMuo",
-    "ses_2a7607cc4ffen86vt2Nx3EUZwR",
-    "ses_2a75d80c5ffexAxDXedr9iqe4e",
-    "ses_2a75daddcffekpwmg0SkrWNeI9",
-    "ses_2a7586c7dffeKzLwwHZZ5AIMh7",
-    "ses_2a74f45bdffeJ9Te3u5ookpgLS",
-    "ses_2a74bc03effe3IE6aemgMJsecP",
-    "ses_2a747db29ffe4xzaOafxoisHbA",
-    "ses_2a74135cdffe3SGj8A4IkvdnSe",
-    "ses_2a73dab19ffevwY4lruytUQYFN",
-    "ses_2a73bb357ffeZYbH3IFuT47PMU",
-    "ses_2a73bd281ffeLO550pCap4gmsx",
-    "ses_2a73aa24affe7HVyJ1sd32AvUh",
-    "ses_2a73b8a05ffeb2gKei51RjTYtF",
-    "ses_2a4365228ffekLRMNoviTOkaYq",
-    "ses_2a434f28affevPkkfFS7LgGqoV",
-    "ses_2a4332851ffeITt9dHqi3hlFQ1",
-    "ses_2a4334f23ffe747E6sH95w4K2H"
+    "ses_29eed4244ffe77l8AuL2gYzfPM",
+    "ses_29a97bc2cffeq5zWV5NMcQMLrY",
+    "ses_29a8d3423ffemhKkcGdLIa8A8Y",
+    "ses_29a8d1115ffen2KzhZJRLyJ81z",
+    "ses_29a85fc2bffeVHAkvIrQxyzqrJ"
   ],
-  "plan_name": "trends-executive-dashboard-redesign",
+  "plan_name": "optisearch-system-remediation",
   "agent": "atlas"
 }
