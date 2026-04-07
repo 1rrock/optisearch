@@ -10,6 +10,7 @@ const bodySchema = z.object({
   device: z.enum(["pc", "mo"]).optional(),
   gender: z.enum(["m", "f"]).optional(),
   ages: z.array(z.string()).optional(),
+  timeUnit: z.enum(["week", "month"]).optional(),
 });
 
 export async function POST(request: Request) {
@@ -41,7 +42,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { keywords, device, gender, ages } = parsed.data;
+    const { keywords, device, gender, ages, timeUnit } = parsed.data;
     const limits = PLAN_LIMITS[user.plan];
 
     // Enforce plan-based trend period limit
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
     const effectiveAges = limits.demographicsEnabled ? ages : undefined;
 
     // Fetch requested period for display
-    const trends = await getKeywordTrend(keywords, months, device, effectiveGender, effectiveAges);
+    const trends = await getKeywordTrend(keywords, months, device, effectiveGender, effectiveAges, timeUnit);
 
     // Detect seasonality using 36-month data (reuses cache if same keyword)
     // Only for single-keyword requests to save DataLab quota

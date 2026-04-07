@@ -233,7 +233,7 @@ export default function DashboardPage() {
               {recentSearches.slice(0, 3).map((s) => (
                 <a
                   key={s.keyword + s.createdAt}
-                  href={`/analyze?q=${encodeURIComponent(s.keyword)}`}
+                  href={`/analyze?keyword=${encodeURIComponent(s.keyword)}`}
                   className="px-4 py-1.5 bg-muted/60 hover:bg-muted text-foreground text-sm rounded-full transition-colors font-medium border border-transparent"
                 >
                   {s.keyword}

@@ -10,7 +10,7 @@ import { Badge } from "@/shared/ui/badge";
 import { PageHeader } from "@/shared/ui/page-header";
 import { SavedKeywordsPopover } from "@/shared/ui/saved-keywords-popover";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
-import { getKeywordGradeConfig } from "@/shared/config/constants";
+import { getKeywordGradeConfig, CHART_COLORS } from "@/shared/config/constants";
 import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
@@ -36,14 +36,6 @@ interface KeywordEntry {
 // ---------------------------------------------------------------------------
 
 const MAX_KEYWORDS = 5;
-
-const CHART_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#8b5cf6",
-  "#f59e0b",
-  "#ef4444",
-];
 
 // ---------------------------------------------------------------------------
 // Sub-components

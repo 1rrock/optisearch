@@ -83,7 +83,8 @@ export async function getKeywordTrend(
   months: number = 12,
   device?: string,
   gender?: string,
-  ages?: string[]
+  ages?: string[],
+  timeUnit?: "week" | "month"
 ): Promise<TrendResult[]> {
   const endDate = new Date();
   const startDate = new Date();
@@ -91,19 +92,19 @@ export async function getKeywordTrend(
 
   const formatDate = (d: Date) => d.toISOString().split("T")[0];
 
-  const timeUnit = months <= 3 ? "week" : "month";
+  const resolvedTimeUnit = timeUnit ?? (months <= 3 ? "week" : "month");
   const start = formatDate(startDate);
   const end = formatDate(endDate);
 
   const results = await Promise.all(
     keywords.map((kw) => {
-      const cacheKey = `trend:${kw.toLowerCase()}:${months}:${device ?? ""}:${gender ?? ""}:${(ages ?? []).join(",")}`;
+      const cacheKey = `trend:${kw.toLowerCase()}:${months}:${device ?? ""}:${gender ?? ""}:${(ages ?? []).join(",")}:${resolvedTimeUnit}`;
       return cached<TrendResult>(cacheKey, CacheTTL.KEYWORD, async () => {
         const response = await getSearchTrend({
           keyword: kw,
           startDate: start,
           endDate: end,
-          timeUnit,
+          timeUnit: resolvedTimeUnit,
           device,
           gender,
           ages,

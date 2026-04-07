@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useUserStore } from "@/shared/stores/user-store";
@@ -21,9 +21,13 @@ import {
   Check,
   Tag,
   Star,
+  Lock,
+  ChevronUp,
+  ChevronDown,
+  Download,
 } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
-import { getKeywordGradeConfig } from "@/shared/config/constants";
+import { getKeywordGradeConfig, CHART_COLORS } from "@/shared/config/constants";
 import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/model/types";
 import type { TrendPoint, SeasonalityInfo } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
@@ -191,7 +195,56 @@ function competitionDescription(competition: string) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function KeywordTrendChart({ data, error }: { data: TrendPoint[] | null; error: boolean }) {
+// ---------------------------------------------------------------------------
+// TrendSeries type
+// ---------------------------------------------------------------------------
+
+interface TrendSeries {
+  label: string;
+  data: TrendPoint[];
+  color: string;
+}
+
+const SPIKE_THRESHOLD = 0.5; // 50% change marks a spike
+
+function catmullRomToBezier(pts: { x: number; y: number }[]): string {
+  if (pts.length < 2) return "";
+  let d = `M ${pts[0].x} ${pts[0].y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(i - 1, 0)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(i + 2, pts.length - 1)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
+const COMPETITION_ORDER: Record<string, number> = { "낮음": 0, "보통": 1, "높음": 2 };
+
+function KeywordTrendChart({
+  series,
+  error,
+  loading,
+  totalVolume,
+  showMarkers,
+  showForecast,
+  plan,
+}: {
+  series: TrendSeries[];
+  error: boolean;
+  loading: boolean;
+  totalVolume?: number;
+  showMarkers?: boolean;
+  showForecast?: boolean;
+  plan?: "free" | "basic" | "pro";
+}) {
+  const [tooltip, setTooltip] = useState<{ x: number; period: string; values: { label: string; value: string; color: string }[] } | null>(null);
+
   if (error) {
     return (
       <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
@@ -200,15 +253,15 @@ function KeywordTrendChart({ data, error }: { data: TrendPoint[] | null; error: 
     );
   }
 
-  if (data === null) {
+  if (loading || series.length === 0) {
     return (
       <div className="h-64 bg-muted/30 rounded-lg animate-pulse" />
     );
   }
 
-  const sorted = [...data].sort((a, b) => a.period.localeCompare(b.period));
+  const primarySorted = [...series[0].data].sort((a, b) => a.period.localeCompare(b.period));
 
-  if (sorted.length < 2) {
+  if (primarySorted.length < 2) {
     return (
       <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">
         트렌드 데이터가 없습니다
@@ -216,108 +269,350 @@ function KeywordTrendChart({ data, error }: { data: TrendPoint[] | null; error: 
     );
   }
 
+  const isSingle = series.length === 1;
+
   const W = 700;
-  const H = 240;
-  const PAD = { top: 16, right: 20, bottom: 40, left: 40 };
+  const H = 260;
+  const PAD = { top: 20, right: 24, bottom: 44, left: 70 };
   const chartW = W - PAD.left - PAD.right;
   const chartH = H - PAD.top - PAD.bottom;
-  const xStep = chartW / Math.max(sorted.length - 1, 1);
+
+  const periods = primarySorted.map((d) => d.period);
+  const xStep = chartW / Math.max(periods.length - 1, 1);
+
+  const allRatios = series.flatMap((s) => s.data.map((d) => d.ratio));
+  const maxRatio = Math.max(...allRatios, 1);
+
+  const useVolume = !!totalVolume;
+  const ratioToVol = (r: number) => useVolume ? Math.round((r / maxRatio) * totalVolume) : r;
+  const maxValue = useVolume ? Math.ceil(ratioToVol(maxRatio) * 1.15) : Math.ceil(maxRatio * 1.15);
+  const niceStep = useVolume
+    ? (maxValue > 100000 ? 50000 : maxValue > 10000 ? 10000 : maxValue > 1000 ? 1000 : 100)
+    : 25;
+  const niceMax = Math.ceil(maxValue / niceStep) * niceStep || 100;
+  const yTickCount = 4;
+  const yTickValues = Array.from({ length: yTickCount + 1 }, (_, i) => Math.round((niceMax / yTickCount) * i));
 
   const xOf = (i: number) => PAD.left + i * xStep;
-  const yOf = (ratio: number) => PAD.top + chartH - (ratio / 100) * chartH;
+  const yOf = (ratio: number) => {
+    const val = ratioToVol(ratio);
+    return PAD.top + chartH - (val / niceMax) * chartH;
+  };
+  const formatYLabel = (v: number): string => {
+    if (v >= 10000) return `${Math.round(v / 10000)}만`;
+    if (v >= 1000) return `${(v / 1000).toFixed(0)}천`;
+    return v.toLocaleString("ko-KR");
+  };
+  const volumeLabel = (ratio: number): string => {
+    const vol = ratioToVol(ratio);
+    return vol.toLocaleString("ko-KR");
+  };
 
-  const yTicks = [0, 25, 50, 75, 100];
-  const tickStep = Math.max(1, Math.floor(sorted.length / 6));
-  const xTicks = sorted.filter((_, i) => i % tickStep === 0);
+  const tickStep = Math.max(1, Math.floor(periods.length / 6));
+  const xTicks = primarySorted.filter((_, i) => i % tickStep === 0);
 
-  const linePath = sorted
-    .map((pt, i) => `${i === 0 ? "M" : "L"} ${xOf(i)} ${yOf(pt.ratio)}`)
-    .join(" ");
+  const seriesRenderData = series.map((s) => {
+    const sortedData = [...s.data].sort((a, b) => a.period.localeCompare(b.period));
+    const periodMap = new Map<string, TrendPoint>(sortedData.map((d) => [d.period, d]));
+    const pts = periods.map((period, i) => {
+      const pt = periodMap.get(period);
+      const ratio = pt ? pt.ratio : 0;
+      return { x: xOf(i), y: yOf(ratio), ratio, period };
+    });
+    const volumeLookup = new Map<string, number>(pts.map((p) => [p.period, ratioToVol(p.ratio)]));
+    const linePath = catmullRomToBezier(pts.map((p) => ({ x: p.x, y: p.y })));
+    const areaPath = isSingle
+      ? linePath + ` L ${xOf(periods.length - 1)} ${PAD.top + chartH} L ${xOf(0)} ${PAD.top + chartH} Z`
+      : "";
+    return { pts, linePath, areaPath, volumeLookup };
+  });
 
-  const areaPath =
-    `M ${xOf(0)} ${yOf(sorted[0].ratio)} ` +
-    sorted.slice(1).map((pt, i) => `L ${xOf(i + 1)} ${yOf(pt.ratio)}`).join(" ") +
-    ` L ${xOf(sorted.length - 1)} ${PAD.top + chartH} L ${xOf(0)} ${PAD.top + chartH} Z`;
+  // Linear regression from last 6 points of primary series, extended 3 periods forward
+  let forecastPath = "";
+  if (showForecast && plan === "pro" && primarySorted.length >= 6) {
+    const last6 = primarySorted.slice(-6);
+    const n = last6.length;
+    const xs = last6.map((_, i) => i);
+    const ys = last6.map((d) => d.ratio);
+    const sumX = xs.reduce((a, b) => a + b, 0);
+    const sumY = ys.reduce((a, b) => a + b, 0);
+    const sumXY = xs.reduce((a, x, i) => a + x * ys[i], 0);
+    const sumX2 = xs.reduce((a, x) => a + x * x, 0);
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    const baseIdx = periods.length - 1;
+    const forecastPts = [
+      { x: xOf(baseIdx), y: yOf(intercept + slope * (n - 1)) },
+      { x: xOf(baseIdx + 1), y: yOf(intercept + slope * n) },
+      { x: xOf(baseIdx + 2), y: yOf(intercept + slope * (n + 1)) },
+      { x: xOf(baseIdx + 3), y: yOf(intercept + slope * (n + 2)) },
+    ];
+    forecastPath = catmullRomToBezier(forecastPts);
+  }
+
+  const primaryColor = series[0].color;
+  const dateRange = primarySorted.length >= 2
+    ? `${primarySorted[0].period.slice(0, 7)} ~ ${primarySorted[primarySorted.length - 1].period.slice(0, 7)}`
+    : null;
+
+  // Build tooltip y position (use primary series)
+  const tooltipY = tooltip
+    ? (() => {
+        const idx = periods.indexOf(tooltip.period);
+        if (idx < 0) return PAD.top;
+        const pt = seriesRenderData[0]?.pts[idx];
+        return pt ? pt.y : PAD.top;
+      })()
+    : 0;
+  const tooltipX = tooltip
+    ? (() => {
+        const idx = periods.indexOf(tooltip.period);
+        return idx >= 0 ? xOf(idx) : 0;
+      })()
+    : 0;
 
   return (
-    <div className="w-full overflow-x-auto">
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="w-full min-w-[320px]"
-        style={{ height: H }}
-        aria-label="검색량 트렌드 차트"
-      >
-        <defs>
-          <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.18} />
-            <stop offset="100%" stopColor="#3b82f6" stopOpacity={0.01} />
-          </linearGradient>
-        </defs>
+    <div className="w-full">
+      {dateRange && (
+        <p className="text-[11px] text-muted-foreground mb-2 text-right">{dateRange}</p>
+      )}
+      {/* Legend for multi-series */}
+      {!isSingle && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 mb-3 text-xs">
+          {series.map((s) => (
+            <span key={s.label} className="flex items-center gap-1.5">
+              <span className="inline-block w-5 h-0.5 rounded" style={{ backgroundColor: s.color }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full min-w-[320px]"
+          style={{ height: H }}
+          aria-label="검색량 트렌드 차트"
+          onMouseLeave={() => setTooltip(null)}
+        >
+          <defs>
+            <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={primaryColor} stopOpacity={0.22} />
+              <stop offset="80%" stopColor={primaryColor} stopOpacity={0.04} />
+              <stop offset="100%" stopColor={primaryColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
 
-        {yTicks.map((v) => (
-          <line
-            key={v}
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={yOf(v)}
-            y2={yOf(v)}
-            stroke="currentColor"
-            strokeOpacity={0.08}
-            strokeWidth={1}
-          />
-        ))}
+          {yTickValues.map((v) => {
+            const py = PAD.top + chartH - (v / niceMax) * chartH;
+            return (
+              <line
+                key={v}
+                x1={PAD.left}
+                x2={W - PAD.right}
+                y1={py}
+                y2={py}
+                stroke="currentColor"
+                strokeOpacity={0.08}
+                strokeWidth={1}
+              />
+            );
+          })}
 
-        {yTicks.map((v) => (
-          <text
-            key={v}
-            x={PAD.left - 8}
-            y={yOf(v) + 4}
-            textAnchor="end"
-            fontSize={11}
-            fill="currentColor"
-            fillOpacity={0.45}
-          >
-            {v}
-          </text>
-        ))}
+          {yTickValues.map((v) => {
+            const py = PAD.top + chartH - (v / niceMax) * chartH;
+            return (
+              <text
+                key={v}
+                x={PAD.left - 8}
+                y={py + 4}
+                textAnchor="end"
+                fontSize={10}
+                fill="currentColor"
+                fillOpacity={0.5}
+              >
+                {formatYLabel(v)}
+              </text>
+            );
+          })}
 
-        {xTicks.map((pt) => (
-          <text
-            key={pt.period}
-            x={xOf(sorted.indexOf(pt))}
-            y={H - 8}
-            textAnchor="middle"
-            fontSize={10}
-            fill="currentColor"
-            fillOpacity={0.45}
-          >
-            {pt.period.slice(0, 7)}
-          </text>
-        ))}
+          {xTicks.map((pt) => {
+            const idx = periods.indexOf(pt.period);
+            return (
+              <text
+                key={pt.period}
+                x={xOf(idx)}
+                y={H - 10}
+                textAnchor="middle"
+                fontSize={10}
+                fill="currentColor"
+                fillOpacity={0.45}
+              >
+                {pt.period.slice(0, 7)}
+              </text>
+            );
+          })}
 
-        <path d={areaPath} fill="url(#trendGradient)" />
-        <path
-          d={linePath}
-          fill="none"
-          stroke="#3b82f6"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+          {/* Series paths */}
+          {seriesRenderData.map((rd, si) => (
+            <g key={series[si].label}>
+              {isSingle && rd.areaPath && (
+                <path d={rd.areaPath} fill="url(#trendGradient)" />
+              )}
+              <path
+                d={rd.linePath}
+                fill="none"
+                stroke={series[si].color}
+                strokeWidth={isSingle ? 2.5 : 2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Dots for primary series only */}
+              {si === 0 && rd.pts.map((pt) => (
+                <circle
+                  key={pt.period}
+                  cx={pt.x}
+                  cy={pt.y}
+                  r={tooltip && tooltip.period === pt.period ? 5 : 3}
+                  fill={series[si].color}
+                  style={{ transition: "r 0.1s" }}
+                />
+              ))}
+              {/* Markers for 급등/급락 (primary series only) */}
+              {showMarkers && si === 0 && rd.pts.map((pt, pi) => {
+                if (pi === 0) return null;
+                const prev = rd.pts[pi - 1];
+                if (prev.ratio === 0) return null;
+                const change = (pt.ratio - prev.ratio) / prev.ratio;
+                if (Math.abs(change) < SPIKE_THRESHOLD) return null;
+                const isUp = change > 0;
+                const mx = pt.x;
+                const my = isUp ? pt.y - 14 : pt.y + 14;
+                return (
+                  <text
+                    key={`marker-${pt.period}`}
+                    x={mx}
+                    y={my}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill={isUp ? "#ef4444" : "#3b82f6"}
+                  >
+                    {isUp ? "▲" : "▼"}
+                  </text>
+                );
+              })}
+            </g>
+          ))}
 
-        {sorted.map((pt, i) => (
-          <circle
-            key={pt.period}
-            cx={xOf(i)}
-            cy={yOf(pt.ratio)}
-            r={3}
-            fill="#3b82f6"
-          />
-        ))}
-      </svg>
+          {/* Forecast dashed line */}
+          {forecastPath && (
+            <path
+              d={forecastPath}
+              fill="none"
+              stroke={primaryColor}
+              strokeWidth={1.5}
+              strokeDasharray="5 3"
+              strokeOpacity={0.5}
+              strokeLinecap="round"
+            />
+          )}
+
+          {/* Invisible hover rects for tooltip */}
+          {periods.map((period, i) => (
+            <rect
+              key={`hover-${period}`}
+              x={xOf(i) - xStep / 2}
+              y={PAD.top}
+              width={xStep}
+              height={chartH}
+              fill="transparent"
+              onMouseEnter={() => {
+                const vals = seriesRenderData.map((rd, si) => {
+                  const vol = rd.volumeLookup.get(period);
+                  const value = vol !== undefined ? vol.toLocaleString("ko-KR") : "-";
+                  return { label: series[si].label, value, color: series[si].color };
+                });
+                setTooltip({ x: xOf(i), period, values: vals });
+              }}
+            />
+          ))}
+
+          {/* Tooltip */}
+          {tooltip && (() => {
+            const tooltipHeight = 18 + series.length * 16 + 8;
+            const tooltipWidth = 130;
+            const tx = Math.min(tooltipX + 8, W - tooltipWidth - 4);
+            const ty = Math.max(PAD.top, tooltipY - tooltipHeight / 2);
+            return (
+              <g>
+                <line
+                  x1={tooltipX}
+                  x2={tooltipX}
+                  y1={PAD.top}
+                  y2={PAD.top + chartH}
+                  stroke={primaryColor}
+                  strokeOpacity={0.3}
+                  strokeWidth={1}
+                  strokeDasharray="4 2"
+                />
+                <rect
+                  x={tx}
+                  y={ty}
+                  width={tooltipWidth}
+                  height={tooltipHeight}
+                  rx={6}
+                  fill="#1e293b"
+                  fillOpacity={0.92}
+                />
+                <text
+                  x={tx + tooltipWidth / 2}
+                  y={ty + 14}
+                  textAnchor="middle"
+                  fontSize={10}
+                  fill="white"
+                  fillOpacity={0.7}
+                >
+                  {tooltip.period.slice(0, 7)}
+                </text>
+                {tooltip.values.map((v, vi) => (
+                  <g key={v.label}>
+                    <circle cx={tx + 10} cy={ty + 24 + vi * 16} r={3} fill={v.color} />
+                    <text
+                      x={tx + 18}
+                      y={ty + 28 + vi * 16}
+                      fontSize={10}
+                      fill="white"
+                    >
+                      {v.label}: {v.value}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            );
+          })()}
+        </svg>
+      </div>
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Demographic filter definitions
+// ---------------------------------------------------------------------------
+
+const DEMO_FILTERS = [
+  { key: "all", label: "전체", color: "#3b82f6", gender: undefined as undefined, ages: undefined as undefined },
+  { key: "m10", label: "10대 남성", color: "#ef4444", gender: "m" as const, ages: ["1", "2"] },
+  { key: "m20", label: "20대 남성", color: "#f59e0b", gender: "m" as const, ages: ["3", "4"] },
+  { key: "m30", label: "30대 남성", color: "#10b981", gender: "m" as const, ages: ["5", "6"] },
+  { key: "m40", label: "40대 남성", color: "#8b5cf6", gender: "m" as const, ages: ["7", "8"] },
+  { key: "m50", label: "50대+ 남성", color: "#06b6d4", gender: "m" as const, ages: ["9", "10", "11"] },
+  { key: "f10", label: "10대 여성", color: "#ec4899", gender: "f" as const, ages: ["1", "2"] },
+  { key: "f20", label: "20대 여성", color: "#f97316", gender: "f" as const, ages: ["3", "4"] },
+  { key: "f30", label: "30대 여성", color: "#84cc16", gender: "f" as const, ages: ["5", "6"] },
+  { key: "f40", label: "40대 여성", color: "#14b8a6", gender: "f" as const, ages: ["7", "8"] },
+  { key: "f50", label: "50대+ 여성", color: "#6366f1", gender: "f" as const, ages: ["9", "10", "11"] },
+];
 
 function RelatedRow({ word, vol, comp, onClick, onCompare }: { word: string; vol: string; comp: string; onClick: () => void; onCompare: () => void }) {
   const badgeCls = competitionBadgeClass(comp);
@@ -367,7 +662,7 @@ function SkeletonCard() {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-12">
       {/* Metrics Row */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <SkeletonCard />
@@ -377,20 +672,65 @@ function LoadingSkeleton() {
       </section>
 
       {/* Charts & Tables Row */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-card p-8 rounded-xl shadow-sm border border-muted/50 animate-pulse">
+      <section className="flex flex-col gap-8">
+        <div className="w-full bg-card p-8 rounded-xl shadow-sm border border-muted/50 animate-pulse">
           <div className="h-4 w-32 bg-muted rounded mb-8"></div>
           <div className="h-64 bg-muted/50 rounded"></div>
         </div>
-        <div className="bg-card rounded-xl shadow-sm border border-muted/50 animate-pulse">
+        <div className="w-full bg-card rounded-xl shadow-sm border border-muted/50 animate-pulse flex flex-col">
           <div className="p-6">
             <div className="h-4 w-24 bg-muted rounded"></div>
           </div>
-          <div className="p-6 space-y-4">
-            {[1, 2, 3, 4].map((i) => (
+          <div className="p-6 space-y-4 flex-1">
+            {[1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="h-10 bg-muted/50 rounded"></div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Section Analysis Skeleton */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+            <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      </section>
+      
+      {/* Gender Distribution Skeleton */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+            <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
+        </div>
+        <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 animate-pulse">
+           <div className="h-5 w-32 bg-muted rounded mb-4"></div>
+           <div className="h-4 w-full bg-muted rounded-full"></div>
+        </div>
+      </section>
+
+      {/* Demographics Skeleton */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+            <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+        </div>
+      </section>
+
+      {/* AI Insights Skeleton */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+            <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
         </div>
       </section>
     </div>
@@ -414,6 +754,23 @@ function EmptyState() {
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
+
+async function fetchTrendPoints(
+  keywords: string[],
+  months: number,
+  timeUnit?: string,
+  gender?: string,
+  ages?: string[],
+): Promise<TrendPoint[]> {
+  const res = await fetch("/api/trends", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ keywords, months, timeUnit, gender, ages }),
+  });
+  if (!res.ok) throw new Error();
+  const json = await res.json();
+  return json.trends?.[0]?.data ?? [];
+}
 
 async function toggleSavedKeyword(keyword: string, currentlySaved: boolean): Promise<boolean> {
   if (currentlySaved) {
@@ -442,7 +799,7 @@ async function toggleSavedKeyword(keyword: string, currentlySaved: boolean): Pro
 }
 
 async function fetchIsKeywordSaved(keyword: string): Promise<boolean> {
-  const res = await fetch(`/api/keywords/saved?limit=200`);
+  const res = await fetch(`/api/keywords/saved?limit=200`, { cache: "no-store" });
   if (!res.ok) return false;
   const data = await res.json();
   return (data.keywords as Array<{ keyword: string }>).some((k) => k.keyword === keyword);
@@ -475,6 +832,16 @@ function AnalyzePageInner() {
   const [genderRatio, setGenderRatio] = useState<{ male: number; female: number } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileRef>(null);
+  const [sortKey, setSortKey] = useState<"volume" | "competition" | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [aiInsightsLoaded, setAiInsightsLoaded] = useState(false);
+  const [trendMonths, setTrendMonths] = useState(12);
+  const [trendTimeUnit, setTrendTimeUnit] = useState<"month" | "week">("month");
+  const [demoFilters, setDemoFilters] = useState<Set<string>>(new Set(["all"]));
+  const [demoSeriesMap, setDemoSeriesMap] = useState<Map<string, TrendPoint[]>>(new Map());
+  const [compareKeywords, setCompareKeywords] = useState<string[]>([]);
+  const [compareSeriesMap, setCompareSeriesMap] = useState<Map<string, TrendPoint[]>>(new Map());
+  const [compareInput, setCompareInput] = useState("");
 
   // Progressive rendering: 3 separate data phases
   const [quickData, setQuickData] = useState<QuickResponse | null>(null);
@@ -500,6 +867,12 @@ function AnalyzePageInner() {
     setQuickPending(true);
     setFullPending(true);
     setExtraPending(true);
+    setAiInsightsLoaded(false);
+    setDemoFilters(new Set(["all"]));
+    setDemoSeriesMap(new Map());
+    setCompareKeywords([]);
+    setCompareSeriesMap(new Map());
+    setTrendData(null);
 
     // Phase 1: quick must succeed before firing full+extra
     fetchQuick(keyword, token).then((result) => {
@@ -559,6 +932,7 @@ function AnalyzePageInner() {
     onSuccess: (nextSaved) => {
       setIsSaved(nextSaved);
       setBookmarkError(null);
+      queryClient.invalidateQueries({ queryKey: ["savedKeywords"] });
     },
     onError: (err: Error) => {
       setBookmarkError(err.message);
@@ -622,38 +996,32 @@ function AnalyzePageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fullData?.analysis?.keyword]);
 
-  async function fetchTrendData(keyword: string, demographicsEnabled: boolean) {
+  // Re-fetch when period or timeUnit controls change; clear stale demographic/compare data
+  useEffect(() => {
+    const keyword = fullData?.analysis?.keyword ?? quickData?.keyword;
+    if (!keyword) return;
+    setDemoSeriesMap(new Map());
+    setCompareSeriesMap(new Map());
+    setDemoFilters(new Set(["all"]));
+    const plan = quickData?.plan ?? fullData?.plan;
+    fetchTrendData(keyword, plan !== "free", trendMonths, trendTimeUnit);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trendMonths, trendTimeUnit]);
+
+  async function fetchTrendData(keyword: string, demographicsEnabled: boolean, months?: number, timeUnit?: string) {
     setTrendData(null);
     setTrendError(false);
     setGenderRatio(null);
     setSeasonality(null);
     try {
-      const fetches: Promise<Response>[] = [
-        fetch("/api/trends", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], months: 12 }),
-        }),
-      ];
+      const effectiveMonths = months ?? trendMonths;
+      const effectiveUnit = timeUnit ?? trendTimeUnit;
 
-      if (demographicsEnabled) {
-        fetches.push(
-          fetch("/api/trends", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keywords: [keyword], months: 1, gender: "m" }),
-          }),
-          fetch("/api/trends", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ keywords: [keyword], months: 1, gender: "f" }),
-          }),
-        );
-      }
-
-      const responses = await Promise.all(fetches);
-      const trendRes = responses[0];
-
+      const trendRes = await fetch("/api/trends", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ keywords: [keyword], months: effectiveMonths, timeUnit: effectiveUnit }),
+      });
       if (!trendRes.ok) throw new Error();
       const trendJson = await trendRes.json();
       const points: TrendPoint[] = trendJson.trends?.[0]?.data ?? [];
@@ -662,27 +1030,23 @@ function AnalyzePageInner() {
       queryClient.setQueryData(["trend", keyword], points);
 
       // Gender ratio calculation (paid plans only)
-      if (demographicsEnabled && responses.length === 3) {
-        const maleRes = responses[1];
-        const femaleRes = responses[2];
-        if (maleRes.ok && femaleRes.ok) {
-          const maleJson = await maleRes.json();
-          const femaleJson = await femaleRes.json();
-          const maleData: TrendPoint[] = maleJson.trends?.[0]?.data ?? [];
-          const femaleData: TrendPoint[] = femaleJson.trends?.[0]?.data ?? [];
-          const maleAvg = maleData.length > 0 ? maleData.reduce((s, d) => s + d.ratio, 0) / maleData.length : 0;
-          const femaleAvg = femaleData.length > 0 ? femaleData.reduce((s, d) => s + d.ratio, 0) / femaleData.length : 0;
-          const total = maleAvg + femaleAvg;
-          if (total > 0) {
-            const ratio = {
-              male: Math.round((maleAvg / total) * 100),
-              female: Math.round((femaleAvg / total) * 100),
-            };
-            setGenderRatio(ratio);
-            queryClient.setQueryData(["gender", keyword], ratio);
-          } else {
-            queryClient.setQueryData(["gender", keyword], null);
-          }
+      if (demographicsEnabled) {
+        const [maleData, femaleData] = await Promise.all([
+          fetchTrendPoints([keyword], 1, undefined, "m"),
+          fetchTrendPoints([keyword], 1, undefined, "f"),
+        ]);
+        const maleAvg = maleData.length > 0 ? maleData.reduce((s, d) => s + d.ratio, 0) / maleData.length : 0;
+        const femaleAvg = femaleData.length > 0 ? femaleData.reduce((s, d) => s + d.ratio, 0) / femaleData.length : 0;
+        const total = maleAvg + femaleAvg;
+        if (total > 0) {
+          const ratio = {
+            male: Math.round((maleAvg / total) * 100),
+            female: Math.round((femaleAvg / total) * 100),
+          };
+          setGenderRatio(ratio);
+          queryClient.setQueryData(["gender", keyword], ratio);
+        } else {
+          queryClient.setQueryData(["gender", keyword], null);
         }
       }
     } catch {
@@ -701,7 +1065,29 @@ function AnalyzePageInner() {
   }
 
   const analysis = fullData?.analysis ?? null;
-  const relatedKeywords = extraData?.relatedKeywords ?? [];
+  const relatedKeywordsRaw = extraData?.relatedKeywords ?? [];
+  const sortedRelatedKeywords = useMemo(() => {
+    if (!sortKey) return relatedKeywordsRaw;
+    return [...relatedKeywordsRaw].sort((a, b) => {
+      let diff = 0;
+      if (sortKey === "volume") {
+        diff = (a.pcSearchVolume + a.mobileSearchVolume) - (b.pcSearchVolume + b.mobileSearchVolume);
+      } else {
+        diff = (COMPETITION_ORDER[a.competition] ?? 1) - (COMPETITION_ORDER[b.competition] ?? 1);
+      }
+      return sortOrder === "asc" ? diff : -diff;
+    });
+  }, [relatedKeywordsRaw, sortKey, sortOrder]);
+  const relatedKeywords = sortedRelatedKeywords;
+
+  function handleSortClick(key: "volume" | "competition") {
+    if (sortKey === key) {
+      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      setSortOrder("desc");
+    }
+  }
   const correctedKeyword = quickData?.correctedKeyword ?? fullData?.correctedKeyword ?? null;
   const hasAnyData = !!(quickData || fullData);
 
@@ -736,6 +1122,68 @@ function AnalyzePageInner() {
     }
   }
 
+  function handleCsvDownload() {
+    if (!trendData || trendData.length === 0) return;
+    const vol = displayVolume?.totalSearchVolume;
+    const maxR = Math.max(...trendData.map((d) => d.ratio), 1);
+    const header = "날짜,검색량(추정),비율\n";
+    const rows = [...trendData]
+      .sort((a, b) => a.period.localeCompare(b.period))
+      .map((d) => {
+        const estVol = vol ? Math.round((d.ratio / maxR) * vol) : d.ratio;
+        return `${d.period},${estVol},${d.ratio}`;
+      })
+      .join("\n");
+    const csv = header + rows;
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `trend_${submittedKeyword}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function fetchDemoFilterData(filterKey: string, keyword: string) {
+    const filter = DEMO_FILTERS.find((f) => f.key === filterKey);
+    if (!filter || filter.key === "all") return;
+    try {
+      const points = await fetchTrendPoints([keyword], trendMonths, trendTimeUnit, filter.gender, filter.ages);
+      setDemoSeriesMap((prev) => {
+        const next = new Map(prev);
+        next.set(filterKey, points);
+        return next;
+      });
+    } catch { /* ignore */ }
+  }
+
+  async function addCompareKeyword() {
+    const kw = compareInput.trim();
+    if (!kw || compareKeywords.includes(kw)) {
+      setCompareInput("");
+      return;
+    }
+    setCompareKeywords((prev) => [...prev, kw]);
+    setCompareInput("");
+    try {
+      const points = await fetchTrendPoints([kw], trendMonths, trendTimeUnit);
+      setCompareSeriesMap((prev) => {
+        const next = new Map(prev);
+        next.set(kw, points);
+        return next;
+      });
+    } catch { /* ignore */ }
+  }
+
+  function removeCompareKeyword(kw: string) {
+    setCompareKeywords((prev) => prev.filter((k) => k !== kw));
+    setCompareSeriesMap((prev) => {
+      const next = new Map(prev);
+      next.delete(kw);
+      return next;
+    });
+  }
+
   // Use quickData for early rendering, fall back to full analysis
   const displayVolume = quickData ?? (analysis ? {
     pcSearchVolume: analysis.pcSearchVolume,
@@ -755,6 +1203,27 @@ function AnalyzePageInner() {
   const monthlyClicks = quickData?.estimatedClicks
     ?? (displayVolume ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate) : 0);
   const isEstimated = quickData?.isEstimated || analysis?.isEstimated;
+
+  const COMPARE_COLORS = ["#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
+  const trendSeries = useMemo<TrendSeries[]>(() => {
+    const result: TrendSeries[] = [];
+    if (trendData) {
+      result.push({ label: submittedKeyword || "전체", data: trendData, color: CHART_COLORS[0] });
+    }
+    for (const [filterKey, filterData] of demoSeriesMap) {
+      const filter = DEMO_FILTERS.find((f) => f.key === filterKey);
+      if (filter && demoFilters.has(filterKey)) {
+        result.push({ label: filter.label, data: filterData, color: filter.color });
+      }
+    }
+    compareKeywords.forEach((kw, i) => {
+      const data = compareSeriesMap.get(kw);
+      if (data) {
+        result.push({ label: kw, data, color: COMPARE_COLORS[i % COMPARE_COLORS.length] });
+      }
+    });
+    return result;
+  }, [trendData, submittedKeyword, demoSeriesMap, demoFilters, compareKeywords, compareSeriesMap]);
 
   return (
     <div className="space-y-12">
@@ -971,6 +1440,236 @@ function AnalyzePageInner() {
             ) : <SkeletonCard />}
           </section>
 
+          {/* Row 2: Charts & Tables */}
+          <section className="flex flex-col gap-8 mb-12">
+            {/* Trend Chart */}
+            <div className="w-full bg-card p-8 rounded-xl shadow-sm border border-muted/50">
+              {/* Rich toolbar header */}
+              <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h3 className="text-lg font-bold">검색량 트렌드</h3>
+                  {(() => {
+                    const vol = getVolatilityInfo(trendData);
+                    if (!vol) return null;
+                    return (
+                      <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${vol.color}`} title={vol.description}>
+                        {vol.label}
+                      </span>
+                    );
+                  })()}
+                  {seasonality && (
+                    <span
+                      className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400"
+                      title={`매년 ${seasonality.peakMonthLabels.join(", ")}에 급상승 (${seasonality.strength === "strong" ? "강한" : seasonality.strength === "moderate" ? "보통" : "약한"} 계절성)`}
+                    >
+                      계절성 {seasonality.peakMonthLabels.join("·")}
+                    </span>
+                  )}
+                  {/* Trend change rate badge */}
+                  {trendData && trendData.length >= 2 && (() => {
+                    const sorted = [...trendData].sort((a, b) => a.period.localeCompare(b.period));
+                    const last = sorted[sorted.length - 1].ratio;
+                    const prev = sorted[sorted.length - 2].ratio;
+                    if (prev === 0) return null;
+                    const pct = ((last - prev) / prev) * 100;
+                    const isUp = pct >= 0;
+                    return (
+                      <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${isUp ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"}`}>
+                        {isUp ? "▲" : "▼"} {Math.abs(pct).toFixed(1)}%
+                      </span>
+                    );
+                  })()}
+                </div>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={trendMonths}
+                    onChange={(e) => setTrendMonths(Number(e.target.value))}
+                    className="text-xs px-2 py-1.5 border border-muted/60 rounded-lg bg-background text-foreground focus:outline-none"
+                  >
+                    <option value={3}>3개월</option>
+                    <option value={6}>6개월</option>
+                    <option value={12}>1년</option>
+                    {(quickData?.plan !== "free") && <option value={24}>2년</option>}
+                  </select>
+                  <select
+                    value={trendTimeUnit}
+                    onChange={(e) => setTrendTimeUnit(e.target.value as "month" | "week")}
+                    className="text-xs px-2 py-1.5 border border-muted/60 rounded-lg bg-background text-foreground focus:outline-none"
+                  >
+                    <option value="month">월간</option>
+                    <option value="week">주간</option>
+                  </select>
+                  <button
+                    onClick={handleCsvDownload}
+                    className="p-1.5 border border-muted/60 rounded-lg bg-background text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors"
+                    title="CSV 다운로드"
+                  >
+                    <Download className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Demographic filter checkboxes (basic/pro only) */}
+              {quickData?.plan !== "free" && (
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4 text-xs">
+                  {DEMO_FILTERS.map((filter) => (
+                    <label key={filter.key} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={demoFilters.has(filter.key)}
+                        disabled={filter.key === "all"}
+                        onChange={(e) => {
+                          if (filter.key === "all") return;
+                          const keyword = fullData?.analysis?.keyword ?? quickData?.keyword;
+                          if (e.target.checked) {
+                            setDemoFilters((prev) => new Set([...prev, filter.key]));
+                            if (keyword && !demoSeriesMap.has(filter.key)) {
+                              fetchDemoFilterData(filter.key, keyword);
+                            }
+                          } else {
+                            setDemoFilters((prev) => {
+                              const next = new Set(prev);
+                              next.delete(filter.key);
+                              return next;
+                            });
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <span style={{ color: filter.color }}>{filter.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+
+              {/* Chart */}
+              <KeywordTrendChart
+                series={trendSeries}
+                error={trendError}
+                loading={!trendData && !trendError}
+                totalVolume={displayVolume?.totalSearchVolume}
+                showMarkers={true}
+                showForecast={quickData?.plan === "pro"}
+                plan={quickData?.plan}
+              />
+
+              {/* Compare keyword input */}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <input
+                  placeholder="비교 키워드 추가..."
+                  value={compareInput}
+                  onChange={(e) => setCompareInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCompareKeyword(); } }}
+                  className="text-sm px-3 py-1.5 border border-muted/60 rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+                <button
+                  onClick={addCompareKeyword}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-muted/60 bg-muted/20 hover:bg-muted/50 transition-colors"
+                >
+                  추가
+                </button>
+                {compareKeywords.map((kw) => (
+                  <span key={kw} className="px-2 py-0.5 text-xs rounded-full bg-muted flex items-center gap-1">
+                    {kw}
+                    <button
+                      onClick={() => removeCompareKeyword(kw)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* Related Keywords Table */}
+            <div className="w-full bg-card rounded-xl shadow-sm border border-muted/50 flex flex-col overflow-hidden">
+              <div className="p-6 flex items-center justify-between">
+                <h3 className="text-lg font-bold">연관 키워드</h3>
+                {relatedKeywords.length > 0 && (
+                  <button
+                    onClick={handleCopyAllRelatedTags}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-muted/60 bg-muted/20 hover:bg-muted/50 transition-colors"
+                    title="연관 키워드 전체를 쉼표 구분으로 복사"
+                  >
+                    {allTagsCopied ? (
+                      <>
+                        <Check className="size-3 text-emerald-500" />
+                        <span className="text-emerald-600">복사 완료!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3 text-muted-foreground" />
+                        전체 태그 복사
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              <div className="flex-1 overflow-x-hidden overflow-y-auto max-h-[360px] custom-scrollbar">
+                {extraPending && relatedKeywords.length === 0 ? (
+                  <div className="p-6 space-y-4">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div key={i} className="h-10 bg-muted/50 rounded animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : relatedKeywords.length > 0 ? (
+                  <table className="w-full min-w-[360px] text-left border-collapse">
+                    <thead className="bg-muted/30 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-b border-muted/50">
+                      <tr>
+                        <th className="px-6 py-3">키워드</th>
+                        <th className="px-4 py-3 text-right">
+                          <button
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                            onClick={() => handleSortClick("volume")}
+                          >
+                            검색량
+                            {sortKey === "volume" ? (
+                              sortOrder === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />
+                            ) : (
+                              <ChevronDown className="size-3 opacity-30" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-4 py-3 text-center">
+                          <button
+                            className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
+                            onClick={() => handleSortClick("competition")}
+                          >
+                            경쟁도
+                            {sortKey === "competition" ? (
+                              sortOrder === "desc" ? <ChevronDown className="size-3" /> : <ChevronUp className="size-3" />
+                            ) : (
+                              <ChevronDown className="size-3 opacity-30" />
+                            )}
+                          </button>
+                        </th>
+                        <th className="px-6 py-3"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-muted/30">
+                      {relatedKeywords.map((rk) => (
+                        <RelatedRow
+                          key={rk.keyword}
+                          word={rk.keyword}
+                          vol={(rk.pcSearchVolume + rk.mobileSearchVolume).toLocaleString("ko-KR")}
+                          comp={rk.competition}
+                          onClick={() => handleRelatedKeywordClick(rk.keyword)}
+                          onCompare={() => {
+                            const mainKw = analysis?.keyword ?? quickData?.keyword ?? "";
+                            window.location.href = `/compare?keywords=${encodeURIComponent(mainKw)},${encodeURIComponent(rk.keyword)}`;
+                          }}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="px-6 py-8 text-sm text-muted-foreground text-center">연관 키워드가 없습니다</div>
+                )}
+              </div>
+            </div>
+          </section>
+
           {/* Section Analysis — skeleton while full data loads */}
           {!analysis && fullPending && (
             <section className="mb-12">
@@ -1028,121 +1727,37 @@ function AnalyzePageInner() {
           )}
 
           {/* Gender Distribution */}
-          {genderRatio && (
+          {((!trendData && quickData?.plan !== "free") || genderRatio) && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-4">
                 <Gauge className="size-5 text-primary" />
                 <h3 className="text-lg font-bold">검색자 성별 분포</h3>
               </div>
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
-                <div className="flex items-center gap-4 mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="size-3 rounded-full bg-blue-500" />
-                    <span className="text-sm font-semibold">남성 {genderRatio.male}%</span>
+              {!trendData ? (
+                <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 animate-pulse">
+                  <div className="h-5 w-32 bg-muted rounded mb-4"></div>
+                  <div className="h-4 w-full bg-muted rounded-full"></div>
+                </div>
+              ) : genderRatio ? (
+                <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="size-3 rounded-full bg-blue-500" />
+                      <span className="text-sm font-semibold">남성 {genderRatio.male}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="size-3 rounded-full bg-pink-500" />
+                      <span className="text-sm font-semibold">여성 {genderRatio.female}%</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="size-3 rounded-full bg-pink-500" />
-                    <span className="text-sm font-semibold">여성 {genderRatio.female}%</span>
+                  <div className="w-full h-3 bg-muted rounded-full flex overflow-hidden">
+                    <div className="h-full bg-blue-500 transition-all" style={{ width: `${genderRatio.male}%` }} />
+                    <div className="h-full bg-pink-500 transition-all" style={{ width: `${genderRatio.female}%` }} />
                   </div>
                 </div>
-                <div className="w-full h-3 bg-muted rounded-full flex overflow-hidden">
-                  <div className="h-full bg-blue-500 transition-all" style={{ width: `${genderRatio.male}%` }} />
-                  <div className="h-full bg-pink-500 transition-all" style={{ width: `${genderRatio.female}%` }} />
-                </div>
-              </div>
+              ) : null}
             </section>
           )}
-
-          {/* Row 2: Charts & Tables */}
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-            {/* Trend Chart */}
-            <div className="lg:col-span-2 bg-card p-8 rounded-xl shadow-sm border border-muted/50">
-              <div className="flex items-center gap-3 mb-6 flex-wrap">
-                <h3 className="text-lg font-bold">검색량 트렌드</h3>
-                {(() => {
-                  const vol = getVolatilityInfo(trendData);
-                  if (!vol) return null;
-                  return (
-                    <span className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${vol.color}`} title={vol.description}>
-                      {vol.label}
-                    </span>
-                  );
-                })()}
-                {seasonality && (
-                  <span
-                    className="px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-400"
-                    title={`매년 ${seasonality.peakMonthLabels.join(", ")}에 급상승 (${seasonality.strength === "strong" ? "강한" : seasonality.strength === "moderate" ? "보통" : "약한"} 계절성)`}
-                  >
-                    계절성 {seasonality.peakMonthLabels.join("·")}
-                  </span>
-                )}
-              </div>
-              <KeywordTrendChart data={trendData} error={trendError} />
-            </div>
-
-            {/* Related Keywords Table */}
-            <div className="bg-card rounded-xl shadow-sm border border-muted/50 flex flex-col overflow-hidden">
-              <div className="p-6 flex items-center justify-between">
-                <h3 className="text-lg font-bold">연관 키워드</h3>
-                {relatedKeywords.length > 0 && (
-                  <button
-                    onClick={handleCopyAllRelatedTags}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-muted/60 bg-muted/20 hover:bg-muted/50 transition-colors"
-                    title="연관 키워드 전체를 쉼표 구분으로 복사"
-                  >
-                    {allTagsCopied ? (
-                      <>
-                        <Check className="size-3 text-emerald-500" />
-                        <span className="text-emerald-600">복사 완료!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="size-3 text-muted-foreground" />
-                        전체 태그 복사
-                      </>
-                    )}
-                  </button>
-                )}
-              </div>
-              <div className="flex-1 overflow-x-auto">
-                {extraPending && relatedKeywords.length === 0 ? (
-                  <div className="p-6 space-y-4">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-10 bg-muted/50 rounded animate-pulse"></div>
-                    ))}
-                  </div>
-                ) : relatedKeywords.length > 0 ? (
-                  <table className="w-full min-w-[360px] text-left border-collapse">
-                    <thead className="bg-muted/30 text-[11px] font-bold text-muted-foreground uppercase tracking-widest border-b border-muted/50">
-                      <tr>
-                        <th className="px-6 py-3">키워드</th>
-                        <th className="px-4 py-3 text-right">검색량</th>
-                        <th className="px-4 py-3 text-center">경쟁도</th>
-                        <th className="px-6 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-muted/30">
-                      {relatedKeywords.map((rk) => (
-                        <RelatedRow
-                          key={rk.keyword}
-                          word={rk.keyword}
-                          vol={(rk.pcSearchVolume + rk.mobileSearchVolume).toLocaleString("ko-KR")}
-                          comp={rk.competition}
-                          onClick={() => handleRelatedKeywordClick(rk.keyword)}
-                          onCompare={() => {
-                            const mainKw = analysis?.keyword ?? quickData?.keyword ?? "";
-                            window.location.href = `/compare?keywords=${encodeURIComponent(mainKw)},${encodeURIComponent(rk.keyword)}`;
-                          }}
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="px-6 py-8 text-sm text-muted-foreground text-center">연관 키워드가 없습니다</div>
-                )}
-              </div>
-            </div>
-          </section>
 
           {/* Top Posts */}
           {analysis?.topPosts && analysis.topPosts.length > 0 && (
@@ -1277,35 +1892,101 @@ function AnalyzePageInner() {
           )}
           {hasAnyData && quickData?.plan === "free" && (
             <section className="mb-12">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Gauge className="size-5 text-muted-foreground/50" />
                 <h3 className="text-lg font-bold text-muted-foreground/50">인구통계 분석</h3>
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">BASIC</span>
               </div>
-              <p className="text-xs text-muted-foreground">베이직/프로 플랜에서 성별, 기기, 연령대별 검색 비율을 확인할 수 있습니다.</p>
+              <div className="relative rounded-xl overflow-hidden border border-muted/50">
+                {/* Blurred preview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 blur-sm pointer-events-none select-none" aria-hidden>
+                  {[["성별", ["남성 62%", "여성 38%"]], ["기기", ["PC 45%", "모바일 55%"]], ["연령대", ["20대 30%", "30대 35%", "40대 25%"]]].map(([title, rows]) => (
+                    <div key={title as string} className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-3">{title as string}</p>
+                      <div className="space-y-2">
+                        {(rows as string[]).map((r) => (
+                          <div key={r} className="flex items-center gap-3">
+                            <span className="size-3 rounded-full bg-muted" />
+                            <span className="text-sm font-semibold flex-1">{r}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* Lock overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 backdrop-blur-[2px]">
+                  <Lock className="size-8 text-muted-foreground mb-3" />
+                  <p className="text-sm font-bold mb-1">인구통계 분석</p>
+                  <p className="text-xs text-muted-foreground mb-4 text-center px-4">성별, 기기, 연령대별 검색 비율을 확인하세요</p>
+                  <button
+                    onClick={() => setUpgradeModal({ used: 0, limit: 0 })}
+                    className="px-5 py-2 text-sm font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                  >
+                    베이직 플랜으로 업그레이드
+                  </button>
+                </div>
+              </div>
             </section>
           )}
 
           {/* AI Insights — free plan lock */}
           {hasAnyData && quickData?.plan === "free" && (
             <section className="mb-12">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="size-5 text-muted-foreground/50" />
                 <h3 className="text-lg font-bold text-muted-foreground/50">AI 인사이트</h3>
                 <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">BASIC</span>
               </div>
-              <p className="text-xs text-muted-foreground">베이직/프로 플랜에서 검색 의도 분류, 콘텐츠 전략, 키워드 클러스터링을 확인할 수 있습니다.</p>
+              <div className="relative rounded-xl overflow-hidden border border-muted/50">
+                {/* Blurred preview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 blur-sm pointer-events-none select-none" aria-hidden>
+                  {[["검색 의도", "구매성 키워드로 분류됩니다"], ["콘텐츠 전략", "추천: 경쟁이 낮아 상위 노출 가능성이 높습니다"], ["키워드 클러스터", "관련 키워드 그룹화 분석"]].map(([title, desc]) => (
+                    <div key={title as string} className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-2">{title as string}</p>
+                      <p className="text-xs text-muted-foreground">{desc as string}</p>
+                    </div>
+                  ))}
+                </div>
+                {/* Lock overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 backdrop-blur-[2px]">
+                  <Lock className="size-8 text-muted-foreground mb-3" />
+                  <p className="text-sm font-bold mb-1">AI 인사이트</p>
+                  <p className="text-xs text-muted-foreground mb-4 text-center px-4">검색 의도 분류, 콘텐츠 전략, 키워드 클러스터링을 확인하세요</p>
+                  <button
+                    onClick={() => setUpgradeModal({ used: 0, limit: 0 })}
+                    className="px-5 py-2 text-sm font-bold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                  >
+                    베이직 플랜으로 업그레이드
+                  </button>
+                </div>
+              </div>
             </section>
           )}
 
           {/* AI Insights — basic/pro */}
-          {quickData?.plan !== "free" && (extraData?.intent || extraData?.strategy || extraData?.clusters) && (
+          {quickData?.plan !== "free" && (extraPending || extraData?.intent || extraData?.strategy || extraData?.clusters) && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="size-5 text-primary" />
                 <h3 className="text-lg font-bold">AI 인사이트</h3>
+                {!aiInsightsLoaded && !extraPending && (extraData?.intent || extraData?.strategy || extraData?.clusters) && (
+                  <button
+                    onClick={() => setAiInsightsLoaded(true)}
+                    className="ml-2 px-3 py-1 text-xs font-bold rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors flex items-center gap-1"
+                  >
+                    <Sparkles className="size-3" />
+                    AI 분석 시작
+                  </button>
+                )}
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {extraPending && (!extraData?.intent && !extraData?.strategy) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+                </div>
+              )}
+              {aiInsightsLoaded && extraData && (!extraPending || extraData.intent || extraData.strategy) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {/* Intent */}
                 {extraData.intent && (
                   <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
@@ -1375,9 +2056,10 @@ function AnalyzePageInner() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Keyword Clusters */}
-              {extraData.clusters && extraData.clusters.length > 0 && (
+              {aiInsightsLoaded && extraData?.clusters && extraData.clusters.length > 0 && (
                 <div className="mt-4 bg-card p-5 rounded-xl shadow-sm border border-muted/50">
                   <p className="text-sm font-bold text-muted-foreground mb-3">연관 키워드 클러스터</p>
                   <div className="flex flex-wrap gap-4">

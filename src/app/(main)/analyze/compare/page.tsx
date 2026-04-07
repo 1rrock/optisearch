@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Plus, X, ArrowRightLeft, Search, AlertCircle, BarChart2, Bookmark } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
-import { getKeywordGradeConfig } from "@/shared/config/constants";
+import { getKeywordGradeConfig, CHART_COLORS } from "@/shared/config/constants";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
 import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
 import { getApiErrorMessage } from "@/shared/lib/errors";
@@ -42,14 +42,6 @@ interface KeywordResult {
 
 const MAX_KEYWORDS = 5;
 const MIN_KEYWORDS = 2;
-
-const CHART_COLORS = [
-  "#3b82f6",
-  "#10b981",
-  "#8b5cf6",
-  "#f59e0b",
-  "#ef4444",
-];
 
 const SATURATION_COLORS: Record<string, string> = {
   "매우 낮음": "#16A34A",

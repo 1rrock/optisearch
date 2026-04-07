@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight, ArrowRightLeft, Database } from "lucide-react";
 
@@ -36,7 +36,7 @@ interface SavedKeywordsResponse {
 // ---------------------------------------------------------------------------
 
 async function fetchSavedKeywords(): Promise<SavedKeywordsResponse> {
-  const res = await fetch("/api/keywords/saved");
+  const res = await fetch("/api/keywords/saved", { cache: "no-store" });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.error ?? `불러오기 실패 (${res.status})`);
@@ -251,6 +251,14 @@ export default function KeywordsPage() {
     });
   }, [keywords, searchQuery, sortBy]);
 
+  const [visibleCount, setVisibleCount] = useState(24);
+
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [searchQuery, sortBy]);
+
+  const displayedKeywords = filteredKeywords.slice(0, visibleCount);
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -355,24 +363,37 @@ export default function KeywordsPage() {
 
       {/* Keyword grid */}
       {!isLoading && keywords.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredKeywords.map((item) => (
-            <KeywordCard
-              key={item.id}
-              item={item}
-              isSelected={selected.has(item.keyword)}
-              onToggleSelect={() => {
-                setSelected(prev => {
-                  const next = new Set(prev);
-                  if (next.has(item.keyword)) next.delete(item.keyword);
-                  else next.add(item.keyword);
-                  return next;
-                });
-              }}
-              onDelete={(keyword) => setDeleteTarget(keyword)}
-              onMemoSave={(keyword, memo) => memoMutation.mutate({ keyword, memo })}
-            />
-          ))}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {displayedKeywords.map((item) => (
+              <KeywordCard
+                key={item.id}
+                item={item}
+                isSelected={selected.has(item.keyword)}
+                onToggleSelect={() => {
+                  setSelected(prev => {
+                    const next = new Set(prev);
+                    if (next.has(item.keyword)) next.delete(item.keyword);
+                    else next.add(item.keyword);
+                    return next;
+                  });
+                }}
+                onDelete={(keyword) => setDeleteTarget(keyword)}
+                onMemoSave={(keyword, memo) => memoMutation.mutate({ keyword, memo })}
+              />
+            ))}
+          </div>
+
+          {visibleCount < filteredKeywords.length && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={() => setVisibleCount((v) => v + 24)}
+                className="px-6 py-2.5 text-sm font-bold rounded-xl bg-card border border-muted-foreground/20 hover:bg-muted/50 hover:border-muted-foreground/40 transition-colors shadow-sm"
+              >
+                더보기 ({visibleCount} / {filteredKeywords.length})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
