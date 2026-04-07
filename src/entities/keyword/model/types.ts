@@ -1,3 +1,6 @@
+import type { KeywordGrade } from "@/shared/model/keyword-grade";
+export type { KeywordGrade };
+
 /**
  * Keyword entity types — shared across features.
  * These types mirror the keyword_searches table columns and derived analytics.
@@ -6,24 +9,6 @@
 // ---------------------------------------------------------------------------
 // Grade / Saturation
 // ---------------------------------------------------------------------------
-
-/** 15-step keyword grade S+ → D- */
-export type KeywordGrade =
-  | "S+"
-  | "S"
-  | "S-"
-  | "A+"
-  | "A"
-  | "A-"
-  | "B+"
-  | "B"
-  | "B-"
-  | "C+"
-  | "C"
-  | "C-"
-  | "D+"
-  | "D"
-  | "D-";
 
 /** Competition level returned by Naver SearchAd API */
 export type CompetitionLevel = "낮음" | "중간" | "높음";

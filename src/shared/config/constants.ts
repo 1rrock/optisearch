@@ -1,4 +1,4 @@
-import type { KeywordGrade } from "@/entities/keyword/model/types";
+import type { KeywordGrade } from "@/shared/model/keyword-grade";
 
 // ---------------------------------------------------------------------------
 // Application config

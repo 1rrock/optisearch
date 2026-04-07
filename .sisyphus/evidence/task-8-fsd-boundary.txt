@@ -1,0 +1,25 @@
+BEFORE_FIX (expected fail):
+
+/Users/1rrock/opencodeproject/optisearch/src/shared/config/constants.ts
+  1:1  error  '@/entities/keyword/model/types' import is restricted from being used by a pattern. src/shared must not depend on app/features/widgets/entities (FSD boundary)  no-restricted-imports
+
+/Users/1rrock/opencodeproject/optisearch/src/shared/lib/naver-searchad.ts
+  259:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  306:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  350:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+✖ 4 problems (1 error, 3 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
+
+---
+AFTER_FIX (expected pass):
+
+/Users/1rrock/opencodeproject/optisearch/src/shared/lib/naver-searchad.ts
+  259:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  306:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+  350:5  warning  Unused eslint-disable directive (no problems were reported from '@typescript-eslint/no-explicit-any')
+
+✖ 3 problems (0 errors, 3 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
