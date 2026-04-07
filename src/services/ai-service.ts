@@ -61,7 +61,11 @@ JSON 배열로 응답하세요:
     console.error("[ai-service] Failed to parse title response:", content.slice(0, 200));
     throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
   }
-  const suggestions: AITitleSuggestion[] = parsed.titles ?? parsed.suggestions ?? (Array.isArray(parsed) ? parsed : []);
+  // OpenAI json_object mode may wrap in various keys — try all common patterns
+  const suggestions: AITitleSuggestion[] =
+    Array.isArray(parsed) ? parsed :
+    parsed.titles ?? parsed.suggestions ?? parsed.results ?? parsed.data ??
+    (Array.isArray(Object.values(parsed)[0]) ? Object.values(parsed)[0] as AITitleSuggestion[] : []);
 
   return suggestions.slice(0, 5).map((s, i) => ({
     title: s.title,

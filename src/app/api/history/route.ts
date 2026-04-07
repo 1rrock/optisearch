@@ -54,6 +54,11 @@ export async function DELETE(request: Request) {
       return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
     }
 
+    const rl = await checkRateLimit(user.userId);
+    if (!rl.allowed) {
+      return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
+    }
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
     if (!id) {

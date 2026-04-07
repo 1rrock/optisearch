@@ -7,6 +7,7 @@ import {
   countSavedKeywords,
 } from "@/services/saved-keyword-service";
 import { PLAN_LIMITS } from "@/shared/config/constants";
+import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // GET: List saved keywords (paginated)
@@ -43,6 +44,15 @@ export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  // Rate limit: prevent spam (e.g. 961 calls in 3 seconds)
+  const rl = await checkRateLimit(user.userId);
+  if (!rl.allowed) {
+    return Response.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+      { status: 429 }
+    );
   }
 
   let body: unknown;
@@ -101,6 +111,11 @@ export async function DELETE(request: Request) {
   const user = await getAuthenticatedUser();
   if (!user) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+  }
+
+  const rl = await checkRateLimit(user.userId);
+  if (!rl.allowed) {
+    return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
   let body: unknown;

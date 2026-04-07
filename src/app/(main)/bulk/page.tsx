@@ -16,6 +16,7 @@ import {
   Check,
   ArrowRightLeft,
 } from "lucide-react";
+import { useUserStore } from "@/shared/stores/user-store";
 import { copyToClipboard, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { parseKeywordsFromFile, exportToExcel } from "@/shared/lib/excel";
 import { Button } from "@/shared/ui/button";
@@ -36,7 +37,7 @@ const GRADE_ORDER: KeywordGrade[] = [
   "S+", "S", "S-", "A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-",
 ];
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 30;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -183,6 +184,8 @@ function BulkAnalysisPageInner() {
       const data = await res.json() as { results: KeywordSearchResult[] };
       setResults(data.results);
       setProgress({ done: data.results.length, total: keywords.length });
+      // Sync usage counter with server after batch analysis
+      useUserStore.getState().refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "분석 중 오류가 발생했습니다.");
     } finally {

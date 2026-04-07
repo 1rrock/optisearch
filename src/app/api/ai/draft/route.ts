@@ -1,13 +1,21 @@
 import { z } from "zod";
 import { generateDraft } from "@/services/ai-service";
-import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
+import { recordAndEnforce } from "@/services/usage-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
   postType: z.enum(["정보성", "리뷰", "리스트형", "비교분석"]).optional().default("정보성"),
-  targetLength: z.number().min(500).max(5000).optional().default(1500),
-});
+  // Frontend sends "length" as string ("500","1000","1500","2500"), backend expects "targetLength" as number
+  // Accept both field names and coerce string→number for compatibility
+  targetLength: z.coerce.number().min(500).max(5000).optional(),
+  length: z.coerce.number().min(500).max(5000).optional(),
+}).transform((data) => ({
+  keyword: data.keyword,
+  postType: data.postType,
+  targetLength: data.targetLength ?? data.length ?? 1500,
+}));
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -32,12 +40,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "draft");
-  if (limitError) return limitError;
+  const usage = await recordAndEnforce(user.userId, user.plan, "draft", parsed.data.keyword);
+  if (!usage.allowed) {
+    return Response.json(
+      { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+      { status: 429 }
+    );
+  }
 
   try {
     const draft = await generateDraft(parsed.data.keyword, parsed.data.postType, parsed.data.targetLength);
-    await recordUsage(user.userId, "draft", parsed.data.keyword);
     return Response.json({ draft });
   } catch (err) {
     console.error("[api/ai/draft] Error:", err);

@@ -186,7 +186,7 @@ async function upsertCorpus(
   keywords: CollectedKeyword[]
 ): Promise<{ inserted: number; updated: number }> {
   const supabase = await createServerClient();
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split("T")[0]; // KST YYYY-MM-DD
 
   let inserted = 0;
   let updated = 0;

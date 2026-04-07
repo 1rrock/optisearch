@@ -36,7 +36,7 @@ interface DraftResponse {
 // ─── Local types ──────────────────────────────────────────────────────────────
 
 type PostType = "정보성" | "리뷰" | "리스트형" | "비교분석";
-type DraftLength = "1000" | "1500" | "2500";
+type DraftLength = "500" | "1000" | "1500" | "2500";
 
 // ─── DraftTool ────────────────────────────────────────────────────────────────
 
@@ -184,6 +184,7 @@ export function DraftTool({
                 value={length}
                 onChange={(e) => setLength(e.target.value as DraftLength)}
               >
+                <option value="500">500자 (간략)</option>
                 <option value="1000">1,000자 (짧게)</option>
                 <option value="1500">1,500자 (보통)</option>
                 <option value="2500">2,500자 (길게)</option>

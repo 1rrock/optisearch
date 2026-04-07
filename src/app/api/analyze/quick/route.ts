@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
-import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
+import { recordAndEnforce } from "@/services/usage-service";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
 import { PLAN_LIMITS } from "@/shared/config/constants";
@@ -41,10 +42,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const [rateLimitResult, limitError] = await Promise.all([
-    checkRateLimit(user.userId),
-    enforceUsageLimit(user.userId, user.plan, "search"),
-  ]);
+  const rateLimitResult = await checkRateLimit(user.userId);
 
   if (!rateLimitResult.allowed) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
@@ -57,8 +55,6 @@ export async function POST(request: Request) {
     }
   }
 
-  if (limitError) return limitError;
-
   try {
     if (adultResult.adult === "1") {
       return Response.json(
@@ -69,6 +65,15 @@ export async function POST(request: Request) {
 
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
     const effectiveKeyword = correctedKeyword ?? keyword;
+
+    // Atomic usage limit check + record
+    const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
+    if (!usage.allowed) {
+      return Response.json(
+        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+        { status: 429 }
+      );
+    }
 
     const stats = await getKeywordStats([effectiveKeyword]);
     const stat = stats.find(
@@ -103,9 +108,6 @@ export async function POST(request: Request) {
     const estimatedClicks = Math.round(
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
     );
-
-    // Record usage (non-blocking)
-    void recordUsage(user.userId, "search", effectiveKeyword).catch(() => {});
 
     // Save search history (non-blocking) — uses a minimal result for history
     const planLimits = PLAN_LIMITS[user.plan];

@@ -44,6 +44,34 @@ function planLabel(plan: PlanId): string {
   return PLAN_PRICING[plan]?.label ?? plan;
 }
 
+function StatCard({ label, used, limit, color, initialized }: { label: string; used: number; limit: number; color: string; initialized: boolean }) {
+  const isAtLimit = limit !== -1 && limit !== 0 && used >= limit;
+  return (
+    <div className="bg-card p-5 lg:p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
+      <div>
+        <p className="text-[10px] lg:text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">{label}</p>
+        <div className="flex items-baseline gap-1">
+          {initialized ? (
+            <>
+              <h3 className={`text-xl lg:text-2xl font-bold ${isAtLimit ? "text-rose-500" : "text-foreground"}`}>{used}</h3>
+              <span className="text-muted-foreground text-xs lg:text-sm font-medium">
+                / {limit === -1 ? "∞" : limit === 0 ? "—" : limit}
+              </span>
+            </>
+          ) : (
+            <SkeletonBlock className="h-8 w-20" />
+          )}
+        </div>
+      </div>
+      {initialized ? (
+        <CircleProgress value={used} max={limit} color={isAtLimit ? "#f43f5e" : color} />
+      ) : (
+        <SkeletonBlock className="h-14 w-14 rounded-full" />
+      )}
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [query, setQuery] = useState("");
@@ -55,8 +83,8 @@ export default function DashboardPage() {
   const limits = PLAN_LIMITS[effectivePlan];
   const searchLimit = limits.dailySearch;
   const titleLimit = limits.dailyTitle;
-  const aiUsed = usage.title + usage.draft + usage.score;
-  const aiLimit = titleLimit + limits.dailyDraft + limits.dailyScore;
+  const draftLimit = limits.dailyDraft;
+  const scoreLimit = limits.dailyScore;
 
   function handleSearch() {
     const q = query.trim();
@@ -106,63 +134,47 @@ export default function DashboardPage() {
     <div className="space-y-8">
 
       {/* 1. Top Section: Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* 오늘 검색 */}
-        <div className="bg-card p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
-          <div>
-            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">오늘 검색</p>
-            <div className="flex items-baseline gap-1">
-              {initialized ? (
-                <>
-                  <h3 className="text-2xl font-bold text-foreground">{usage.search}</h3>
-                  <span className="text-muted-foreground text-sm font-medium">
-                    / {searchLimit === -1 ? "∞" : searchLimit}
-                  </span>
-                </>
-              ) : (
-                <SkeletonBlock className="h-8 w-20" />
-              )}
-            </div>
-          </div>
-          {initialized ? (
-            <CircleProgress value={usage.search} max={searchLimit} color="hsl(var(--primary))" />
-          ) : (
-            <SkeletonBlock className="h-14 w-14 rounded-full" />
-          )}
-        </div>
-
-        {/* AI 사용 */}
-        <div className="bg-card p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
-          <div>
-            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">AI 사용</p>
-            <div className="flex items-baseline gap-1">
-              {initialized ? (
-                <>
-                  <h3 className="text-2xl font-bold text-foreground">{aiUsed}</h3>
-                  <span className="text-muted-foreground text-sm font-medium">
-                    / {aiLimit === -1 ? "∞" : aiLimit}
-                  </span>
-                </>
-              ) : (
-                <SkeletonBlock className="h-8 w-20" />
-              )}
-            </div>
-          </div>
-          {initialized ? (
-            <CircleProgress value={aiUsed} max={aiLimit} color="#10b981" />
-          ) : (
-            <SkeletonBlock className="h-14 w-14 rounded-full" />
-          )}
-        </div>
-
+        <StatCard
+          label="오늘 검색"
+          used={usage.search}
+          limit={searchLimit}
+          color="hsl(var(--primary))"
+          initialized={initialized}
+        />
+        {/* AI 제목 추천 */}
+        <StatCard
+          label="AI 제목"
+          used={usage.title}
+          limit={titleLimit}
+          color="#f59e0b"
+          initialized={initialized}
+        />
+        {/* AI 초안 생성 */}
+        <StatCard
+          label="AI 초안"
+          used={usage.draft}
+          limit={draftLimit}
+          color="#10b981"
+          initialized={initialized}
+        />
+        {/* AI 점수 분석 */}
+        <StatCard
+          label="AI 점수"
+          used={usage.score}
+          limit={scoreLimit}
+          color="#8b5cf6"
+          initialized={initialized}
+        />
         {/* 저장 키워드 */}
-        <div className="bg-card p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
+        <div className="bg-card p-5 lg:p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
           <div>
-            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">저장 키워드</p>
+            <p className="text-[10px] lg:text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">저장 키워드</p>
             <div className="flex items-baseline gap-1">
               {initialized ? (
                 <>
-                  <h3 className="text-2xl font-bold text-foreground">{savedKeywordsCount}</h3>
+                  <h3 className="text-xl lg:text-2xl font-bold text-foreground">{savedKeywordsCount}</h3>
                   <span className="text-muted-foreground text-sm font-medium">개</span>
                 </>
               ) : (
@@ -170,25 +182,24 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <Bookmark className="size-6" />
+          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+            <Bookmark className="size-5 lg:size-6" />
           </div>
         </div>
-
-        {/* 현재 플랜 - available immediately from store defaults or session */}
-        <div className="bg-card p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
+        {/* 현재 플랜 */}
+        <div className="bg-card p-5 lg:p-6 rounded-xl shadow-sm flex items-center justify-between border border-transparent hover:border-primary/20 transition-all">
           <div>
-            <p className="text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">현재 플랜</p>
+            <p className="text-[10px] lg:text-xs font-bold text-muted-foreground mb-1 uppercase tracking-wider">현재 플랜</p>
             <div className="flex items-baseline gap-1">
               {initialized ? (
-                <h3 className="text-2xl font-bold text-foreground">{planLabel(effectivePlan)}</h3>
+                <h3 className="text-xl lg:text-2xl font-bold text-foreground">{planLabel(effectivePlan)}</h3>
               ) : (
                 <SkeletonBlock className="h-8 w-24" />
               )}
             </div>
           </div>
-          <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
-            <Verified className="size-6" />
+          <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+            <Verified className="size-5 lg:size-6" />
           </div>
         </div>
       </div>

@@ -1280,14 +1280,26 @@ function AnalyzePageInner() {
               <div className="flex items-center gap-2 mb-2">
                 <Gauge className="size-5 text-muted-foreground/50" />
                 <h3 className="text-lg font-bold text-muted-foreground/50">인구통계 분석</h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">PRO</span>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">BASIC</span>
               </div>
               <p className="text-xs text-muted-foreground">베이직/프로 플랜에서 성별, 기기, 연령대별 검색 비율을 확인할 수 있습니다.</p>
             </section>
           )}
 
-          {/* AI Insights */}
-          {(extraData?.intent || extraData?.strategy || extraData?.clusters) && (
+          {/* AI Insights — free plan lock */}
+          {hasAnyData && quickData?.plan === "free" && (
+            <section className="mb-12">
+              <div className="flex items-center gap-2 mb-2">
+                <Sparkles className="size-5 text-muted-foreground/50" />
+                <h3 className="text-lg font-bold text-muted-foreground/50">AI 인사이트</h3>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-muted text-muted-foreground">BASIC</span>
+              </div>
+              <p className="text-xs text-muted-foreground">베이직/프로 플랜에서 검색 의도 분류, 콘텐츠 전략, 키워드 클러스터링을 확인할 수 있습니다.</p>
+            </section>
+          )}
+
+          {/* AI Insights — basic/pro */}
+          {quickData?.plan !== "free" && (extraData?.intent || extraData?.strategy || extraData?.clusters) && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="size-5 text-primary" />

@@ -101,17 +101,19 @@ export function ScoreTool({
   // strokeDashoffset = 552.9 - (552.9 * score / 100)
   const dashOffset = score ? 552.9 - (552.9 * score.totalScore) / 100 : 552.9;
 
+  const gradeBase = score?.grade?.charAt(0) ?? "";
   const svgColor = score
-    ? score.grade === "S" || score.grade === "A" ? "text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]"
-      : score.grade === "B" ? "text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]"
-      : score.grade === "C" ? "text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]"
+    ? gradeBase === "S" || gradeBase === "A" ? "text-emerald-500 drop-shadow-[0_0_8px_rgba(16,185,129,0.6)]"
+      : gradeBase === "B" ? "text-blue-500 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+      : gradeBase === "C" ? "text-amber-500 drop-shadow-[0_0_8px_rgba(245,158,11,0.6)]"
       : "text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.6)]"
     : "text-muted-foreground/30";
 
   const gradeColor = (grade: string) => {
-    if (grade === "A" || grade === "S") return "text-emerald-500";
-    if (grade === "B") return "text-blue-500";
-    if (grade === "C") return "text-amber-500";
+    const base = grade.charAt(0);
+    if (base === "A" || base === "S") return "text-emerald-500";
+    if (base === "B") return "text-blue-500";
+    if (base === "C") return "text-amber-500";
     return "text-rose-500";
   };
 
@@ -161,7 +163,7 @@ export function ScoreTool({
                 size="lg"
                 className="px-10 rounded-xl font-extrabold bg-primary text-primary-foreground border-none shadow-xl shadow-primary/20 hover:scale-[1.03] transition-transform flex items-center gap-2"
                 onClick={handleAnalyze}
-                disabled={mutation.isPending || !keyword.trim() || !content.trim()}
+                disabled={mutation.isPending || !keyword.trim() || content.replace(/\s/g, "").length < 10}
               >
                 <PieChart className="size-5" />
                 {mutation.isPending ? "분석 중..." : "점수 분석 시작"}
@@ -309,15 +311,15 @@ function ScoreMetricCard({
   value?: number;
   loading: boolean;
 }) {
-  const displayValue = value !== undefined ? `${value}/10` : "--";
+  const displayValue = value !== undefined ? `${value}` : "--";
   const color =
     value === undefined
       ? ""
-      : value >= 8
+      : value >= 80
       ? "text-emerald-500"
-      : value >= 6
+      : value >= 60
       ? "text-blue-500"
-      : value >= 4
+      : value >= 40
       ? "text-amber-500"
       : "text-rose-500";
 

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { generateTitleSuggestions } from "@/services/ai-service";
-import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
+import { recordAndEnforce } from "@/services/usage-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 
 const bodySchema = z.object({
@@ -31,12 +32,16 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  const limitError = await enforceUsageLimit(user.userId, user.plan, "title");
-  if (limitError) return limitError;
+  const usage = await recordAndEnforce(user.userId, user.plan, "title", parsed.data.keyword);
+  if (!usage.allowed) {
+    return Response.json(
+      { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+      { status: 429 }
+    );
+  }
 
   try {
     const suggestions = await generateTitleSuggestions(parsed.data.keyword, parsed.data.context);
-    await recordUsage(user.userId, "title", parsed.data.keyword);
     return Response.json({ suggestions });
   } catch (err) {
     console.error("[api/ai/title] Error:", err);
