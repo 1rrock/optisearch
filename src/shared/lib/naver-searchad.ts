@@ -148,6 +148,10 @@ export async function getKeywordStats(
           { method: "GET", headers: buildHeaders("GET", signaturePath), signal: AbortSignal.timeout(8000) }
         );
         if (!response.ok) {
+          // 400 에러는 공백 등 지원하지 않는 키워드 — 빈 결과 반환
+          if (response.status === 400) {
+            return { keywordList: [] } as KeywordToolResponse;
+          }
           const err = new Error(
             `Naver SearchAd API error: ${response.status} ${response.statusText}`
           ) as Error & { status: number };
@@ -178,8 +182,12 @@ export async function getRelatedKeywords(
     const response = await fetch(`${BASE_URL}${signaturePath}${queryString}`, {
       method: "GET",
       headers: buildHeaders("GET", signaturePath),
+      signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
+      if (response.status === 400) {
+        return { keywordList: [] } as KeywordToolResponse;
+      }
       const err = new Error(
         `Naver SearchAd API error: ${response.status} ${response.statusText}`
       ) as Error & { status: number };
