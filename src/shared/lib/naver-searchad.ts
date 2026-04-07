@@ -160,7 +160,10 @@ export async function getKeywordStats(
           err.status = response.status;
           throw err;
         }
-        return response.json() as Promise<KeywordToolResponse>;
+        const json = await response.json() as KeywordToolResponse;
+        console.log(`[searchad] getKeywordStats response for [${batch.join(",")}]:`,
+          JSON.stringify({ count: json.keywordList?.length ?? 0, first: json.keywordList?.[0] ?? null }));
+        return json;
       });
     })
   );
