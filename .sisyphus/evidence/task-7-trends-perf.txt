@@ -1,0 +1,32 @@
+Task: Optimize client-side WordCloud computation in trends page
+Date: 2026-04-07
+
+Changes applied:
+1) Extracted TrendingWordCloud from src/app/(main)/trends/page.tsx
+   -> src/features/trends/ui/TrendingWordCloud.tsx
+2) Switched trends page to dynamic import with SSR disabled:
+   const TrendingWordCloud = dynamic(() => import(...).then(...), { ssr: false })
+3) Preserved UI and behavior while memoizing heavy loops in extracted component:
+   - sortedKeywords: useMemo
+   - rateRange (min/range): useMemo
+   - archimedean spiral placement loop: useMemo
+   - viewBox calculation: useMemo
+
+Validation evidence:
+
+[LSP] src/app/(main)/trends/page.tsx
+- Result: No diagnostics found
+
+[LSP] src/features/trends/ui/TrendingWordCloud.tsx
+- Result: No diagnostics found
+
+[Build] npm run build
+- Command executed successfully up to compilation and TS phase
+- Build status: FAILED (unrelated existing type issue)
+- Error:
+  ./src/app/(main)/bulk/page.tsx:24:36
+  Type error: Module '"@/entities/keyword/model/types"' declares 'KeywordGrade' locally, but it is not exported.
+
+Notes:
+- The trends extraction itself introduces no LSP errors in modified files.
+- Build failure originates from pre-existing issue outside task scope.
