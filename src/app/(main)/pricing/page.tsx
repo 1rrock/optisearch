@@ -8,10 +8,30 @@ import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { usePaddle } from "@/shared/providers/paddle-provider";
-import { priceIdFromPlanId } from "@/shared/lib/paddle";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect } from "react";
+
+declare global {
+  interface Window {
+    AUTHNICE?: {
+      requestPay: (params: {
+        clientId: string;
+        method: string;
+        orderId: string;
+        amount: number;
+        goodsName: string;
+        returnUrl: string;
+        fnError?: (result: { msg?: string; errorMsg?: string }) => void;
+      }) => void;
+    };
+  }
+}
+
+const PLAN_AMOUNT_MAP: Record<string, number> = {
+  basic: 9900,
+  pro: 29000,
+};
 
 type FeatureValue = string | boolean;
 
@@ -45,7 +65,6 @@ function FeatureCell({ value }: { value: FeatureValue }) {
   if (value === false) {
     return <X className="size-4 text-muted-foreground/40 mx-auto" />;
   }
-  // Both true and string values mean the feature is available
   return <CheckCircle2 className="size-5 text-primary mx-auto" />;
 }
 
@@ -63,7 +82,7 @@ interface PlanCardProps {
   planId: PlanId;
   currentPlan: PlanId | null;
   isPopular?: boolean;
-  onSubscribe: (planId: PlanId) => Promise<void>;
+  onSubscribe: (planId: PlanId) => void;
   isLoading?: boolean;
 }
 
@@ -71,7 +90,6 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
   const pricing = PLAN_PRICING[planId];
   const isCurrent = currentPlan === planId;
 
-  // Determine plan rank to disable buttons for current or lower plans
   const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
   const currentRank = currentPlan ? planRank[currentPlan] : -1;
   const thisRank = planRank[planId];
@@ -148,13 +166,6 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
           })}
         </ul>
 
-        {/* Trial info — only Basic has 1-month free trial */}
-        {planId === "basic" && canUpgrade && (
-          <p className="text-center text-xs text-muted-foreground font-medium">
-            첫 1개월 무료 체험 후 월 ₩{pricing.monthly.toLocaleString()}
-          </p>
-        )}
-
         {/* CTA */}
         <Button
           size="lg"
@@ -168,7 +179,7 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
           ].join(" ")}
           onClick={() => {
             if (canUpgrade && planId !== "free") {
-              void onSubscribe(planId);
+              onSubscribe(planId);
             }
           }}
         >
@@ -180,51 +191,43 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
 }
 
 export default function PricingPage() {
+  return (
+    <Suspense>
+      <PricingContent />
+    </Suspense>
+  );
+}
+
+function PricingContent() {
   const { isAuthenticated } = useIsAuthenticated();
   const userPlan = useUserPlan();
   const { data: session } = useSession();
-  const paddle = usePaddle();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
-  const activatePlan = async (transactionId: string) => {
-    toast.success("결제가 완료되었습니다! 플랜을 업그레이드하고 있습니다...");
-    try {
-      const res = await fetch("/api/paddle/activate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transactionId }),
-      });
-      const result = await res.json();
-
-      if (res.ok && result.success) {
-        await useUserStore.getState().refresh();
-        toast.success(`${result.plan === "pro" ? "프로" : "베이직"} 플랜으로 업그레이드되었습니다!`);
-        router.push("/dashboard");
-      } else {
-        console.error("[pricing] activate response:", result);
-        toast.error(`플랜 활성화 실패: ${result.error ?? "알 수 없는 오류"}`, {
-          description: `고객센터로 문의해주세요. (거래 번호: ${transactionId})`,
-          action: {
-            label: "다시 시도",
-            onClick: () => activatePlan(transactionId),
-          },
-        });
-      }
-    } catch (err) {
-      console.error("[pricing] activate failed:", err);
-      toast.error("플랜 활성화 중 오류가 발생했습니다.", {
-        description: `잠시 후 다시 시도하거나 고객센터로 문의해주세요. (거래 번호: ${transactionId})`,
-        action: {
-          label: "다시 시도",
-          onClick: () => activatePlan(transactionId),
-        },
-      });
+  // 결제 결과 처리 (리다이렉트 후 에러 파라미터 체크)
+  useEffect(() => {
+    const error = searchParams.get("error");
+    const msg = searchParams.get("msg");
+    if (error) {
+      const messages: Record<string, string> = {
+        auth_failed: "카드 인증에 실패했습니다.",
+        signature_failed: "결제 검증에 실패했습니다. 다시 시도해주세요.",
+        invalid_order: "잘못된 주문 정보입니다.",
+        amount_mismatch: "결제 금액이 일치하지 않습니다.",
+        payment_failed: "결제 처리에 실패했습니다.",
+        db_failed: "결제는 완료되었으나 플랜 업데이트에 실패했습니다. 고객센터로 문의해주세요.",
+        server_error: "서버 오류가 발생했습니다.",
+      };
+      toast.error(messages[error] ?? msg ?? "결제 중 오류가 발생했습니다.");
+      // URL에서 에러 파라미터 제거
+      router.replace("/pricing");
     }
-  };
+  }, [searchParams, router]);
 
-  const handleSubscribe = async (planId: PlanId) => {
+  const handleSubscribe = (planId: PlanId) => {
     if (planId === "free") return;
 
     if (!isAuthenticated) {
@@ -233,55 +236,29 @@ export default function PricingPage() {
       return;
     }
 
-    const paddlePriceId = priceIdFromPlanId(planId);
-    if (!paddlePriceId) {
-      toast.error("가격 정보를 찾을 수 없습니다.");
-      return;
-    }
-
-    if (!paddle) {
+    if (!window.AUTHNICE) {
       toast.error("결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.");
       return;
     }
 
-    // Set up event listener BEFORE opening checkout
-    paddle.Update({
-      eventCallback: (event) => {
-        if (event.name === "checkout.completed") {
-          const transactionId = (event.data as { transaction_id?: string })?.transaction_id;
-          if (transactionId) {
-            // Store transaction ID for processing after checkout closes
-            sessionStorage.setItem("paddle_transaction_id", transactionId);
-          }
-        }
-        if (event.name === "checkout.closed") {
-          const txId = sessionStorage.getItem("paddle_transaction_id");
-          if (txId) {
-            sessionStorage.removeItem("paddle_transaction_id");
-            activatePlan(txId);
-          } else {
-            toast.info("결제가 취소되었거나 정상적으로 완료되지 않았습니다.", {
-              description: "결제 과정에서 문제가 있었다면 다시 시도해주세요.",
-            });
-          }
-        }
-        if (
-          event.name === "checkout.error" || 
-          event.name === "checkout.failed" || 
-          event.name === "checkout.payment.failed"
-        ) {
-          toast.error("결제 처리 중 오류가 발생했습니다.", {
-            description: "잠시 후 다시 시도하거나 고객센터로 문의해주세요.",
-          });
-        }
-      },
-    });
+    const amount = PLAN_AMOUNT_MAP[planId];
+    if (!amount) {
+      toast.error("가격 정보를 찾을 수 없습니다.");
+      return;
+    }
 
-    paddle.Checkout.open({
-      items: [{ priceId: paddlePriceId, quantity: 1 }],
-      ...(session?.user?.email ? { customer: { email: session.user.email } } : {}),
-      customData: {
-        userId: session?.user?.id ?? "",
+    const userId = session?.user?.id ?? "";
+    const orderId = `optisearch_${planId}_${userId}_${Date.now()}`;
+
+    window.AUTHNICE.requestPay({
+      clientId: process.env.NEXT_PUBLIC_NICEPAY_CLIENT_ID ?? "",
+      method: "card",
+      orderId,
+      amount,
+      goodsName: `옵티써치 ${PLAN_PRICING[planId].label} 플랜`,
+      returnUrl: `${window.location.origin}/api/nicepay/callback`,
+      fnError: (result) => {
+        toast.error(`결제 오류: ${result.msg ?? result.errorMsg ?? "알 수 없는 오류"}`);
       },
     });
   };

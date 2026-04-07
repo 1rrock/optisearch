@@ -1,25 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useDashboardData } from "@/shared/hooks/use-user";
-import { useUserStore } from "@/shared/stores/user-store";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, AlertTriangle, LogOut } from "lucide-react";
+import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
 type Section = "subscription" | "danger" | "logout";
-
-interface SubscriptionData {
-  plan: PlanId;
-  subscriptionId: string | null;
-  status: string | null;
-  nextBillingDate: string | null;
-  scheduledChange?: { action: string; effectiveAt: string } | null;
-}
 
 function UsageBar({ label, used, limit, icon }: { label: string; used: number; limit: number; icon: React.ReactNode }) {
   const isUnlimited = limit === -1;
@@ -71,58 +61,14 @@ function SkeletonCard() {
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<Section>("subscription");
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const queryClient = useQueryClient();
 
   const dashboardStore = useDashboardData();
   const data = dashboardStore.initialized ? { plan: dashboardStore.plan, usage: dashboardStore.usage } : null;
   const isLoading = !dashboardStore.initialized || dashboardStore.loading;
 
-  const { data: subscription } = useQuery<SubscriptionData>({
-    queryKey: ["subscription"],
-    queryFn: async () => {
-      const res = await fetch("/api/subscription");
-      if (!res.ok) throw new Error("Failed to load subscription");
-      return res.json();
-    },
-  });
-
-  const cancelMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/subscription", { method: "DELETE" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? "구독 취소에 실패했습니다.");
-      }
-      return res.json();
-    },
-    onSuccess: (data) => {
-      toast.success(data.message);
-      setShowCancelConfirm(false);
-      void queryClient.invalidateQueries({ queryKey: ["subscription"] });
-      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      void useUserStore.getState().refresh();
-    },
-    onError: (err: Error) => {
-      toast.error(err.message);
-    },
-  });
-
   const plan = data?.plan ?? "free";
   const limits = PLAN_LIMITS[plan];
   const pricing = PLAN_PRICING[plan];
-  const hasSubscription = !!subscription?.subscriptionId;
-  const isCancelScheduled = subscription?.scheduledChange?.action === "cancel";
-
-  const statusLabel = subscription?.status === "active"
-    ? "활성"
-    : subscription?.status === "trialing"
-    ? "무료 체험 중"
-    : subscription?.status === "canceled"
-    ? "취소됨"
-    : subscription?.status === "paused"
-    ? "일시 정지"
-    : null;
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
@@ -155,7 +101,7 @@ export default function SettingsPage() {
         </div>
 
         {/* Setting Content */}
-                <div className="flex-1 flex flex-col gap-6 w-full max-w-full overflow-hidden">
+        <div className="flex-1 flex flex-col gap-6 w-full max-w-full overflow-hidden">
 
           {/* Subscription Section */}
           {activeSection === "subscription" && (
@@ -172,15 +118,9 @@ export default function SettingsPage() {
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">현재 플랜</span>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold text-foreground">{pricing.label}</span>
-                        {statusLabel && (
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            subscription?.status === "trialing"
-                              ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                              : subscription?.status === "active"
-                              ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}>
-                            {statusLabel}
+                        {plan !== "free" && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            활성
                           </span>
                         )}
                       </div>
@@ -192,26 +132,6 @@ export default function SettingsPage() {
                       <Star className="size-6" />
                     </div>
                   </div>
-
-                  {/* Next billing date */}
-                  {hasSubscription && subscription?.nextBillingDate && !isCancelScheduled && (
-                    <div className="text-sm text-muted-foreground font-medium">
-                      다음 결제일: <span className="text-foreground font-semibold">{new Date(subscription.nextBillingDate).toLocaleDateString("ko-KR")}</span>
-                    </div>
-                  )}
-
-                  {/* Cancel scheduled notice */}
-                  {isCancelScheduled && subscription?.scheduledChange?.effectiveAt && (
-                    <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
-                      <AlertTriangle className="size-5 text-amber-600 shrink-0" />
-                      <div className="text-sm">
-                        <p className="font-semibold text-amber-800 dark:text-amber-400">구독 취소 예약됨</p>
-                        <p className="text-amber-700 dark:text-amber-500">
-                          {new Date(subscription.scheduledChange.effectiveAt).toLocaleDateString("ko-KR")}에 무료 플랜으로 전환됩니다.
-                        </p>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Usage bars */}
                   <div className="flex flex-col gap-4">
@@ -255,32 +175,12 @@ export default function SettingsPage() {
                     </div>
                   )}
 
-                  {/* Cancel subscription for paid plans */}
-                  {hasSubscription && !isCancelScheduled && (
+                  {/* Refund notice for paid plans */}
+                  {plan !== "free" && (
                     <div className="border-t border-muted pt-6">
-                      <div className="flex flex-col gap-4 p-4 rounded-xl bg-rose-50 border border-rose-200 dark:bg-rose-900/20 dark:border-rose-800">
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle className="size-5 text-rose-500 mt-0.5 shrink-0" />
-                          <div className="flex flex-col gap-1">
-                            <p className="text-sm font-bold text-rose-800 dark:text-rose-400">구독을 취소하시겠습니까?</p>
-                            <p className="text-xs text-rose-600 dark:text-rose-500">
-                              의도치 않은 결제 취소와 데이터 손실을 방지하기 위해, 구독 취소는 고객센터를 통해 안전하게 진행됩니다. 아래 버튼을 눌러 카카오톡 채널로 문의해 주세요.
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex">
-                          <Button
-                            asChild
-                            variant="destructive"
-                            size="sm"
-                            className="rounded-xl font-bold w-full sm:w-auto"
-                          >
-                            <a href="https://pf.kakao.com/" target="_blank" rel="noopener noreferrer">
-                              카카오톡으로 구독 취소 문의하기
-                            </a>
-                          </Button>
-                        </div>
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        환불 및 플랜 변경은 고객센터로 문의해주세요.
+                      </p>
                     </div>
                   )}
                 </CardContent>
@@ -296,7 +196,6 @@ export default function SettingsPage() {
                 <CardDescription className="text-rose-500/80">계정 삭제 및 데이터를 완전히 영구 삭제합니다.</CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
-                <span className="text-sm font-semibold text-foreground/80">서비스를 더 이상 사용하지 않으시나요?</span>
                 <Button
                   variant="destructive"
                   className="rounded-xl font-bold bg-rose-500 hover:bg-rose-600 w-full sm:w-auto"
@@ -329,11 +228,10 @@ function SettingNav({
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors w-full text-left ${
-        active
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium cursor-pointer transition-colors w-full text-left ${active
           ? "bg-primary/10 text-primary font-bold"
           : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-      }`}
+        }`}
     >
       <div className="size-4 [&>svg]:size-full">{icon}</div>
       <span className="text-sm">{label}</span>

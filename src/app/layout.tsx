@@ -4,7 +4,7 @@ import { ThemeProvider } from "@/shared/components/theme-provider";
 import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
 import { Toaster } from "@/shared/ui/sonner";
-import { PaddleProvider } from "@/shared/providers/paddle-provider";
+
 import { UserStoreSync } from "@/shared/providers/user-store-provider";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -77,6 +77,7 @@ export default function RootLayout({
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9970402588626346"
           crossOrigin="anonymous"
         />
+        <script src="https://pay.nicepay.co.kr/v1/js/" />
       </head>
       <body>
         <ThemeProvider
@@ -87,9 +88,7 @@ export default function RootLayout({
         >
           <SessionProvider>
             <UserStoreSync />
-            <PaddleProvider>
-              <QueryProvider>{children}</QueryProvider>
-            </PaddleProvider>
+            <QueryProvider>{children}</QueryProvider>
             <Toaster />
           </SessionProvider>
         </ThemeProvider>
