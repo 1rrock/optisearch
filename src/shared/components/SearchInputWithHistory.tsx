@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search, Clock, X, ArrowUpRight } from "lucide-react";
+import { Search, Clock, X } from "lucide-react";
 import { useUserStore } from "@/shared/stores/user-store";
 import { cn } from "@/shared/lib/utils";
 
@@ -78,7 +78,6 @@ export function SearchInputWithHistory({
       if (!res.ok) return { history: [] };
       return res.json();
     },
-    staleTime: 0,
   });
 
   const allHistory = historyData?.history ?? [];

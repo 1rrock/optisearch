@@ -1326,7 +1326,6 @@ function TrendingSectionWrapper() {
       if (!res.ok) throw new Error("Failed to fetch trending keywords");
       return res.json();
     },
-    staleTime: 0,
   });
 
   const rawKeywords = data?.keywords ?? [];
