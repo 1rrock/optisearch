@@ -148,6 +148,8 @@ export async function getKeywordStats(
           { method: "GET", headers: buildHeaders("GET", signaturePath), signal: AbortSignal.timeout(8000) }
         );
         if (!response.ok) {
+          const body = await response.text().catch(() => "");
+          console.error(`[searchad] getKeywordStats ${response.status}:`, body);
           // 400 에러는 공백 등 지원하지 않는 키워드 — 빈 결과 반환
           if (response.status === 400) {
             return { keywordList: [] } as KeywordToolResponse;
@@ -185,6 +187,8 @@ export async function getRelatedKeywords(
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.error(`[searchad] getRelatedKeywords ${response.status}:`, body);
       if (response.status === 400) {
         return { keywordList: [] } as KeywordToolResponse;
       }
