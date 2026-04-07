@@ -22,20 +22,31 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  // Idempotency: skip already-processed events
   const eventId = (event as { eventId?: string }).eventId;
-  if (eventId) {
-    const supabase = await createServerClient();
-    const { data: existing } = await supabase
-      .from("webhook_events")
-      .select("id")
-      .eq("event_id", eventId)
-      .maybeSingle();
+  let claimedEvent = false;
+  const supabase = eventId ? await createServerClient() : null;
 
-    if (existing) {
-      console.log(`[paddle-webhook] Event ${eventId} already processed, skipping`);
-      return Response.json({ received: true });
+  if (eventId) {
+    const { error: claimError } = await supabase!.from("webhook_events").insert({
+      event_id: eventId,
+      event_type: event.eventType,
+      processed_at: new Date().toISOString(),
+    });
+
+    if (claimError) {
+      if (claimError.code === "23505") {
+        console.log(`[paddle-webhook] Event ${eventId} already claimed/processed, skipping`);
+        return Response.json({ received: true });
+      }
+
+      console.error(
+        `[paddle-webhook] Failed to claim event ${eventId}:`,
+        claimError.message
+      );
+      return Response.json({ error: "Idempotency claim failed" }, { status: 500 });
     }
+
+    claimedEvent = true;
   }
 
   try {
@@ -52,23 +63,22 @@ export async function POST(req: Request) {
         console.log("[paddle-webhook] Unhandled event:", event.eventType);
     }
   } catch (err) {
+    if (eventId && claimedEvent && supabase) {
+      const { error: releaseError } = await supabase
+        .from("webhook_events")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (releaseError) {
+        console.error(
+          `[paddle-webhook] Failed to release claim for ${eventId}:`,
+          releaseError.message
+        );
+      }
+    }
+
     console.error("[paddle-webhook] Handler error:", err instanceof Error ? err.message : String(err));
     return Response.json({ error: "Handler failed" }, { status: 500 });
-  }
-
-  // Record processed event for idempotency
-  if (eventId) {
-    try {
-      const supabase = await createServerClient();
-      await supabase.from("webhook_events").insert({
-        event_id: eventId,
-        event_type: event.eventType,
-        processed_at: new Date().toISOString(),
-      });
-    } catch {
-      // Non-critical: worst case is a duplicate processing on retry
-      console.warn("[paddle-webhook] Failed to record event ID for idempotency");
-    }
   }
 
   return Response.json({ received: true });
