@@ -46,12 +46,7 @@ export async function GET() {
     });
   } catch (err) {
     console.error("[api/subscription] Paddle fetch error:", err instanceof Error ? err.message : String(err));
-    return Response.json({
-      plan: profile.plan,
-      subscriptionId: profile.paddle_subscription_id,
-      status: null,
-      nextBillingDate: null,
-    });
+    return Response.json({ error: "구독 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
   }
 }
 
@@ -87,6 +82,11 @@ export async function DELETE() {
     });
   } catch (err) {
     console.error("[api/subscription] Cancel error:", err instanceof Error ? err.message : String(err));
-    return Response.json({ error: "구독 취소에 실패했습니다. 잠시 후 다시 시도해주세요." }, { status: 500 });
+    return Response.json(
+      {
+        error: "구독 취소에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      },
+      { status: 500 },
+    );
   }
 }
