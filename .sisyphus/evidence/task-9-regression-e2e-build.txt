@@ -1,0 +1,72 @@
+
+> frontend@0.1.0 build
+> next build
+
+▲ Next.js 16.2.2 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.3s
+  Running TypeScript ...
+  Finished TypeScript in 7.7s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/43) ...
+  Generating static pages using 7 workers (10/43) 
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+⚠ metadataBase property in metadata export is not set for resolving social open graph or twitter images, using "http://localhost:3000". See https://nextjs.org/docs/app/api-reference/functions/generate-metadata#metadatabase
+  Generating static pages using 7 workers (21/43) 
+  Generating static pages using 7 workers (32/43) 
+✓ Generating static pages using 7 workers (43/43) in 646ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /ai
+├ ○ /analyze
+├ ○ /analyze/compare
+├ ƒ /api/ai/draft
+├ ƒ /api/ai/score
+├ ƒ /api/ai/title
+├ ƒ /api/analyze
+├ ƒ /api/analyze/extra
+├ ƒ /api/analyze/quick
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/cron/collect-keywords
+├ ƒ /api/dashboard
+├ ƒ /api/debug/paddle
+├ ƒ /api/history
+├ ƒ /api/keywords
+├ ƒ /api/keywords/batch
+├ ƒ /api/keywords/estimate
+├ ƒ /api/keywords/new
+├ ƒ /api/keywords/saved
+├ ƒ /api/keywords/seasonal
+├ ƒ /api/keywords/trending
+├ ƒ /api/paddle/activate
+├ ƒ /api/shopping
+├ ƒ /api/shopping/demographics
+├ ƒ /api/subscription
+├ ƒ /api/trends
+├ ƒ /api/webhooks/paddle
+├ ○ /bulk
+├ ○ /compare
+├ ○ /dashboard
+├ ○ /keywords
+├ ○ /login
+├ ○ /pricing
+├ ○ /privacy
+├ ○ /robots.txt
+├ ○ /settings
+├ ○ /shopping
+├ ○ /sitemap.xml
+├ ○ /support
+├ ○ /terms
+└ ○ /trends
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
