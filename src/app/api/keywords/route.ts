@@ -5,6 +5,7 @@ import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "@/shared/l
 import { saveSearchHistory } from "@/services/history-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
+import { createErrorResponse } from "@/shared/lib/api-handler";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -16,28 +17,27 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    return createErrorResponse("INVALID_JSON", "Invalid JSON body", 400);
   }
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return Response.json(
-      { error: "Validation failed", details: parsed.error.flatten() },
-      { status: 422 }
-    );
+    return createErrorResponse("VALIDATION_FAILED", "Validation failed", 422, parsed.error.flatten());
   }
 
   const user = await getAuthenticatedUser();
   if (!user) {
-    return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+    return createErrorResponse("AUTH_REQUIRED", "로그인이 필요합니다.", 401);
   }
 
   const rateLimitResult = await checkRateLimit(user.userId);
   if (!rateLimitResult.allowed) {
-    return Response.json(
-      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." },
+    return createErrorResponse(
+      "RATE_LIMIT_EXCEEDED",
+      "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.",
+      429,
+      undefined,
       {
-        status: 429,
         headers: {
           "Retry-After": "60",
           "X-RateLimit-Remaining": String(rateLimitResult.remaining),
@@ -53,11 +53,11 @@ export async function POST(request: Request) {
   if (user.plan === "free" && process.env.TURNSTILE_SECRET_KEY) {
     const { turnstileToken } = parsed.data;
     if (!turnstileToken) {
-      return Response.json({ error: "CAPTCHA 검증이 필요합니다.", code: "CAPTCHA_REQUIRED" }, { status: 403 });
+      return createErrorResponse("CAPTCHA_REQUIRED", "CAPTCHA 검증이 필요합니다.", 403);
     }
     const valid = await verifyTurnstileToken(turnstileToken);
     if (!valid) {
-      return Response.json({ error: "CAPTCHA 검증에 실패했습니다.", code: "CAPTCHA_FAILED" }, { status: 403 });
+      return createErrorResponse("CAPTCHA_FAILED", "CAPTCHA 검증에 실패했습니다.", 403);
     }
   }
 
@@ -70,10 +70,7 @@ export async function POST(request: Request) {
     ]);
 
     if (adultResult.adult === "1") {
-      return Response.json(
-        { error: "성인 키워드는 분석할 수 없습니다." },
-        { status: 400 }
-      );
+      return createErrorResponse("ADULT_KEYWORD_BLOCKED", "성인 키워드는 분석할 수 없습니다.", 400);
     }
 
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
@@ -86,6 +83,6 @@ export async function POST(request: Request) {
     return Response.json({ ...result, correctedKeyword });
   } catch (err) {
     console.error("[api/keywords] Error:", err);
-    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+    return createErrorResponse("INTERNAL_ERROR", "서버 오류가 발생했습니다.", 500);
   }
 }

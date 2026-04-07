@@ -7,6 +7,7 @@ import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig } from "@/shared/config/constants";
 import type { KeywordSearchResult } from "@/entities/keyword/model/types";
 import { formatNumber, competitionBadgeClass } from "@/shared/lib/keyword-utils";
+import { getApiErrorMessage } from "@/shared/lib/errors";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,7 +71,7 @@ async function fetchKeyword(keyword: string): Promise<KeywordSearchResult> {
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error ?? `분석 실패 (${res.status})`);
+    throw new Error(getApiErrorMessage(data) ?? `분석 실패 (${res.status})`);
   }
   const json = (await res.json()) as KeywordApiResponse;
   return {

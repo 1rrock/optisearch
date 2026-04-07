@@ -15,6 +15,35 @@ import { type ZodSchema } from "zod";
 import { getAuthenticatedUser, enforceUsageLimit, recordUsage } from "./api-helpers";
 import type { PlanId } from "@/shared/config/constants";
 
+interface ErrorResponsePayload {
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+  };
+}
+
+export function createErrorResponse(
+  code: string,
+  message: string,
+  status: number,
+  details?: unknown,
+  init?: ResponseInit
+): Response {
+  const payload: ErrorResponsePayload = {
+    error: {
+      code,
+      message,
+      ...(details !== undefined ? { details } : {}),
+    },
+  };
+
+  return Response.json(payload, {
+    status,
+    ...(init ?? {}),
+  });
+}
+
 export type AuthenticatedUser = { userId: string; plan: PlanId };
 
 interface ApiHandlerOptions<T> {
@@ -53,7 +82,7 @@ export function createApiHandler<T = unknown>(options: ApiHandlerOptions<T>) {
       if (auth) {
         const authenticatedUser = await getAuthenticatedUser();
         if (!authenticatedUser) {
-          return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
+          return createErrorResponse("AUTH_REQUIRED", "로그인이 필요합니다.", 401);
         }
         user = authenticatedUser;
 
@@ -71,15 +100,12 @@ export function createApiHandler<T = unknown>(options: ApiHandlerOptions<T>) {
         try {
           body = await request.json();
         } catch {
-          return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+          return createErrorResponse("INVALID_JSON", "Invalid JSON body", 400);
         }
 
         const parsed = schema.safeParse(body);
         if (!parsed.success) {
-          return Response.json(
-            { error: "Validation failed", details: parsed.error.flatten() },
-            { status: 422 }
-          );
+          return createErrorResponse("VALIDATION_FAILED", "Validation failed", 422, parsed.error.flatten());
         }
         data = parsed.data;
       }
@@ -107,7 +133,7 @@ export function createApiHandler<T = unknown>(options: ApiHandlerOptions<T>) {
     } catch (err) {
       const elapsed = Date.now() - startTime;
       console.error(`[api:${requestId}] Error after ${elapsed}ms:`, err);
-      return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+      return createErrorResponse("INTERNAL_ERROR", "서버 오류가 발생했습니다.", 500);
     }
   };
 }
