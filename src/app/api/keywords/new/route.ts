@@ -104,7 +104,7 @@ async function fetchFromCorpus(
   const items = (data as Array<{ keyword: string; pc_volume: number; mobile_volume: number; first_seen_at: string }>).map((row) => ({
     keyword: row.keyword,
     volume: (row.pc_volume ?? 0) + (row.mobile_volume ?? 0),
-    date: row.first_seen_at,
+    date: toKSTDateString(row.first_seen_at),
   }));
 
   return buildResponse(items, days, endDate, "corpus");
@@ -142,7 +142,7 @@ async function fetchFromSearches(
       items.push({
         keyword: row.keyword,
         volume: (row.pc_search_volume ?? 0) + (row.mobile_search_volume ?? 0),
-        date: row.created_at.split("T")[0],
+        date: toKSTDateString(row.created_at),
       });
     }
   }
@@ -163,7 +163,8 @@ function buildResponse(
     const d = new Date(endDate);
     d.setDate(d.getDate() - i);
     const dateStr = formatDateISO(d);
-    const dayOfWeek = DAY_NAMES[d.getDay()];
+    const kstD = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const dayOfWeek = DAY_NAMES[kstD.getUTCDay()];
 
     const dayKeywords = items
       .filter((item) => item.date === dateStr)
@@ -185,9 +186,16 @@ function buildResponse(
   };
 }
 
+/** Convert any timestamp/date string to KST YYYY-MM-DD */
+function toKSTDateString(timestamp: string): string {
+  const d = new Date(timestamp);
+  // KST = UTC+9
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Format a Date object as KST YYYY-MM-DD */
 function formatDateISO(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
 }
