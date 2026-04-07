@@ -159,7 +159,7 @@ export async function getKeywordStats(
     })
   );
 
-  return batchResults.flatMap((data) => data.keywordList.map(normalise));
+  return batchResults.flatMap((data) => (data.keywordList ?? []).map(normalise));
 }
 
 /**
@@ -188,7 +188,7 @@ export async function getRelatedKeywords(
     }
     return response.json() as Promise<KeywordToolResponse>;
   });
-  return data.keywordList.map(normalise);
+  return (data.keywordList ?? []).map(normalise);
 }
 
 // ---------------------------------------------------------------------------
