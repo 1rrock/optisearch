@@ -16,15 +16,6 @@ import { Workflow } from "@/components/landing/Workflow";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { CTABlock } from "@/components/landing/CTABlock";
 
-function GuestPricingLink() {
-  const { isAuthenticated } = useIsAuthenticated();
-  // 인증된 것이 확실할 때만 숨김 — 로딩 중엔 낙관적으로 표시
-  if (isAuthenticated) return null;
-  return (
-    <a href="#pricing" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors tracking-wide">요금제</a>
-  );
-}
-
 function AuthNav() {
   const { isAuthenticated, loading: sessionLoading } = useIsAuthenticated();
   const isLoggedIn = isAuthenticated && !sessionLoading;
@@ -70,7 +61,7 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-8">
             <a href="#features" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors tracking-wide">핵심 기능</a>
             <a href="/support" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors tracking-wide">고객지원</a>
-            <GuestPricingLink />
+            <a href="#pricing" className="text-sm font-bold text-muted-foreground hover:text-foreground transition-colors tracking-wide">요금제</a>
           </div>
 
           <div className="flex items-center gap-4">
