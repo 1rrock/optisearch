@@ -59,6 +59,7 @@ const FEATURES: Feature[] = [
   { label: "AI 제목 추천", free: "3회/일", basic: "20회/일", pro: "100회/일" },
   { label: "AI 글 초안", free: "1회/일", basic: "5회/일", pro: "30회/일" },
   { label: "AI 콘텐츠 점수", free: "1회/일", basic: "10회/일", pro: "50회/일" },
+  { label: "순위 추적", free: "3개", basic: "20개", pro: "무제한" },
   { label: "오타 교정", free: true, basic: true, pro: true },
 ];
 
