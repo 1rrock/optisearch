@@ -12,6 +12,7 @@ export type { KeywordGrade };
 
 /** Competition level returned by Naver SearchAd API */
 export type CompetitionLevel = "낮음" | "중간" | "높음";
+export type ProfitSignal = "HIGH" | "MEDIUM" | "LOW";
 
 /**
  * Content saturation index.
@@ -66,6 +67,7 @@ export interface KeywordSearchResult {
   isEstimated?: boolean;
   /** Estimated monthly click count (PC + Mobile) derived from SearchAd CTR data */
   estimatedClicks?: number;
+  profitSignal?: ProfitSignal;
 }
 
 // ---------------------------------------------------------------------------

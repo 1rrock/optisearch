@@ -64,6 +64,8 @@ export interface PlanLimit {
   shoppingInsightEnabled: boolean;
   /** Whether search history export to Excel is available */
   historyExcelEnabled: boolean;
+  /** Max rank track targets (-1 = unlimited) */
+  maxTrackTargets: number;
   /** Max saved keywords (-1 = unlimited) */
   savedKeywordLimit: number;
   /** Max search history entries stored (-1 = unlimited) */
@@ -76,6 +78,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     dailyTitle: 3,
     dailyDraft: 1,
     dailyScore: 1,
+    maxTrackTargets: 3,
     bulkKeywordsPerRun: -1,
     trendPeriodMonths: 3,
     demographicsEnabled: false,
@@ -91,6 +94,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     dailyTitle: 20,
     dailyDraft: 5,
     dailyScore: 10,
+    maxTrackTargets: 20,
     bulkKeywordsPerRun: 50,
     trendPeriodMonths: 12,
     demographicsEnabled: true,
@@ -106,6 +110,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     dailyTitle: 100,
     dailyDraft: 30,
     dailyScore: 50,
+    maxTrackTargets: -1,
     bulkKeywordsPerRun: 500,
     trendPeriodMonths: -1,
     demographicsEnabled: true,

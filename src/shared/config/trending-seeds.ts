@@ -47,3 +47,54 @@ export const TRENDING_CATEGORIES: TrendCategory[] = [
 export function getAllTrendingSeeds(): string[] {
   return TRENDING_CATEGORIES.flatMap((cat) => cat.keywords);
 }
+
+/**
+ * Build dynamic trending seeds by combining static seeds with
+ * high-volume and recently discovered keywords from keyword_corpus.
+ */
+export async function getDynamicTrendingSeeds(
+  supabase: { from: (table: string) => any }
+): Promise<string[]> {
+  const { getKSTDateString } = await import("@/shared/lib/date-utils");
+  const staticSeeds = getAllTrendingSeeds();
+  const seedSet = new Set<string>(staticSeeds);
+
+  const threeDaysAgo = getKSTDateString(new Date(Date.now() - 3 * 86400000));
+
+  // Recent discoveries (last 3 days, top 80 by volume)
+  try {
+    const { data: recent } = await supabase
+      .from("keyword_corpus")
+      .select("keyword")
+      .gte("first_seen_at", threeDaysAgo)
+      .order("total_volume", { ascending: false })
+      .limit(80);
+
+    if (recent) {
+      for (const r of recent as Array<{ keyword: string }>) {
+        seedSet.add(r.keyword);
+      }
+    }
+  } catch (err) {
+    console.warn("[trending-seeds] Failed to fetch recent keywords:", err instanceof Error ? err.message : err);
+  }
+
+  // All-time top volume (top 80)
+  try {
+    const { data: top } = await supabase
+      .from("keyword_corpus")
+      .select("keyword")
+      .order("total_volume", { ascending: false })
+      .limit(80);
+
+    if (top) {
+      for (const r of top as Array<{ keyword: string }>) {
+        seedSet.add(r.keyword);
+      }
+    }
+  } catch (err) {
+    console.warn("[trending-seeds] Failed to fetch top keywords:", err instanceof Error ? err.message : err);
+  }
+
+  return [...seedSet];
+}

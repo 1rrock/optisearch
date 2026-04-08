@@ -19,10 +19,12 @@ import {
   Bookmark,
   CreditCard,
   Menu,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PLAN_PRICING } from "@/shared/config/constants";
 import { useUserName, useUserPlan } from "@/shared/hooks/use-user";
+import { useQuotaStore } from "@/shared/stores/quota-store";
 import {
   Sheet,
   SheetTrigger,
@@ -64,6 +66,8 @@ export function MobileNav() {
   const userPlan = useUserPlan();
   const userName = useUserName() ?? "사용자";
   const userInitial = userName.charAt(0).toUpperCase();
+  const { limit, remaining } = useQuotaStore();
+  const percentage = limit > 0 ? ((limit - remaining) / limit) * 100 : 100;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -115,6 +119,21 @@ export function MobileNav() {
         </nav>
 
         <div className="mt-auto border-t p-3">
+          <div className="mb-3 flex items-center gap-3 bg-muted/30 px-3 py-2 rounded-lg border border-border">
+            <Zap className="size-4 text-emerald-500" />
+            <div className="flex flex-col gap-1 w-full">
+              <div className="flex justify-between items-center text-[10px] font-medium leading-none">
+                <span className="text-muted-foreground">일일 분석</span>
+                <span className="text-emerald-500">{remaining} / {limit}</span>
+              </div>
+              <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-500 ease-in-out shadow-[0_0_10px_rgba(16,185,129,0.5)]"
+                  style={{ width: `${Math.min(100, Math.max(0, percentage))}%` }}
+                />
+              </div>
+            </div>
+          </div>
           <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-sm shrink-0">
               {userInitial}

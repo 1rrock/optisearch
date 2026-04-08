@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
+import { getKSTDateString } from "@/shared/lib/date-utils";
 
 export interface NewKeywordItem {
   keyword: string;
@@ -81,33 +82,42 @@ async function fetchFromCorpus(
 ): Promise<NewKeywordsResponse | null> {
   const supabase = await createServerClient();
 
-  // Check if keyword_corpus table exists and has data
-  const { data, error } = await supabase
-    .from("keyword_corpus")
-    .select("keyword, pc_volume, mobile_volume, first_seen_at")
-    .gte("first_seen_at", startStr)
-    .lte("first_seen_at", endStr)
-    .order("first_seen_at", { ascending: false })
-    .limit(1000);
+  // Query per-date in parallel to avoid Supabase 1000-row default limit
+  const PER_DATE_LIMIT = 500;
 
-  if (error) {
-    // Table doesn't exist or other error — fall back
-    console.warn("[new-keywords] corpus query failed:", error.message);
+  const queries = Array.from({ length: days }, (_, i) => {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    return supabase
+      .from("keyword_corpus")
+      .select("keyword, pc_volume, mobile_volume, first_seen_at")
+      .eq("first_seen_at", formatDateISO(d))
+      .order("total_volume", { ascending: false })
+      .limit(PER_DATE_LIMIT);
+  });
+
+  const results = await Promise.all(queries);
+
+  // Check first result for table existence
+  if (results[0].error) {
+    console.warn("[new-keywords] corpus query failed:", results[0].error.message);
     return null;
   }
 
-  if (!data || data.length === 0) {
-    // Table exists but empty — still return corpus format with empty dates
-    return buildResponse([], days, endDate, "corpus");
+  const allItems: Array<{ keyword: string; volume: number; date: string }> = [];
+  for (const { data } of results) {
+    if (data) {
+      for (const row of data as Array<{ keyword: string; pc_volume: number; mobile_volume: number; first_seen_at: string }>) {
+        allItems.push({
+          keyword: row.keyword,
+          volume: (row.pc_volume ?? 0) + (row.mobile_volume ?? 0),
+          date: getKSTDateString(row.first_seen_at),
+        });
+      }
+    }
   }
 
-  const items = (data as Array<{ keyword: string; pc_volume: number; mobile_volume: number; first_seen_at: string }>).map((row) => ({
-    keyword: row.keyword,
-    volume: (row.pc_volume ?? 0) + (row.mobile_volume ?? 0),
-    date: toKSTDateString(row.first_seen_at),
-  }));
-
-  return buildResponse(items, days, endDate, "corpus");
+  return buildResponse(allItems, days, endDate, "corpus");
 }
 
 // Intentionally queries all users' searches to identify globally trending keywords.
@@ -142,7 +152,7 @@ async function fetchFromSearches(
       items.push({
         keyword: row.keyword,
         volume: (row.pc_search_volume ?? 0) + (row.mobile_search_volume ?? 0),
-        date: toKSTDateString(row.created_at),
+        date: getKSTDateString(row.created_at),
       });
     }
   }
@@ -186,16 +196,7 @@ function buildResponse(
   };
 }
 
-/** Convert any timestamp/date string to KST YYYY-MM-DD */
-function toKSTDateString(timestamp: string): string {
-  const d = new Date(timestamp);
-  // KST = UTC+9
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
-}
-
-/** Format a Date object as KST YYYY-MM-DD */
+/** Format a Date object as KST YYYY-MM-DD (used for query date ranges) */
 function formatDateISO(d: Date): string {
-  const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
-  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, "0")}-${String(kst.getUTCDate()).padStart(2, "0")}`;
+  return getKSTDateString(d);
 }

@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/collect-keywords",
       "schedule": "0 18 * * *"
+    },
+    {
+      "path": "/api/cron/collect-ranks",
+      "schedule": "0 19 * * *"
+    },
+    {
+      "path": "/api/cron/collect-trending",
+      "schedule": "0 20 * * *"
     }
   ]
 }

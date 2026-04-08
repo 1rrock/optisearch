@@ -3,6 +3,11 @@
 import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useProfitMutation,
+  type ProfitCompetitionLevel,
+} from "@/features/keyword-analysis/api/use-profit";
+import { ProfitScoreCard } from "@/features/keyword-analysis/ui/ProfitScoreCard";
 import { useUserStore } from "@/shared/stores/user-store";
 import {
   Search,
@@ -189,6 +194,12 @@ function competitionDescription(competition: string) {
   if (competition === "낮음") return "상위 노출이 비교적 쉬운 키워드입니다";
   if (competition === "높음") return "상위 노출이 어려운 키워드입니다";
   return "적당한 경쟁 강도의 키워드입니다";
+}
+
+function toProfitCompetitionLevel(competition: string): ProfitCompetitionLevel {
+  if (competition === "낮음") return "LOW";
+  if (competition === "높음") return "HIGH";
+  return "MEDIUM";
 }
 
 // ---------------------------------------------------------------------------
@@ -664,7 +675,8 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-12">
       {/* Metrics Row */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
         <SkeletonCard />
@@ -815,6 +827,8 @@ export default function AnalyzePage() {
 
 function AnalyzePageInner() {
   const queryClient = useQueryClient();
+  const profitMutation = useProfitMutation();
+  const latestProfitRequestKey = useRef<string | null>(null);
   const searchParams = useSearchParams();
   const autoTriggered = useRef(false);
   const [inputValue, setInputValue] = useState("");
@@ -1203,6 +1217,44 @@ function AnalyzePageInner() {
   const monthlyClicks = quickData?.estimatedClicks
     ?? (displayVolume ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate) : 0);
   const isEstimated = quickData?.isEstimated || analysis?.isEstimated;
+  const displayCompetition = displayVolume?.competition;
+  const displayTotalSearchVolume = displayVolume?.totalSearchVolume;
+  const mutateProfit = profitMutation.mutate;
+  const currentProfitKeyword = quickData?.keyword ?? analysis?.keyword;
+
+  const profitResult =
+    profitMutation.data && profitMutation.data.keyword === currentProfitKeyword
+      ? profitMutation.data
+      : undefined;
+
+  const profitErrorMessage =
+    profitMutation.error && !profitResult ? profitMutation.error.message : null;
+
+  useEffect(() => {
+    if (!displayCompetition || displayTotalSearchVolume === undefined) return;
+    const keyword = quickData?.keyword ?? analysis?.keyword;
+    if (!keyword) return;
+
+    const competition = toProfitCompetitionLevel(displayCompetition);
+    const requestKey = `${keyword}:${displayTotalSearchVolume}:${monthlyClicks}:${competition}`;
+
+    if (latestProfitRequestKey.current === requestKey) return;
+    latestProfitRequestKey.current = requestKey;
+
+    mutateProfit({
+      keyword,
+      searchVolume: displayTotalSearchVolume,
+      expectedClicks: monthlyClicks,
+      competition,
+    });
+  }, [
+    analysis?.keyword,
+    displayCompetition,
+    displayTotalSearchVolume,
+    monthlyClicks,
+    mutateProfit,
+    quickData?.keyword,
+  ]);
 
   const COMPARE_COLORS = ["#ef4444", "#10b981", "#f59e0b", "#8b5cf6"];
   const trendSeries = useMemo<TrendSeries[]>(() => {
@@ -1353,7 +1405,7 @@ function AnalyzePageInner() {
           )}
 
           {/* Row 1: Key Metrics (renders with quickData) */}
-          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-4 lg:gap-6 mb-12">
             {/* Monthly Volume */}
             {displayVolume ? (
               <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
@@ -1423,6 +1475,16 @@ function AnalyzePageInner() {
                   <span className="text-[11px] text-muted-foreground">검색량 x 클릭률</span>
                 </div>
               </div>
+            ) : <SkeletonCard />}
+
+            {displayVolume ? (
+              <ProfitScoreCard
+                score={profitResult?.profitScore}
+                signal={profitResult?.profitSignal}
+                competition={profitResult?.inputMetrics.competition ?? toProfitCompetitionLevel(displayVolume.competition)}
+                isLoading={profitMutation.isPending && !profitResult}
+                errorMessage={profitErrorMessage}
+              />
             ) : <SkeletonCard />}
 
             {/* Blog Posts — requires full analysis data */}

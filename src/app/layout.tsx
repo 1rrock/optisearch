@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/shared/components/theme-provider";
 import { QueryProvider } from "@/shared/providers/query-provider";
 import { SessionProvider } from "@/shared/providers/session-provider";
 import { Toaster } from "@/shared/ui/sonner";
+import { QuotaLimitModal } from "@/widgets/layout/ui/QuotaLimitModal";
 
 import { UserStoreSync } from "@/shared/providers/user-store-provider";
 import { Analytics } from "@vercel/analytics/react";
@@ -90,6 +91,7 @@ export default function RootLayout({
             <UserStoreSync />
             <QueryProvider>{children}</QueryProvider>
             <Toaster />
+            <QuotaLimitModal />
           </SessionProvider>
         </ThemeProvider>
         <Analytics />

@@ -102,8 +102,8 @@ export async function POST(request: Request) {
 
     const competition = stat?.compIdx ?? "중간";
 
-    const pcCtr = stat?.monthlyAvePcCtr ?? 0;
-    const mobileCtr = stat?.monthlyAveMobileCtr ?? 0;
+    const pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
+    const mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
     const clickRate = (pcCtr + mobileCtr) / 2;
     const estimatedClicks = Math.round(
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr

@@ -3,7 +3,6 @@
 import { useRef, useCallback, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { ThemeToggle } from "@/shared/components/theme-toggle";
 import { MobileNav } from "./MobileNav";

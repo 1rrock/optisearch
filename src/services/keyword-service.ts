@@ -112,8 +112,8 @@ export async function analyzeKeyword(
     }
 
     const competition = toCompetitionLevel(stat?.compIdx ?? "높음");
-    const pcCtr = stat?.monthlyAvePcCtr ?? 0;
-    const mobileCtr = stat?.monthlyAveMobileCtr ?? 0;
+    const pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
+    const mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
     const clickRate = totalSearchVolume > 0
       ? (pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr) / totalSearchVolume
       : 0;
