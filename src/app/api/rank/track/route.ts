@@ -78,21 +78,23 @@ export async function POST(request: Request) {
     try {
       const storeCheckUrl = `https://smartstore.naver.com/${normalizedStoreId}`;
       const storeRes = await fetch(storeCheckUrl, {
-        method: "HEAD",
+        method: "GET",
         signal: AbortSignal.timeout(5000),
         redirect: "follow",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; OptiSearch/1.0)",
+        },
       });
-      if (!storeRes.ok) {
+      // Only treat 404 as "store not found"; other errors (429, 403, 5xx) are transient
+      if (storeRes.status === 404) {
         return Response.json(
           { error: `존재하지 않는 스토어입니다. 스토어 URL을 확인해주세요. (${normalizedStoreId})`, code: "STORE_NOT_FOUND" },
           { status: 422 }
         );
       }
     } catch {
-      return Response.json(
-        { error: "스토어 URL 확인에 실패했습니다. 잠시 후 다시 시도해주세요.", code: "STORE_CHECK_FAILED" },
-        { status: 502 }
-      );
+      // Network timeout or fetch failure — don't block the user, allow the request through
+      console.warn(`[api/rank/track] Store check failed for ${normalizedStoreId}, proceeding anyway`);
     }
 
     // Check plan-based target limit (skip if this combo already exists = upsert update)
