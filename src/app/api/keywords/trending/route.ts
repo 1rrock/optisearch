@@ -14,6 +14,8 @@ export interface TrendingKeywordItem {
   changeRate: number;
   estimatedDelta: number;
   direction: "up" | "down" | "stable";
+  newsTitle?: string | null;
+  newsLink?: string | null;
 }
 
 export interface TrendingResponse {
@@ -91,7 +93,7 @@ async function fetchFromTrendDaily(
   // Fetch only that date's data, sorted by absolute change
   const { data, error } = await supabase
     .from("keyword_trend_daily")
-    .select("keyword, change_rate, monthly_volume, estimated_delta")
+    .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link")
     .eq("recorded_date", latestDate)
     .limit(200);
 
@@ -102,6 +104,8 @@ async function fetchFromTrendDaily(
     change_rate: number;
     monthly_volume: number;
     estimated_delta: number;
+    news_title: string | null;
+    news_link: string | null;
   };
 
   // Sort by absolute change rate in JS (DB can't sort by ABS), take top 30
@@ -116,6 +120,8 @@ async function fetchFromTrendDaily(
     estimatedDelta: row.estimated_delta,
     direction:
       row.change_rate > 5 ? "up" : row.change_rate < -5 ? "down" : "stable",
+    newsTitle: row.news_title ?? null,
+    newsLink: row.news_link ?? null,
   }));
 
   return { period, keywords };

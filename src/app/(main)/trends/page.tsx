@@ -23,6 +23,7 @@ import {
   ArrowDownRight,
   Minus,
   ChevronDown,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -1140,7 +1141,14 @@ function TrendingSectionWrapper() {
                 )}>
                   {idx + 1}
                 </span>
-                <span className="flex-1 text-sm font-semibold truncate">{kw.keyword}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm font-semibold truncate block">{kw.keyword}</span>
+                  {kw.newsTitle && (
+                    <span className="text-[10px] text-muted-foreground truncate block mt-0.5">
+                      {kw.newsTitle}
+                    </span>
+                  )}
+                </div>
                 <div className="flex flex-col items-end shrink-0">
                   <span className={cn(
                     "text-xs font-bold",
@@ -1165,6 +1173,7 @@ function TrendingSectionWrapper() {
               <tr className="border-b border-muted/30 text-muted-foreground text-xs">
                 <th className="text-left py-2.5 px-4 font-semibold w-10">#</th>
                 <th className="text-left py-2.5 pr-4 font-semibold">키워드</th>
+                <th className="text-left py-2.5 pr-4 font-semibold hidden md:table-cell">관련 뉴스</th>
                 <th
                   className="text-right py-2.5 pr-4 font-semibold cursor-pointer hover:text-foreground transition-colors select-none"
                   onClick={() => toggleSort("volume")}
@@ -1188,6 +1197,26 @@ function TrendingSectionWrapper() {
                 >
                   <td className="py-3 px-4 font-bold text-muted-foreground">{idx + 1}</td>
                   <td className="py-3 pr-4 font-semibold">{kw.keyword}</td>
+                  <td className="py-3 pr-4 hidden md:table-cell max-w-[260px]">
+                    {kw.newsTitle ? (
+                      kw.newsLink ? (
+                        <a
+                          href={kw.newsLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors truncate block group"
+                        >
+                          <span className="truncate">{kw.newsTitle}</span>
+                          <ExternalLink className="size-2.5 inline ml-1 opacity-0 group-hover:opacity-60 transition-opacity" />
+                        </a>
+                      ) : (
+                        <span className="text-xs text-muted-foreground truncate block">{kw.newsTitle}</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">-</span>
+                    )}
+                  </td>
                   <td className="py-3 pr-4 text-right text-muted-foreground">
                     {kw.volume > 0 ? kw.volume.toLocaleString() : "-"}
                   </td>

@@ -11,23 +11,26 @@ import { getNaverAuthHeaders } from "./naver-auth";
 
 const BASE_URL = "https://openapi.naver.com/v1/search";
 
-async function fetchSearch<T>(path: string): Promise<T> {
+/** Raw fetch without retry — shared by fetchSearch and no-retry callers. */
+async function fetchSearchRaw<T>(path: string, timeoutMs = 8000): Promise<T> {
   const url = `${BASE_URL}${path}`;
-  return withRetry(async () => {
-    const response = await fetch(url, {
-      headers: getNaverAuthHeaders(),
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      const err = new Error(
-        `Naver Search API error ${response.status} ${response.statusText}: ${text}`
-      ) as Error & { status: number };
-      err.status = response.status;
-      throw err;
-    }
-    return response.json() as Promise<T>;
+  const response = await fetch(url, {
+    headers: getNaverAuthHeaders(),
+    signal: AbortSignal.timeout(timeoutMs),
   });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    const err = new Error(
+      `Naver Search API error ${response.status} ${response.statusText}: ${text}`
+    ) as Error & { status: number };
+    err.status = response.status;
+    throw err;
+  }
+  return response.json() as Promise<T>;
+}
+
+async function fetchSearch<T>(path: string): Promise<T> {
+  return withRetry(() => fetchSearchRaw<T>(path));
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +195,7 @@ export interface NewsSearchItem {
 }
 
 export interface NewsSearchResponse {
-  items: NewsSearchItem[];
+  items?: NewsSearchItem[];
   total: number;
   display: number;
 }
@@ -214,6 +217,28 @@ export async function searchNews(
     sort: sort ?? "date",
   });
   return fetchSearch<NewsSearchResponse>(`/news.json?${params}`);
+}
+
+/**
+ * Search Naver news WITHOUT retry logic.
+ * Designed for cron-job bulk enrichment where retries would risk timeout.
+ * Uses a 5-second hard timeout and throws on any error.
+ *
+ * @param query - Search keyword
+ * @param display - Number of results (default 1)
+ * @param sort - Sort order: "date" (recent) | "sim" (relevance)
+ */
+export async function searchNewsNoRetry(
+  query: string,
+  display?: number,
+  sort?: "date" | "sim"
+): Promise<NewsSearchResponse> {
+  const params = new URLSearchParams({
+    query,
+    display: String(display ?? 1),
+    sort: sort ?? "date",
+  });
+  return fetchSearchRaw<NewsSearchResponse>(`/news.json?${params}`, 5000);
 }
 
 // ---------------------------------------------------------------------------

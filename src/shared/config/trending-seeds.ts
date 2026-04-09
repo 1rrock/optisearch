@@ -3,6 +3,10 @@
  * DataLab compares recent ratio vs prior period to calculate velocity.
  */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getKSTDateString } from "@/shared/lib/date-utils";
+import { fetchGoogleTrendsRSS } from "@/shared/lib/google-trends-rss";
+
 export interface TrendCategory {
   name: string;
   keywords: string[];
@@ -48,53 +52,77 @@ export function getAllTrendingSeeds(): string[] {
   return TRENDING_CATEGORIES.flatMap((cat) => cat.keywords);
 }
 
+/** Maximum seed count to prevent unbounded DataLab quota consumption. */
+const MAX_SEED_COUNT = 250;
+
+/** Minimum RSS keywords required to use RSS as primary source. */
+const MIN_RSS_KEYWORDS = 10;
+
 /**
- * Build dynamic trending seeds by combining static seeds with
- * high-volume and recently discovered keywords from keyword_corpus.
+ * Build dynamic trending seeds by combining external RSS trending keywords
+ * (or static fallback seeds) with high-volume and recently discovered
+ * keywords from keyword_corpus.
+ *
+ * Primary: Google Trends RSS daily trending keywords for Korea.
+ * Fallback: Static category seeds (TRENDING_CATEGORIES) if RSS fails or
+ *           returns fewer than MIN_RSS_KEYWORDS results.
  */
 export async function getDynamicTrendingSeeds(
-  supabase: { from: (table: string) => any }
+  supabase: SupabaseClient
 ): Promise<string[]> {
-  const { getKSTDateString } = await import("@/shared/lib/date-utils");
-  const staticSeeds = getAllTrendingSeeds();
-  const seedSet = new Set<string>(staticSeeds);
+  // 1. Try Google Trends RSS as primary seed source
+  let seedSet: Set<string>;
+  try {
+    const rssKeywords = await fetchGoogleTrendsRSS();
+    if (rssKeywords.length >= MIN_RSS_KEYWORDS) {
+      seedSet = new Set<string>(rssKeywords);
+      console.log(`[trending-seeds] RSS source: ${rssKeywords.length} keywords`);
+    } else {
+      console.warn(
+        `[trending-seeds] RSS returned only ${rssKeywords.length} keywords (min: ${MIN_RSS_KEYWORDS}), using static fallback`
+      );
+      seedSet = new Set<string>(getAllTrendingSeeds());
+    }
+  } catch (err) {
+    console.warn(
+      "[trending-seeds] RSS fetch failed, using static fallback:",
+      err instanceof Error ? err.message : err
+    );
+    seedSet = new Set<string>(getAllTrendingSeeds());
+  }
 
+  // 2. Enrich with corpus keywords (parallel queries)
   const threeDaysAgo = getKSTDateString(new Date(Date.now() - 3 * 86400000));
 
-  // Recent discoveries (last 3 days, top 80 by volume)
-  try {
-    const { data: recent } = await supabase
+  const [recentResult, topResult] = await Promise.allSettled([
+    supabase
       .from("keyword_corpus")
       .select("keyword")
       .gte("first_seen_at", threeDaysAgo)
       .order("total_volume", { ascending: false })
-      .limit(80);
-
-    if (recent) {
-      for (const r of recent as Array<{ keyword: string }>) {
-        seedSet.add(r.keyword);
-      }
-    }
-  } catch (err) {
-    console.warn("[trending-seeds] Failed to fetch recent keywords:", err instanceof Error ? err.message : err);
-  }
-
-  // All-time top volume (top 80)
-  try {
-    const { data: top } = await supabase
+      .limit(80),
+    supabase
       .from("keyword_corpus")
       .select("keyword")
       .order("total_volume", { ascending: false })
-      .limit(80);
+      .limit(80),
+  ]);
 
-    if (top) {
-      for (const r of top as Array<{ keyword: string }>) {
-        seedSet.add(r.keyword);
-      }
+  if (recentResult.status === "fulfilled" && recentResult.value.data) {
+    for (const r of recentResult.value.data as Array<{ keyword: string }>) {
+      seedSet.add(r.keyword);
     }
-  } catch (err) {
-    console.warn("[trending-seeds] Failed to fetch top keywords:", err instanceof Error ? err.message : err);
+  } else if (recentResult.status === "rejected") {
+    console.warn("[trending-seeds] Failed to fetch recent keywords:", recentResult.reason);
   }
 
-  return [...seedSet];
+  if (topResult.status === "fulfilled" && topResult.value.data) {
+    for (const r of topResult.value.data as Array<{ keyword: string }>) {
+      seedSet.add(r.keyword);
+    }
+  } else if (topResult.status === "rejected") {
+    console.warn("[trending-seeds] Failed to fetch top keywords:", topResult.reason);
+  }
+
+  return [...seedSet].slice(0, MAX_SEED_COUNT);
 }

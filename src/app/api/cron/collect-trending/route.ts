@@ -2,8 +2,28 @@ import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getSearchTrendBatch } from "@/shared/lib/naver-datalab";
 import { getDynamicTrendingSeeds } from "@/shared/config/trending-seeds";
-import { formatDate } from "@/shared/lib/utils";
+import { searchNewsNoRetry } from "@/shared/lib/naver-search";
+import { formatDate, stripHtmlTags } from "@/shared/lib/utils";
 import { getKSTDateString, calculateDailyChangeRate } from "@/shared/lib/date-utils";
+
+/** Wall-clock guard: skip news enrichment if elapsed exceeds this. */
+const NEWS_ENRICHMENT_DEADLINE_MS = 45_000;
+/** Max keywords to enrich with news headlines. */
+const NEWS_ENRICHMENT_LIMIT = 50;
+/** Concurrency limit for parallel news fetches. */
+const NEWS_CONCURRENCY = 5;
+
+/** Validate URL is https:// only — prevents open redirect / javascript: injection. */
+function sanitizeNewsUrl(url: string | undefined | null): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Vercel Cron job — runs daily to collect DataLab trend ratios
@@ -82,6 +102,8 @@ export async function GET(request: Request) {
       monthly_volume: number;
       estimated_delta: number;
       recorded_date: string;
+      news_title: string | null;
+      news_link: string | null;
     }> = [];
 
     for (const [keyword, data] of trendMap) {
@@ -108,10 +130,66 @@ export async function GET(request: Request) {
         monthly_volume: monthlyVolume,
         estimated_delta: estimatedDelta,
         recorded_date: today,
+        news_title: null,
+        news_link: null,
       });
     }
 
-    // 4. Upsert into keyword_trend_daily
+    // 4. Best-effort news headline enrichment for top keywords
+    const elapsed = Date.now() - startTime;
+    if (elapsed < NEWS_ENRICHMENT_DEADLINE_MS && rows.length > 0) {
+      // Sort by absolute change rate, take top N for enrichment
+      const sortedForNews = [...rows]
+        .sort((a, b) => Math.abs(b.change_rate) - Math.abs(a.change_rate))
+        .slice(0, NEWS_ENRICHMENT_LIMIT);
+
+      // sortedForNews items are references to objects in rows[] — mutations here update the original array
+      let enriched = 0;
+
+      for (let i = 0; i < sortedForNews.length; i += NEWS_CONCURRENCY) {
+        if (Date.now() - startTime > NEWS_ENRICHMENT_DEADLINE_MS) {
+          console.warn(
+            `[collect-trending] News enrichment stopped at ${enriched}/${sortedForNews.length} (wall-clock guard)`
+          );
+          break;
+        }
+
+        const batch = sortedForNews.slice(i, i + NEWS_CONCURRENCY);
+        const results = await Promise.allSettled(
+          batch.map(async (row) => {
+            const news = await searchNewsNoRetry(row.keyword, 1, "date");
+            return { row, news };
+          })
+        );
+
+        for (const result of results) {
+          if (result.status === "fulfilled") {
+            const { row, news } = result.value;
+            const item = news.items?.[0];
+            if (item) {
+              row.news_title = stripHtmlTags(item.title);
+              row.news_link = sanitizeNewsUrl(item.link);
+              enriched++;
+            }
+          } else {
+            console.warn(
+              "[collect-trending] News fetch failed:",
+              result.reason instanceof Error
+                ? result.reason.message
+                : result.reason
+            );
+          }
+        }
+      }
+
+      console.log(
+        `[collect-trending] News enrichment: ${enriched}/${sortedForNews.length} keywords`
+      );
+    } else if (rows.length > 0) {
+      console.warn("[collect-trending] Skipped news enrichment (time budget exceeded)");
+    }
+
+    // 5. Upsert into keyword_trend_daily
     let upserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
@@ -126,7 +204,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 5. Clean up old data (> 7 days)
+    // 6. Clean up old data (> 7 days)
     const cutoff = getKSTDateString(new Date(Date.now() - 7 * 86400000));
 
     await supabase
@@ -134,12 +212,12 @@ export async function GET(request: Request) {
       .delete()
       .lt("recorded_date", cutoff);
 
-    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
     const result = {
       seeds: seeds.length,
       datalabResults: trendMap.size,
       upserted,
-      elapsed: `${elapsed}s`,
+      elapsed: `${elapsedSec}s`,
     };
 
     console.log("[collect-trending] Done:", result);

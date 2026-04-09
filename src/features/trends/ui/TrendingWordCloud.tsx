@@ -8,7 +8,10 @@ export interface TrendingWordCloudItem {
   keyword: string;
   volume: number;
   changeRate: number;
+  estimatedDelta: number;
   direction: "up" | "down" | "stable";
+  newsTitle?: string | null;
+  newsLink?: string | null;
 }
 
 interface PlacedWord {
@@ -22,6 +25,8 @@ interface PlacedWord {
   volume: number;
   changeRate: number;
   direction: "up" | "down" | "stable";
+  newsTitle?: string | null;
+  newsLink?: string | null;
 }
 
 function getWordColor(direction: "up" | "down" | "stable", changeRate: number): string {
@@ -172,6 +177,8 @@ export function TrendingWordCloud({ keywords }: { keywords: TrendingWordCloudIte
         volume: kw.volume,
         changeRate: kw.changeRate,
         direction: kw.direction,
+        newsTitle: kw.newsTitle,
+        newsLink: kw.newsLink,
       });
 
       rects.push({ x: px, y: py, w: textWidth, h: textHeight });
@@ -254,34 +261,42 @@ export function TrendingWordCloud({ keywords }: { keywords: TrendingWordCloudIte
 
       {hoveredIdx !== null && placedWords[hoveredIdx] && (
         <div
-          className="absolute pointer-events-none z-10 bg-card border border-muted/50 shadow-lg rounded-lg px-3 py-2 text-xs"
+          className="absolute pointer-events-none z-10 bg-card border border-muted/50 shadow-lg rounded-lg px-3 py-2 text-xs max-w-xs"
           style={{
             left: "50%",
             bottom: 8,
             transform: "translateX(-50%)",
           }}
         >
-          <span className="font-bold">{placedWords[hoveredIdx].keyword}</span>
-          <span className="text-muted-foreground mx-2">|</span>
-          <span className="text-muted-foreground">
-            {placedWords[hoveredIdx].volume > 0
-              ? `${placedWords[hoveredIdx].volume.toLocaleString()} 검색`
-              : "검색량 미확인"}
-          </span>
-          <span className="text-muted-foreground mx-2">|</span>
-          <span
-            className={cn(
-              "font-bold",
-              placedWords[hoveredIdx].direction === "up"
-                ? "text-rose-500"
-                : placedWords[hoveredIdx].direction === "down"
-                  ? "text-blue-500"
-                  : "text-muted-foreground"
-            )}
-          >
-            {placedWords[hoveredIdx].changeRate > 0 ? "+" : ""}
-            {placedWords[hoveredIdx].changeRate}%
-          </span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-bold">{placedWords[hoveredIdx].keyword}</span>
+            <span className="text-muted-foreground">|</span>
+            <span className="text-muted-foreground">
+              {placedWords[hoveredIdx].volume > 0
+                ? `${placedWords[hoveredIdx].volume.toLocaleString()} 검색`
+                : "검색량 미확인"}
+            </span>
+            <span className="text-muted-foreground">|</span>
+            <span
+              className={cn(
+                "font-bold",
+                placedWords[hoveredIdx].direction === "up"
+                  ? "text-rose-500"
+                  : placedWords[hoveredIdx].direction === "down"
+                    ? "text-blue-500"
+                    : "text-muted-foreground"
+              )}
+            >
+              {placedWords[hoveredIdx].changeRate > 0 ? "+" : ""}
+              {placedWords[hoveredIdx].changeRate}%
+            </span>
+          </div>
+          {placedWords[hoveredIdx].newsTitle && (
+            <div className="mt-1.5 pt-1.5 border-t border-muted/30 text-muted-foreground truncate">
+              <span className="text-[10px] uppercase tracking-wider font-semibold text-orange-500 dark:text-orange-400 mr-1.5">NEWS</span>
+              {placedWords[hoveredIdx].newsTitle}
+            </div>
+          )}
         </div>
       )}
     </div>
