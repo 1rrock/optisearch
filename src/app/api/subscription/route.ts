@@ -10,14 +10,24 @@ export async function GET() {
     return Response.json({ error: "로그인이 필요합니다." }, { status: 401 });
   }
 
-  const supabase = await createServerClient();
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("plan")
-    .eq("auth_user_id", user.userId)
-    .single();
+  try {
+    const supabase = await createServerClient();
+    const { data: profile, error } = await supabase
+      .from("user_profiles")
+      .select("plan")
+      .eq("auth_user_id", user.userId)
+      .single();
 
-  return Response.json({
-    plan: profile?.plan ?? "free",
-  });
+    if (error) {
+      console.error("[subscription] DB error:", error.message);
+      return Response.json({ error: "구독 정보 조회에 실패했습니다." }, { status: 500 });
+    }
+
+    return Response.json({
+      plan: profile?.plan ?? "free",
+    });
+  } catch (err) {
+    console.error("[subscription] Fatal error:", err);
+    return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
+  }
 }

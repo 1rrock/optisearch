@@ -44,15 +44,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  // Atomic usage limit check + record
   const effectiveKeyword = (typoResult.errata ? typoResult.errata : null) ?? keyword;
-  const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
-  if (!usage.allowed) {
-    return Response.json(
-      { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
-      { status: 429 }
-    );
-  }
 
   try {
     if (adultResult.adult === "1") {
@@ -65,6 +57,15 @@ export async function POST(request: Request) {
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
 
     const analysis = await analyzeKeyword(effectiveKeyword);
+
+    // Record usage after successful analysis (prevents quota loss on server errors)
+    const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
+    if (!usage.allowed) {
+      return Response.json(
+        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+        { status: 429 }
+      );
+    }
 
     // Apply plan-based restrictions
     const planLimits = PLAN_LIMITS[user.plan];

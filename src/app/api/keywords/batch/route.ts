@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { analyzeKeywordBatch } from "@/services/keyword-service";
-import { getAuthenticatedUser, recordUsage } from "@/shared/lib/api-helpers";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
-import { checkUsageLimit } from "@/services/usage-service";
+import { recordAndEnforce, recordUsage } from "@/services/usage-service";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 
 const bodySchema = z.object({
@@ -52,24 +52,27 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check remaining daily quota and cap batch size
-    const { allowed, used, limit } = await checkUsageLimit(user.userId, user.plan, "search");
-    if (!allowed) {
+    // Atomic usage check: record first keyword to get accurate count
+    const firstUsage = await recordAndEnforce(user.userId, user.plan, "search", keywords[0]);
+    if (!firstUsage.allowed) {
       return Response.json(
-        { error: `일일 사용 한도를 초과했습니다. (${used}/${limit})`, code: "USAGE_LIMIT_EXCEEDED", used, limit },
+        { error: `일일 사용 한도를 초과했습니다. (${firstUsage.used}/${firstUsage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: firstUsage.used, limit: firstUsage.limit },
         { status: 429 }
       );
     }
 
-    const remaining = limit === -1 ? keywords.length : limit - used;
-    const processable = keywords.slice(0, remaining);
+    // Cap batch: first keyword already recorded, calculate remaining slots
+    const remaining = firstUsage.limit === -1 ? keywords.length - 1 : firstUsage.limit - firstUsage.used;
+    const processable = keywords.slice(0, 1 + Math.max(0, remaining));
 
     const results = await analyzeKeywordBatch(processable);
 
-    // Record usage for each processed keyword
-    await Promise.all(
-      processable.map((kw) => recordUsage(user.userId, "search", kw))
-    );
+    // Record usage for remaining keywords (first already recorded atomically)
+    if (processable.length > 1) {
+      await Promise.all(
+        processable.slice(1).map((kw) => recordUsage(user.userId, "search", kw))
+      );
+    }
 
     return Response.json({
       results,

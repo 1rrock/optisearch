@@ -1,7 +1,7 @@
-import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { searchShopping } from "@/shared/lib/naver-search";
 import { toKstMidnight } from "@/shared/lib/date-utils";
+import { verifyCronAuth } from "@/shared/lib/cron-auth";
 
 /**
  * Vercel Cron job — runs daily to collect shopping rank for all active targets.
@@ -19,10 +19,6 @@ const BATCH_SIZE = 5;
 const DELAY_MS = 200;
 const TIMEOUT_THRESHOLD_MS = 50_000; // graceful stop at 50s
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return _tse(Buffer.from(a), Buffer.from(b));
-}
 
 interface ActiveTarget {
   id: string;
@@ -32,11 +28,8 @@ interface ActiveTarget {
 }
 
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization") ?? "";
-  if (!cronSecret || !safeEqual(authHeader, `Bearer ${cronSecret}`)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const startTime = Date.now();
 

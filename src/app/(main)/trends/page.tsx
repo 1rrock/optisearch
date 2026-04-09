@@ -537,6 +537,7 @@ export default function TrendsPage() {
   const [compareKeywords, setCompareKeywords] = useState<string[]>([]);
   const [compareInput, setCompareInput] = useState("");
   const compareRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const [showCompare, setShowCompare] = useState(false);
 
   // Period
@@ -595,6 +596,12 @@ export default function TrendsPage() {
 
   const fetchTrends = useCallback(
     async (primary: string, compare: string[], period: number) => {
+      // Cancel any in-flight requests
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const { signal } = controller;
+
       const keywords = [primary, ...compare];
       setLoading(true);
       setError(null);
@@ -605,6 +612,7 @@ export default function TrendsPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ keywords, months: period }),
+          signal,
         });
 
         if (res.status === 429) {
@@ -628,40 +636,32 @@ export default function TrendsPage() {
         setHasFetched(true);
 
         // Fetch demographics for the primary keyword (gender/age/device)
-        await fetchDemographics(primary, period);
+        await fetchDemographics(primary, period, signal);
       } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
         setError(err instanceof Error ? err.message : "오류가 발생했습니다.");
       } finally {
-        setLoading(false);
+        if (!signal.aborted) setLoading(false);
       }
     },
     []
   );
 
-  async function fetchDemographics(keyword: string, period: number) {
+  async function fetchDemographics(keyword: string, period: number, signal?: AbortSignal) {
     try {
+      const fetchOpts = (body: object) => ({
+        method: "POST" as const,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
+
       // Gender split
       const [maleRes, femaleRes, pcRes, moRes] = await Promise.all([
-        fetch("/api/trends", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], months: period, gender: "m" }),
-        }),
-        fetch("/api/trends", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], months: period, gender: "f" }),
-        }),
-        fetch("/api/trends", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], months: period, device: "pc" }),
-        }),
-        fetch("/api/trends", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ keywords: [keyword], months: period, device: "mo" }),
-        }),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, gender: "m" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, gender: "f" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, device: "pc" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, device: "mo" })),
       ]);
 
       const [maleData, femaleData, pcData, moData] = await Promise.all([
@@ -687,15 +687,11 @@ export default function TrendsPage() {
       const ageResults = await Promise.all(
         AGE_GROUPS.map(async (ag) => {
           try {
-            const ageRes = await fetch("/api/trends", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                keywords: [keyword],
-                months: period,
-                ages: ag.values,
-              }),
-            });
+            const ageRes = await fetch("/api/trends", fetchOpts({
+              keywords: [keyword],
+              months: period,
+              ages: ag.values,
+            }));
             if (ageRes.ok) {
               const ageData = await ageRes.json();
               return { group: ag.label, ratio: avgRatio(ageData?.trends) };

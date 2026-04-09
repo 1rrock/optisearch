@@ -4,6 +4,7 @@ import { Search, Bookmark, Verified, Minus, Plus, Download, Type, PenTool, BarCh
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { useDashboardData } from "@/shared/hooks/use-user";
 import { exportToExcel } from "@/shared/lib/excel";
+import { toast } from "sonner";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -106,6 +107,9 @@ export default function DashboardPage() {
         검색일시: new Date(item.createdAt).toLocaleString("ko-KR"),
       }));
       exportToExcel(rows, `검색기록_${new Date().toISOString().slice(0, 10)}`);
+    } catch (err) {
+      console.error("[dashboard] Export failed:", err);
+      toast.error("검색 기록 내보내기에 실패했습니다. 다시 시도해주세요.");
     } finally {
       setIsExporting(false);
     }

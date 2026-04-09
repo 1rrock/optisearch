@@ -1,8 +1,9 @@
-import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getRelatedKeywords } from "@/shared/lib/naver-searchad";
 import { getAllTrendingSeeds } from "@/shared/config/trending-seeds";
 import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
+import { getKSTDateString } from "@/shared/lib/date-utils";
+import { verifyCronAuth } from "@/shared/lib/cron-auth";
 
 /**
  * Vercel Cron job — runs daily to collect keywords from SearchAd API.
@@ -18,19 +19,9 @@ import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
  */
 export const maxDuration = 60; // Vercel Pro: 60s max
 
-/** Timing-safe string comparison to prevent timing attacks on secrets */
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return _tse(Buffer.from(a), Buffer.from(b));
-}
-
 export async function GET(request: Request) {
-  // Auth: Vercel CRON_SECRET or manual trigger
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization") ?? "";
-  if (!cronSecret || !safeEqual(authHeader, `Bearer ${cronSecret}`)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const startTime = Date.now();
 
@@ -145,25 +136,24 @@ async function fetchAllRelated(seeds: string[]): Promise<CollectedKeyword[]> {
   for (let i = 0; i < seeds.length; i += BATCH_SIZE) {
     const batch = seeds.slice(i, i + BATCH_SIZE);
 
-    const results = await Promise.all(
+    const results = await Promise.allSettled(
       batch.map(async (seed) => {
-        try {
-          const related = await getRelatedKeywords(seed);
-          return related.map((stat) => ({
-            keyword: stat.relKeyword,
-            sourceSeed: seed,
-            pcVolume: stat.monthlyPcQcCnt,
-            mobileVolume: stat.monthlyMobileQcCnt,
-            competition: stat.compIdx,
-          }));
-        } catch (err) {
-          console.warn(`[collect-keywords] Failed for seed "${seed}":`, err instanceof Error ? err.message : err);
-          return [] as CollectedKeyword[];
-        }
+        const related = await getRelatedKeywords(seed);
+        return related.map((stat) => ({
+          keyword: stat.relKeyword,
+          sourceSeed: seed,
+          pcVolume: stat.monthlyPcQcCnt,
+          mobileVolume: stat.monthlyMobileQcCnt,
+          competition: stat.compIdx,
+        }));
       })
     );
 
-    for (const keywords of results) {
+    for (const result of results) {
+      const keywords = result.status === "fulfilled" ? result.value : [];
+      if (result.status === "rejected") {
+        console.warn(`[collect-keywords] Failed for seed:`, result.reason instanceof Error ? result.reason.message : result.reason);
+      }
       for (const kw of keywords) {
         // Keep highest volume version if duplicate
         const existing = resultMap.get(kw.keyword);
@@ -186,7 +176,7 @@ async function upsertCorpus(
   keywords: CollectedKeyword[]
 ): Promise<{ inserted: number; updated: number }> {
   const supabase = await createServerClient();
-  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split("T")[0]; // KST YYYY-MM-DD
+  const today = getKSTDateString();
 
   let inserted = 0;
   let updated = 0;

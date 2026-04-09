@@ -1,4 +1,3 @@
-import { timingSafeEqual as _tse } from "node:crypto";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getSearchTrendBatch } from "@/shared/lib/naver-datalab";
 import { getDynamicTrendingSeeds } from "@/shared/config/trending-seeds";
@@ -7,6 +6,7 @@ import { formatDate, stripHtmlTags } from "@/shared/lib/utils";
 import { getKSTDateString, calculateDailyChangeRate } from "@/shared/lib/date-utils";
 import { cache } from "@/services/cache-service";
 import { getRedis } from "@/shared/lib/redis";
+import { verifyCronAuth } from "@/shared/lib/cron-auth";
 
 /** Wall-clock guard: skip news enrichment if elapsed exceeds this. */
 const NEWS_ENRICHMENT_DEADLINE_MS = 45_000;
@@ -40,22 +40,25 @@ function sanitizeNewsUrl(url: string | undefined | null): string | null {
  */
 export const maxDuration = 60;
 
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  return _tse(Buffer.from(a), Buffer.from(b));
-}
-
 export async function GET(request: Request) {
-  const cronSecret = process.env.CRON_SECRET;
-  const authHeader = request.headers.get("authorization") ?? "";
-  if (!cronSecret || !safeEqual(authHeader, `Bearer ${cronSecret}`)) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronAuth(request);
+  if (authError) return authError;
 
   const startTime = Date.now();
 
   try {
     const supabase = await createServerClient();
+
+    // 0. Verify collect-keywords ran today (dependency check)
+    const today = getKSTDateString();
+    const { count: freshCorpusCount } = await supabase
+      .from("keyword_corpus")
+      .select("*", { count: "exact", head: true })
+      .eq("last_seen_at", today);
+
+    if ((freshCorpusCount ?? 0) === 0) {
+      console.warn("[collect-trending] WARNING: collect-keywords may not have run today — corpus has no rows with last_seen_at = " + today);
+    }
 
     // 1. Collect dynamic seeds from corpus + static config
     const seeds = await getDynamicTrendingSeeds(supabase);
@@ -75,7 +78,6 @@ export async function GET(request: Request) {
     console.log(`[collect-trending] DataLab returned ${trendMap.size} keywords`);
 
     // 3. Calculate change rates and build rows
-    const today = getKSTDateString();
 
     // Fetch monthly volumes from corpus for estimatedDelta calculation
     const corpusKeywords = [...trendMap.keys()];
@@ -206,7 +208,15 @@ export async function GET(request: Request) {
       }
     }
 
-    // 6. Invalidate trending cache so API serves fresh data
+    // 6. Clean up old data (> 35 days) — keep 35 days for 30-day rolling window
+    const cutoff = getKSTDateString(new Date(Date.now() - 35 * 86400000));
+
+    await supabase
+      .from("keyword_trend_daily")
+      .delete()
+      .lt("recorded_date", cutoff);
+
+    // 7. Invalidate trending cache AFTER all writes and deletes complete
     cache.delete("trending:daily");
     cache.delete("trending:monthly");
     const redis = getRedis();
@@ -217,20 +227,14 @@ export async function GET(request: Request) {
       ]);
     }
 
-    // 7. Clean up old data (> 35 days) — keep 35 days for 30-day rolling window
-    const cutoff = getKSTDateString(new Date(Date.now() - 35 * 86400000));
-
-    await supabase
-      .from("keyword_trend_daily")
-      .delete()
-      .lt("recorded_date", cutoff);
-
     const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
+    const stale = (freshCorpusCount ?? 0) === 0;
     const result = {
       seeds: seeds.length,
       datalabResults: trendMap.size,
       upserted,
       elapsed: `${elapsedSec}s`,
+      ...(stale && { stale: true }),
     };
 
     console.log("[collect-trending] Done:", result);

@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight, ArrowRightLeft, Database } from "lucide-react";
 
+import { toast } from "sonner";
 import { PageHeader } from "@/shared/ui/page-header";
 import {
   AlertDialog,
@@ -226,6 +227,10 @@ export default function KeywordsPage() {
     mutationFn: deleteKeyword,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["savedKeywords"] });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast.error("키워드 삭제에 실패했습니다. 다시 시도해주세요.");
     },
   });
 
@@ -409,12 +414,13 @@ export default function KeywordsPage() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
-              onClick={() => {
+              disabled={deleteMutation.isPending}
+              onClick={(e) => {
+                e.preventDefault();
                 if (deleteTarget) deleteMutation.mutate(deleteTarget);
-                setDeleteTarget(null);
               }}
             >
-              삭제
+              {deleteMutation.isPending ? "삭제 중..." : "삭제"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

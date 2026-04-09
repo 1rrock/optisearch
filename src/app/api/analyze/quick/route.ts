@@ -68,15 +68,6 @@ export async function POST(request: Request) {
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
     const effectiveKeyword = correctedKeyword ?? keyword;
 
-    // Atomic usage limit check + record
-    const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
-    if (!usage.allowed) {
-      return Response.json(
-        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
-        { status: 429 }
-      );
-    }
-
     const stats = await getKeywordStats([effectiveKeyword]);
     const stat = stats.find(
       (s) => s.relKeyword.toLowerCase() === effectiveKeyword.toLowerCase()
@@ -126,54 +117,58 @@ export async function POST(request: Request) {
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
     );
 
+    // Record usage after successful work (prevents quota loss on server errors)
+    const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
+    if (!usage.allowed) {
+      return Response.json(
+        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+        { status: 429 }
+      );
+    }
+
     // Save search history (non-blocking) — uses a minimal result for history
     const planLimits = PLAN_LIMITS[user.plan];
     const historyLimit = planLimits.historyLimit;
-    (async () => {
-      try {
-        // saveSearchHistory expects a KeywordSearchResult; we pass a minimal one.
-        // The full analysis will overwrite it if it arrives later.
-        await saveSearchHistory(user.userId, {
-          keyword: effectiveKeyword,
-          pcSearchVolume,
-          mobileSearchVolume,
-          totalSearchVolume,
-          competition: competition as "낮음" | "중간" | "높음",
-          clickRate,
-          blogPostCount: 0,
-          saturationIndex: { value: 0, label: "보통", score: 50 },
-          keywordGrade: "C" as const,
-          sectionData: null,
-          topPosts: null,
-          shoppingData: null,
-          createdAt: new Date().toISOString(),
-        });
-        if (historyLimit !== -1) {
-          const { createServerClient } = await import("@/shared/lib/supabase");
-          const supabase = await createServerClient();
-          const { count } = await supabase
+    saveSearchHistory(user.userId, {
+      keyword: effectiveKeyword,
+      pcSearchVolume,
+      mobileSearchVolume,
+      totalSearchVolume,
+      competition: competition as "낮음" | "중간" | "높음",
+      clickRate,
+      blogPostCount: 0,
+      saturationIndex: { value: 0, label: "보통", score: 50 },
+      keywordGrade: "C" as const,
+      sectionData: null,
+      topPosts: null,
+      shoppingData: null,
+      createdAt: new Date().toISOString(),
+    })
+      .then(async () => {
+        if (historyLimit === -1) return;
+        const trimSupabase = await createServerClient();
+        const { count } = await trimSupabase
+          .from("keyword_searches")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.userId);
+        if ((count ?? 0) > historyLimit) {
+          const { data: oldest } = await trimSupabase
             .from("keyword_searches")
-            .select("*", { count: "exact", head: true })
-            .eq("user_id", user.userId);
-          if ((count ?? 0) > historyLimit) {
-            const { data: oldest } = await supabase
+            .select("id")
+            .eq("user_id", user.userId)
+            .order("created_at", { ascending: true })
+            .limit((count ?? 0) - historyLimit);
+          if (oldest && oldest.length > 0) {
+            await trimSupabase
               .from("keyword_searches")
-              .select("id")
-              .eq("user_id", user.userId)
-              .order("created_at", { ascending: true })
-              .limit((count ?? 0) - historyLimit);
-            if (oldest && oldest.length > 0) {
-              await supabase
-                .from("keyword_searches")
-                .delete()
-                .in("id", oldest.map((r) => r.id));
-            }
+              .delete()
+              .in("id", oldest.map((r) => r.id));
           }
         }
-      } catch (err) {
+      })
+      .catch((err) => {
         console.error("[analyze/quick] saveSearchHistory failed:", err instanceof Error ? err.message : err);
-      }
-    })();
+      });
 
     return Response.json({
       keyword: effectiveKeyword,

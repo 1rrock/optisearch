@@ -2,6 +2,7 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getDatalabQuotaUsage } from "@/shared/lib/naver-datalab";
 import { PLAN_LIMITS } from "@/shared/config/constants";
+import { getKSTDateString } from "@/shared/lib/date-utils";
 
 const EMPTY_DASHBOARD = {
   plan: "free" as const,
@@ -22,7 +23,7 @@ export async function GET() {
     const supabase = await createServerClient();
 
     // Parallel DB queries for speed (was sequential ~3.1s → ~600ms)
-    const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split("T")[0];
+    const today = getKSTDateString();
 
     const [
       { data: usageData },

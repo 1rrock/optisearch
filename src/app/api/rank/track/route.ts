@@ -216,6 +216,11 @@ export async function DELETE(request: Request) {
     return Response.json({ error: "id 파라미터가 필요합니다." }, { status: 400 });
   }
 
+  // Validate UUID format (consistent with zod schemas used in POST/PATCH)
+  if (!z.string().uuid().safeParse(targetId).success) {
+    return Response.json({ error: "잘못된 ID 형식입니다." }, { status: 400 });
+  }
+
   try {
     await deleteRankTrackTarget(user.userId, targetId);
     return Response.json({ success: true });

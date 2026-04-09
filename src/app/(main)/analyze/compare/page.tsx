@@ -155,7 +155,7 @@ function KeywordComparePageInner() {
   }, []);
 
   async function runComparison(keywords: string[]) {
-    if (keywords.length < 1) return;
+    if (keywords.length < MIN_KEYWORDS) return;
 
     setIsLoading(true);
     setGlobalError(null);
