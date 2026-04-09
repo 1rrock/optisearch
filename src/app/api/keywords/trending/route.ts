@@ -23,8 +23,10 @@ export interface TrendingResponse {
   keywords: TrendingKeywordItem[];
 }
 
-// 1-hour cache for DB reads (data changes once daily via cron)
-const CACHE_TTL = 60 * 60 * 1000;
+// Daily: 1-hour cache (data changes once daily via cron)
+// Monthly: 5-min cache (live DataLab calculation, avoid hammering API)
+const CACHE_TTL_DAILY = 60 * 60 * 1000;
+const CACHE_TTL_MONTHLY = 5 * 60 * 1000;
 
 /**
  * GET /api/keywords/trending?period=daily|monthly
@@ -51,9 +53,10 @@ export async function GET(request: Request) {
   }
 
   try {
+    const ttl = period === "daily" ? CACHE_TTL_DAILY : CACHE_TTL_MONTHLY;
     const result = await cached<TrendingResponse>(
       `trending:${period}`,
-      CACHE_TTL,
+      ttl,
       () => fetchTrendingData(period)
     );
     return Response.json(result);
