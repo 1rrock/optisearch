@@ -4,11 +4,11 @@
  * Fetches the Korean daily trending searches RSS feed and extracts
  * keyword titles. Used as the primary seed source for trending detection.
  *
- * Feed URL: https://trends.google.co.kr/trends/trendingsearches/daily/rss?geo=KR
+ * Feed URL: https://trends.google.com/trending/rss?geo=KR
  */
 
 const RSS_URL =
-  "https://trends.google.co.kr/trends/trendingsearches/daily/rss?geo=KR";
+  "https://trends.google.com/trending/rss?geo=KR";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
