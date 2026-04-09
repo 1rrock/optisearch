@@ -66,17 +66,17 @@ export async function GET(request: Request) {
 async function fetchTrendingData(
   period: "daily" | "monthly"
 ): Promise<TrendingResponse> {
-  // Try pre-computed data first
-  const precomputed = await fetchFromTrendDaily(period);
-  if (precomputed) return precomputed;
+  // Daily: use cron-collected data from keyword_trend_daily
+  if (period === "daily") {
+    const precomputed = await fetchFromTrendDaily();
+    if (precomputed) return precomputed;
+  }
 
-  // Fallback: live DataLab calculation (legacy)
+  // Monthly or daily fallback: live DataLab calculation
   return fetchLiveFallback(period);
 }
 
-async function fetchFromTrendDaily(
-  period: "daily" | "monthly"
-): Promise<TrendingResponse | null> {
+async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
   const supabase = await createServerClient();
 
   // Find the latest recorded date
@@ -124,7 +124,7 @@ async function fetchFromTrendDaily(
     newsLink: row.news_link ?? null,
   }));
 
-  return { period, keywords };
+  return { period: "daily", keywords };
 }
 
 // ---------------------------------------------------------------------------
