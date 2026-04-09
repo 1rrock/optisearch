@@ -8,6 +8,8 @@ import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { saveSearchHistory } from "@/services/history-service";
+import { getVolumeMapFromCorpusOrSearchAd } from "@/services/keyword-service";
+import { createServerClient } from "@/shared/lib/supabase";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -87,16 +89,31 @@ export async function POST(request: Request) {
 
     // Reverse-estimate volume for censored keywords
     if (totalSearchVolume === 0) {
-      const estimated = await estimateVolumeFromDataLab(effectiveKeyword, async () => {
-        const refStats = await getKeywordStats(["네이버"]);
-        const ref = refStats[0];
-        return { pc: ref?.monthlyPcQcCnt ?? 0, mobile: ref?.monthlyMobileQcCnt ?? 0 };
-      });
-      if (estimated) {
-        pcSearchVolume = estimated.pcSearchVolume;
-        mobileSearchVolume = estimated.mobileSearchVolume;
-        totalSearchVolume = estimated.totalSearchVolume;
-        isEstimated = true;
+      // 1. Check keyword_corpus first — may have historical volume from before censorship
+      const supabase = await createServerClient();
+      const { data: corpusRow } = await supabase
+        .from("keyword_corpus")
+        .select("pc_volume, mobile_volume")
+        .eq("keyword", effectiveKeyword)
+        .single();
+
+      if (corpusRow && (corpusRow.pc_volume > 0 || corpusRow.mobile_volume > 0)) {
+        pcSearchVolume = corpusRow.pc_volume;
+        mobileSearchVolume = corpusRow.mobile_volume;
+        totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+        isEstimated = true; // still flagged as estimated (historical, not current)
+      } else {
+        // 2. Fall back to DataLab estimation, using corpus for reference volumes too
+        const estimated = await estimateVolumeFromDataLab(
+          effectiveKeyword,
+          (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase)
+        );
+        if (estimated) {
+          pcSearchVolume = estimated.pcSearchVolume;
+          mobileSearchVolume = estimated.mobileSearchVolume;
+          totalSearchVolume = estimated.totalSearchVolume;
+          isEstimated = true;
+        }
       }
     }
 

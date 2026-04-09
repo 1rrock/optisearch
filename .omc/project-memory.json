@@ -1,13 +1,197 @@
 {
-  "techStack": [],
-  "build": [],
-  "conventions": [],
-  "structure": [],
-  "notes": [
+  "version": "1.0.0",
+  "lastScanned": 1775698812786,
+  "projectRoot": "/Users/1rrock/opencodeproject/optisearch",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "next",
+        "version": "16.2.2",
+        "category": "fullstack"
+      },
+      {
+        "name": "react",
+        "version": "19.2.4",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "19.2.4",
+        "category": "frontend"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start",
+      "lint": "eslint"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": "ES modules",
+    "testPattern": null,
+    "fileOrganization": "feature-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 10,
+      "lastAccessed": 1775698812621,
+      "keyFiles": [
+        "android-chrome-192x192.png",
+        "android-chrome-512x512.png",
+        "apple-touch-icon.png",
+        "favicon-16x16.png",
+        "favicon-32x32.png"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1775698812623,
+      "keyFiles": [
+        "auth.ts",
+        "proxy.ts"
+      ]
+    },
+    "supabase": {
+      "path": "supabase",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1775698812632,
+      "keyFiles": [
+        "migration-001-fix-auth-user-id.sql",
+        "migration-002-keyword-corpus.sql",
+        "migration-003-users-id-text.sql"
+      ]
+    },
+    "temp-files": {
+      "path": "temp-files",
+      "purpose": null,
+      "fileCount": 7,
+      "lastAccessed": 1775698812635,
+      "keyFiles": [
+        "bulk_analysis_raw.html",
+        "draft_raw.html",
+        "extract-blackkiwi-pricing.cjs",
+        "extract-blackkiwi-pricing.mjs",
+        "landing_raw.html"
+      ]
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 7,
+      "lastAccessed": 1775698812636,
+      "keyFiles": [
+        "global-error.tsx",
+        "globals.css",
+        "layout.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 0,
+      "lastAccessed": 1775698812637,
+      "keyFiles": []
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 1,
+      "lastAccessed": 1775698812637,
+      "keyFiles": [
+        "quota.ts"
+      ]
+    },
+    "src/services": {
+      "path": "src/services",
+      "purpose": "Business logic services",
+      "fileCount": 10,
+      "lastAccessed": 1775698812637,
+      "keyFiles": [
+        "ai-service.ts",
+        "cache-service.ts",
+        "history-service.ts"
+      ]
+    },
+    "supabase/migrations": {
+      "path": "supabase/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 3,
+      "lastAccessed": 1775698812638,
+      "keyFiles": [
+        "20260406_webhook_events.sql",
+        "20260408_rank_tracking.sql",
+        "20260409_trend_daily.sql"
+      ]
+    }
+  },
+  "hotPaths": [
     {
-      "date": "2026-04-07",
-      "content": "Optisearch system remediation was successfully completed: Paddle webhooks made idempotent, API errors standardized, FSD boundary `shared` enforced, client WordCloud optimized"
+      "path": "src/shared/lib/naver-datalab.ts",
+      "accessCount": 7,
+      "lastAccessed": 1775698963334,
+      "type": "file"
+    },
+    {
+      "path": "src/services/keyword-service.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775698984163,
+      "type": "file"
+    },
+    {
+      "path": "src/app/api/analyze/quick/route.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775698998123,
+      "type": "file"
+    },
+    {
+      "path": "src/shared/lib/naver-searchad.ts",
+      "accessCount": 1,
+      "lastAccessed": 1775698821014,
+      "type": "file"
     }
   ],
-  "directives": []
+  "userDirectives": []
 }

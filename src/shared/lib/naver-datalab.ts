@@ -378,13 +378,19 @@ export async function getShoppingAgeTrend(
 // Censored keyword volume estimation via DataLab reverse-calculation
 // ---------------------------------------------------------------------------
 
-/** Reference keyword with known stable search volume from SearchAd */
-const REFERENCE_KEYWORD = "네이버";
+/** Tiered reference keywords with known stable search volumes from SearchAd (~5K / ~30K / ~100K / ~500K) */
+const REFERENCE_POOL = ["볼보", "제주도맛집", "날씨", "로또"];
 
-/** Cached reference keyword volume (singleton promise pattern to prevent race conditions) */
-let refVolumeCache: { pc: number; mobile: number; fetchedAt: number } | null = null;
-let refVolumePending: Promise<{ pc: number; mobile: number }> | null = null;
+/** Cached reference keyword volumes (Map-based, singleton promise pattern) */
+const refVolumeCache = new Map<string, { pc: number; mobile: number; fetchedAt: number }>();
+let refVolumePending: Promise<void> | null = null;
 const REF_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+/** Moving average period in months for seasonality correction */
+const MOVING_AVG_MONTHS = 3;
+
+/** DataLab API allows max 5 keyword groups per request (target + references) */
+const MAX_DATALAB_GROUPS = 5;
 
 export interface EstimatedVolume {
   pcSearchVolume: number;
@@ -394,61 +400,180 @@ export interface EstimatedVolume {
 }
 
 /**
+ * Calculate moving average of DataLab ratios, excluding months with ratio=0
+ * to prevent under-estimation from censored/missing data points.
+ */
+function calcMovingAverage(data: TrendDataPoint[], months: number): number {
+  const recent = data.slice(-months).filter(d => d.ratio > 0);
+  if (recent.length === 0) return 0;
+  return recent.reduce((sum, d) => sum + d.ratio, 0) / recent.length;
+}
+
+/**
+ * Select the best reference keyword by finding the one with the most stable
+ * proportional relationship (lowest coefficient of variation) to the target.
+ * Skips months where either ratio is 0 to avoid division-by-zero.
+ * Requires at least 3 valid data points per reference.
+ */
+function selectBestReference(
+  targetData: TrendDataPoint[],
+  refResults: { keyword: string; data: TrendDataPoint[] }[]
+): { keyword: string; data: TrendDataPoint[] } | null {
+  let bestRef: (typeof refResults)[0] | null = null;
+  let bestCV = Infinity;
+
+  for (const ref of refResults) {
+    // Build pairs by matching on period string (not index) to handle misaligned data
+    const refMap = new Map(ref.data.map(d => [d.period, d.ratio]));
+    const pairs = targetData
+      .map(t => ({ t: t.ratio, r: refMap.get(t.period) ?? 0 }))
+      .filter(p => p.t > 0 && p.r > 0);
+
+    // Require at least 3 valid months for meaningful CV
+    if (pairs.length < 3) continue;
+
+    const ratios = pairs.map(p => p.t / p.r);
+    const mean = ratios.reduce((s, v) => s + v, 0) / ratios.length;
+    if (mean === 0) continue;
+
+    const variance = ratios.reduce((s, v) => s + (v - mean) ** 2, 0) / ratios.length;
+    const cv = Math.sqrt(variance) / mean;
+
+    if (cv < bestCV) {
+      bestCV = cv;
+      bestRef = ref;
+    }
+  }
+
+  return bestRef;
+}
+
+/**
+ * Ensure all reference keyword volumes are loaded and cached.
+ * Uses singleton promise pattern to prevent concurrent fetches.
+ */
+async function ensureRefVolumesLoaded(
+  getVolumes: (keywords: string[]) => Promise<Map<string, { pc: number; mobile: number }>>
+): Promise<boolean> {
+  const now = Date.now();
+  const allFresh = REFERENCE_POOL.every(ref => {
+    const cached = refVolumeCache.get(ref);
+    return cached && now - cached.fetchedAt < REF_CACHE_TTL;
+  });
+  if (allFresh) return true;
+
+  if (!refVolumePending) {
+    refVolumePending = (async () => {
+      const staleKeywords = REFERENCE_POOL
+        .filter(ref => {
+          const cached = refVolumeCache.get(ref);
+          return !cached || Date.now() - cached.fetchedAt >= REF_CACHE_TTL;
+        });
+
+      const volumes = await getVolumes(staleKeywords);
+      for (const [kw, vol] of volumes) {
+        if (vol.pc > 0 || vol.mobile > 0) {
+          refVolumeCache.set(kw, { ...vol, fetchedAt: Date.now() });
+        }
+      }
+    })().finally(() => { refVolumePending = null; });
+  }
+
+  try { await refVolumePending; } catch { return false; }
+
+  // Verify at least one reference has a non-stale cache entry
+  return REFERENCE_POOL.some(ref => {
+    const cached = refVolumeCache.get(ref);
+    return cached && Date.now() - cached.fetchedAt < REF_CACHE_TTL;
+  });
+}
+
+/**
  * Estimate search volume for a keyword that SearchAd reports as 0 (censored).
- * Compares the target keyword's DataLab relative ratio against a reference keyword
- * with known absolute volume.
+ * Uses tiered multi-reference system with 3-month moving average for accuracy.
  *
- * DataLab cost: 1 call (+ 0–1 for reference keyword SearchAd lookup, cached 24h).
+ * Algorithm:
+ * 1. Load reference keyword volumes from SearchAd (cached 24h)
+ * 2. Call DataLab with target + 4 reference keywords (1 API call, 5 groups)
+ * 3. Select best reference by coefficient of variation (most stable ratio)
+ * 4. Calculate 3-month moving average for seasonality correction
+ * 5. Estimate target volume using scale factor from best reference
+ *
+ * DataLab cost: 1 call (+ 0–1 for reference keywords SearchAd lookup, cached 24h).
  * Returns null if estimation is not possible.
  */
 export async function estimateVolumeFromDataLab(
   targetKeyword: string,
-  getRefVolume: () => Promise<{ pc: number; mobile: number }>
+  getRefVolumes: (keywords: string[]) => Promise<Map<string, { pc: number; mobile: number }>>
 ): Promise<EstimatedVolume | null> {
-  // 1. Get reference keyword absolute volume (singleton promise to prevent race conditions)
-  if (!refVolumeCache || Date.now() - refVolumeCache.fetchedAt > REF_CACHE_TTL) {
-    if (!refVolumePending) {
-      refVolumePending = getRefVolume().finally(() => { refVolumePending = null; });
-    }
-    try {
-      const vol = await refVolumePending;
-      if (vol.pc === 0 && vol.mobile === 0) return null;
-      refVolumeCache = { ...vol, fetchedAt: Date.now() };
-    } catch {
-      return null;
-    }
+  // 1. Load reference keyword volumes (cached, singleton promise)
+  const loaded = await ensureRefVolumesLoaded(getRefVolumes);
+  if (!loaded) {
+    console.warn("[datalab] Failed to load reference keyword volumes");
+    return null;
   }
 
-  // 2. Call DataLab with both reference and target keyword
+  // 2. Call DataLab with target + all reference keywords (1 call, 5 groups max)
   const endDate = new Date();
   const startDate = new Date();
   startDate.setMonth(startDate.getMonth() - 12);
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
   try {
+    // Guard: DataLab allows max 5 groups; use at most (MAX_DATALAB_GROUPS - 1) references
+    const refsToUse = REFERENCE_POOL.slice(0, MAX_DATALAB_GROUPS - 1);
+
     const response = await postDatalab<SearchTrendResponse>("/search", {
       startDate: fmt(startDate),
       endDate: fmt(endDate),
       timeUnit: "month",
       keywordGroups: [
-        { groupName: "ref", keywords: [REFERENCE_KEYWORD] },
         { groupName: "target", keywords: [targetKeyword] },
+        ...refsToUse.map((ref, i) => ({
+          groupName: `ref${i}`,
+          keywords: [ref],
+        })),
       ],
     });
 
-    const refResult = response.results.find((r) => r.title === "ref");
     const targetResult = response.results.find((r) => r.title === "target");
-    if (!refResult?.data?.length || !targetResult?.data?.length) return null;
+    if (!targetResult?.data?.length) return null;
 
-    // 3. Use last month's ratio for estimation
-    const refRatio = refResult.data[refResult.data.length - 1]?.ratio ?? 0;
-    const targetRatio = targetResult.data[targetResult.data.length - 1]?.ratio ?? 0;
+    // Build reference results array (only those with cached volumes)
+    const refResults = refsToUse
+      .map((ref, i) => {
+        const result = response.results.find((r) => r.title === `ref${i}`);
+        return result?.data?.length ? { keyword: ref, data: result.data } : null;
+      })
+      .filter((r): r is { keyword: string; data: TrendDataPoint[] } => r !== null);
 
-    if (refRatio === 0 || targetRatio === 0) return null;
+    if (refResults.length === 0) {
+      console.warn("[datalab] No valid reference data from DataLab for:", targetKeyword);
+      return null;
+    }
 
-    const scale = targetRatio / refRatio;
-    const estPc = Math.round(refVolumeCache.pc * scale);
-    const estMobile = Math.round(refVolumeCache.mobile * scale);
+    // 3. Select best reference by CV (coefficient of variation)
+    const bestRef = selectBestReference(targetResult.data, refResults);
+    if (!bestRef) {
+      console.warn("[datalab] No suitable reference found for:", targetKeyword);
+      return null;
+    }
+
+    // 4. Calculate 3-month moving average for both target and reference
+    const targetAvg = calcMovingAverage(targetResult.data, MOVING_AVG_MONTHS);
+    const refAvg = calcMovingAverage(bestRef.data, MOVING_AVG_MONTHS);
+    if (refAvg === 0 || targetAvg === 0) return null;
+
+    // 5. Estimate using scale factor
+    const refVolume = refVolumeCache.get(bestRef.keyword);
+    if (!refVolume) {
+      console.warn("[datalab] Reference volume cache miss for:", bestRef.keyword);
+      return null;
+    }
+
+    const scale = targetAvg / refAvg;
+    const estPc = Math.round(refVolume.pc * scale);
+    const estMobile = Math.round(refVolume.mobile * scale);
 
     return {
       pcSearchVolume: estPc,

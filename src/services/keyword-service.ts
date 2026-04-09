@@ -10,6 +10,7 @@ import {
   searchNews,
 } from "@/shared/lib/naver-search";
 import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
+import { createServerClient } from "@/shared/lib/supabase";
 import type {
   KeywordSearchResult,
   RelatedKeyword,
@@ -18,6 +19,44 @@ import type {
 } from "@/entities/keyword/model/types";
 import { gradeFromScore, getSaturationThreshold } from "@/shared/config/constants";
 import { cached, CacheKeys, CacheTTL } from "@/services/cache-service";
+
+// ---------------------------------------------------------------------------
+// Shared volume lookup helper (corpus-first, SearchAd fallback)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a volume map for the given keywords by checking keyword_corpus first,
+ * then falling back to SearchAd for any corpus misses.
+ * Used as the getRefVolumes callback for estimateVolumeFromDataLab.
+ */
+export async function getVolumeMapFromCorpusOrSearchAd(
+  keywords: string[],
+  supabase: Awaited<ReturnType<typeof createServerClient>>
+): Promise<Map<string, { pc: number; mobile: number }>> {
+  const result = new Map<string, { pc: number; mobile: number }>();
+
+  const { data: corpusRows } = await supabase
+    .from("keyword_corpus")
+    .select("keyword, pc_volume, mobile_volume")
+    .in("keyword", keywords);
+
+  const corpusHits = new Set<string>();
+  for (const row of (corpusRows ?? []) as Array<{ keyword: string; pc_volume: number; mobile_volume: number }>) {
+    if (row.pc_volume > 0 || row.mobile_volume > 0) {
+      result.set(row.keyword, { pc: row.pc_volume, mobile: row.mobile_volume });
+      corpusHits.add(row.keyword);
+    }
+  }
+
+  const remaining = keywords.filter(k => !corpusHits.has(k));
+  if (remaining.length > 0) {
+    const stats = await getKeywordStats(remaining);
+    for (const stat of stats) {
+      result.set(stat.relKeyword, { pc: stat.monthlyPcQcCnt, mobile: stat.monthlyMobileQcCnt });
+    }
+  }
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -98,11 +137,26 @@ export async function analyzeKeyword(
 
     // Reverse-estimate volume for censored keywords (SearchAd returns 0)
     if (totalSearchVolume === 0) {
-      const estimated = await estimateVolumeFromDataLab(keyword, async () => {
-        const refStats = await getKeywordStats(["네이버"]);
-        const ref = refStats[0];
-        return { pc: ref?.monthlyPcQcCnt ?? 0, mobile: ref?.monthlyMobileQcCnt ?? 0 };
-      });
+      // 1. Check keyword_corpus first — may have historical volume from before censorship
+      const supabase = await createServerClient();
+      const { data: corpusRow } = await supabase
+        .from("keyword_corpus")
+        .select("pc_volume, mobile_volume")
+        .eq("keyword", keyword)
+        .single();
+
+      if (corpusRow && (corpusRow.pc_volume > 0 || corpusRow.mobile_volume > 0)) {
+        pcSearchVolume = corpusRow.pc_volume;
+        mobileSearchVolume = corpusRow.mobile_volume;
+        totalSearchVolume = pcSearchVolume + mobileSearchVolume;
+        isEstimated = true;
+      }
+
+      // 2. Fall back to DataLab estimation if corpus miss
+      const estimated = totalSearchVolume === 0
+        ? await estimateVolumeFromDataLab(keyword, (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase))
+        : null;
+
       if (estimated) {
         pcSearchVolume = estimated.pcSearchVolume;
         mobileSearchVolume = estimated.mobileSearchVolume;
