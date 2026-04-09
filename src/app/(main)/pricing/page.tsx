@@ -1,38 +1,12 @@
 "use client";
 
-import { useSession } from "next-auth/react";
 import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
-import { useUserStore } from "@/shared/stores/user-store";
 import { CheckCircle2, X } from "lucide-react";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { toast } from "sonner";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
-
-declare global {
-  interface Window {
-    AUTHNICE?: {
-      requestPay: (params: {
-        clientId: string;
-        method: string;
-        orderId: string;
-        amount: number;
-        goodsName: string;
-        returnUrl: string;
-        mallReserved?: string;
-        fnError?: (result: { msg?: string; errorMsg?: string }) => void;
-      }) => void;
-    };
-  }
-}
-
-const PLAN_AMOUNT_MAP: Record<string, number> = {
-  basic: 9900,
-  pro: 29000,
-};
 
 type FeatureValue = string | boolean;
 
@@ -193,79 +167,18 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
 }
 
 export default function PricingPage() {
-  return (
-    <Suspense>
-      <PricingContent />
-    </Suspense>
-  );
+  return <PricingContent />;
 }
 
 function PricingContent() {
   const { isAuthenticated } = useIsAuthenticated();
   const userPlan = useUserPlan();
-  const { data: session } = useSession();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
-  // 결제 결과 처리 (리다이렉트 후 에러 파라미터 체크)
-  useEffect(() => {
-    const error = searchParams.get("error");
-    const msg = searchParams.get("msg");
-    if (error) {
-      const messages: Record<string, string> = {
-        auth_failed: "카드 인증에 실패했습니다.",
-        signature_failed: "결제 검증에 실패했습니다. 다시 시도해주세요.",
-        invalid_order: "잘못된 주문 정보입니다.",
-        amount_mismatch: "결제 금액이 일치하지 않습니다.",
-        payment_failed: "결제 처리에 실패했습니다.",
-        db_failed: "결제는 완료되었으나 플랜 업데이트에 실패했습니다. 고객센터로 문의해주세요.",
-        server_error: "서버 오류가 발생했습니다.",
-      };
-      toast.error(messages[error] ?? msg ?? "결제 중 오류가 발생했습니다.");
-      // URL에서 에러 파라미터 제거
-      router.replace("/pricing");
-    }
-  }, [searchParams, router]);
-
   const handleSubscribe = (planId: PlanId) => {
     if (planId === "free") return;
-
-    if (!isAuthenticated) {
-      toast.error("로그인이 필요합니다.");
-      window.location.href = "/login?callbackUrl=/pricing";
-      return;
-    }
-
-    if (!window.AUTHNICE) {
-      toast.error("결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.");
-      return;
-    }
-
-    const amount = PLAN_AMOUNT_MAP[planId];
-    if (!amount) {
-      toast.error("가격 정보를 찾을 수 없습니다.");
-      return;
-    }
-
-    const userId = session?.user?.id ?? "";
-    // orderId 최대 64자 제한 — userId 해시 8자 + timestamp로 압축
-    const userHash = userId.split("").reduce((h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0).toString(36).replace("-", "n");
-    const orderId = `os_${planId}_${userHash}_${Date.now()}`;
-
-    window.AUTHNICE.requestPay({
-      clientId: process.env.NEXT_PUBLIC_NICEPAY_CLIENT_ID ?? "",
-      method: "card",
-      orderId,
-      amount,
-      goodsName: `옵티써치 ${PLAN_PRICING[planId].label} 플랜`,
-      returnUrl: `${window.location.origin}/api/nicepay/callback`,
-      mallReserved: userId,
-      fnError: (result) => {
-        toast.error(`결제 오류: ${result.msg ?? result.errorMsg ?? "알 수 없는 오류"}`);
-      },
-    });
+    toast.info("결제 시스템 준비 중입니다. 곧 서비스가 오픈됩니다!");
   };
 
   return (
