@@ -145,7 +145,7 @@ async function fetchLiveFallback(
   if (period === "daily") {
     startDate = formatDate(new Date(now.getTime() - 30 * 86400000));
   } else {
-    startDate = formatDate(new Date(now.getFullYear(), now.getMonth() - 3, 1));
+    startDate = formatDate(new Date(now.getFullYear(), now.getMonth() - 6, 1));
   }
   const endDate = formatDate(now);
 
@@ -218,13 +218,16 @@ function calculateChangeRate(
   if (period === "daily") {
     return calculateDailyChangeRate(data);
   }
-  // Monthly: compare last month vs previous month
-  const recent = data.slice(-1);
-  const previous = data.slice(-2, -1);
-  if (recent.length === 0 || previous.length === 0) return null;
+  // Monthly: compare last 2 COMPLETE months (skip current partial month)
+  // DataLab returns e.g. [Jan, Feb, Mar, Apr(partial)] — skip Apr, compare Mar vs Feb
+  if (data.length < 3) return null;
+  const complete = data.slice(0, -1); // drop current partial month
+  const recent = complete[complete.length - 1];
+  const previous = complete[complete.length - 2];
+  if (!recent || !previous) return null;
 
-  const recentRatio = recent[0].ratio;
-  const prevRatio = previous[0].ratio;
+  const recentRatio = recent.ratio;
+  const prevRatio = previous.ratio;
   if (prevRatio === 0) return recentRatio > 0 ? 100 : 0;
   return ((recentRatio - prevRatio) / prevRatio) * 100;
 }
