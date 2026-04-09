@@ -217,8 +217,8 @@ export async function GET(request: Request) {
       ]);
     }
 
-    // 7. Clean up old data (> 7 days)
-    const cutoff = getKSTDateString(new Date(Date.now() - 7 * 86400000));
+    // 7. Clean up old data (> 35 days) — keep 35 days for 30-day rolling window
+    const cutoff = getKSTDateString(new Date(Date.now() - 35 * 86400000));
 
     await supabase
       .from("keyword_trend_daily")
