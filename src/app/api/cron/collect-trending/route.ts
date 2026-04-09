@@ -5,6 +5,8 @@ import { getDynamicTrendingSeeds } from "@/shared/config/trending-seeds";
 import { searchNewsNoRetry } from "@/shared/lib/naver-search";
 import { formatDate, stripHtmlTags } from "@/shared/lib/utils";
 import { getKSTDateString, calculateDailyChangeRate } from "@/shared/lib/date-utils";
+import { cache } from "@/services/cache-service";
+import { getRedis } from "@/shared/lib/redis";
 
 /** Wall-clock guard: skip news enrichment if elapsed exceeds this. */
 const NEWS_ENRICHMENT_DEADLINE_MS = 45_000;
@@ -204,7 +206,18 @@ export async function GET(request: Request) {
       }
     }
 
-    // 6. Clean up old data (> 7 days)
+    // 6. Invalidate trending cache so API serves fresh data
+    cache.delete("trending:daily");
+    cache.delete("trending:monthly");
+    const redis = getRedis();
+    if (redis) {
+      await Promise.allSettled([
+        redis.del("trending:daily"),
+        redis.del("trending:monthly"),
+      ]);
+    }
+
+    // 7. Clean up old data (> 7 days)
     const cutoff = getKSTDateString(new Date(Date.now() - 7 * 86400000));
 
     await supabase
