@@ -78,8 +78,8 @@ export async function POST(request: Request) {
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
     let isEstimated = false;
 
-    // Reverse-estimate volume for censored keywords
-    if (totalSearchVolume === 0) {
+    // Reverse-estimate volume for censored keywords (SearchAd returns 0 or 10/10 floors)
+    if (totalSearchVolume <= 20) {
       // 1. Check keyword_corpus first — may have historical volume from before censorship
       const supabase = await createServerClient();
       const { data: corpusRow } = await supabase

@@ -10,7 +10,7 @@ export { recordUsage };
  */
 export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
   // Dev bypass — use pre-created dev profile from DB (production에서는 절대 활성화 금지)
-  if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production") {
+  if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const { DEV_USER } = await import("@/shared/lib/dev-auth");
     try {
       const { createServerClient } = await import("@/shared/lib/supabase");

@@ -17,7 +17,6 @@ import {
   LogOut,
   Settings,
   Bookmark,
-  CreditCard,
   Menu,
   Zap,
 } from "lucide-react";
@@ -54,7 +53,6 @@ const NAV_ITEMS = [
   },
   {
     section: "계정", items: [
-      { href: "/pricing", icon: CreditCard, label: "요금제" },
       { href: "/settings", icon: Settings, label: "설정" },
     ]
   },

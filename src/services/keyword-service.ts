@@ -135,8 +135,8 @@ export async function analyzeKeyword(
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
     let isEstimated = false;
 
-    // Reverse-estimate volume for censored keywords (SearchAd returns 0)
-    if (totalSearchVolume === 0) {
+    // Reverse-estimate volume for censored keywords or anomalies (SearchAd returns 0, 10/10 floors, or suspicious lows)
+    if (totalSearchVolume <= 20 || (totalSearchVolume < 500 && blogPostCount > 50000)) {
       // 1. Check keyword_corpus first — may have historical volume from before censorship
       const supabase = await createServerClient();
       const { data: corpusRow } = await supabase

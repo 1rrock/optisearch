@@ -15,7 +15,7 @@ export async function GET() {
     const { data: profile, error } = await supabase
       .from("user_profiles")
       .select("plan")
-      .eq("auth_user_id", user.userId)
+      .eq("id", user.userId)
       .single();
 
     if (error) {

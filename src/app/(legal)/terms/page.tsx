@@ -85,11 +85,7 @@ export default function TermsPage() {
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>유료 플랜 이용 요금은 결제일 기준 월 단위로 청구됩니다.</li>
           <li>
-            디지털 콘텐츠 서비스 특성상, 결제 후 서비스를 이용하기 시작한 경우 「전자상거래 등에서의 소비자보호에 관한 법률」
-            제17조에 따라 청약 철회가 제한될 수 있습니다.
-          </li>
-          <li>
-            결제 후 14일 이내이며 서비스를 실질적으로 이용하지 않은 경우, 환불을 요청할 수 있습니다.
+            결제일로부터 30일 이내에는 사유에 관계없이 전액 환불을 요청할 수 있습니다.
             환불 요청은 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 문의하시기 바랍니다.
           </li>
           <li>구독 취소 후에는 해당 결제 기간 종료 시까지 서비스를 이용할 수 있으며, 이후 무료 플랜으로 전환됩니다.</li>
@@ -172,7 +168,7 @@ export default function TermsPage() {
           문의사항이 있으시면 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 연락해 주세요.
         </p>
         <div className="text-xs text-muted-foreground space-y-0.5">
-          <p>상호: 알에이케이랩스 | 사업자등록번호: 570-01-03731 | 대표자: 최원락</p>
+          <p>상호: 알에이케이랩스 (OptiSearch) | 사업자등록번호: 570-01-03731 | 대표자: 최원락</p>
         </div>
       </div>
     </article>

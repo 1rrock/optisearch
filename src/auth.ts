@@ -1,5 +1,5 @@
 import NextAuth from "next-auth"
-import Naver from "next-auth/providers/naver"
+import Google from "next-auth/providers/google"
 import Kakao from "next-auth/providers/kakao"
 import type { NextAuthConfig } from "next-auth"
 import type { JWT } from "@auth/core/jwt"
@@ -20,9 +20,9 @@ declare module "@auth/core/jwt" {
 // ---------------------------------------------------------------------------
 const config: NextAuthConfig = {
   providers: [
-    Naver({
-      clientId: process.env.AUTH_NAVER_ID!,
-      clientSecret: process.env.AUTH_NAVER_SECRET!,
+    Google({
+      clientId: process.env.AUTH_GOOGLE_ID!,
+      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
     }),
     Kakao({
       clientId: process.env.KAKAO_CLIENT_ID!,
@@ -49,12 +49,11 @@ const config: NextAuthConfig = {
       if (account && profile) {
         const provider = account.provider
 
-        if (provider === "naver") {
-          const naverProfile = (profile as any).response ?? profile
-          token.providerId = `naver_${naverProfile.id ?? account.providerAccountId}`
-          token.name = naverProfile.name ?? naverProfile.nickname ?? token.name
-          token.email = naverProfile.email ?? token.email
-          token.picture = naverProfile.profile_image ?? token.picture
+        if (provider === "google") {
+          token.providerId = `google_${account.providerAccountId}`
+          token.name = profile.name ?? token.name
+          token.email = profile.email ?? token.email
+          token.picture = (profile as any).picture ?? token.picture
         } else if (provider === "kakao") {
           token.providerId = `kakao_${account.providerAccountId}`
           const kakaoAccount = (profile as any).kakao_account
