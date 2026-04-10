@@ -1,55 +1,17 @@
 /**
- * Category-based seed keywords for trending detection.
- * DataLab compares recent ratio vs prior period to calculate velocity.
+ * Dynamic trending seed keywords for trending detection.
+ * Primary: Google Trends RSS discovery + keyword_corpus volume data.
+ * Fallback: Seasonal seeds when corpus is empty (bootstrap state).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getKSTDateString } from "@/shared/lib/date-utils";
 import { fetchGoogleTrendsRSS } from "@/shared/lib/google-trends-rss";
+import { getKeywordStats } from "@/shared/lib/naver-searchad";
+import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
 
-export interface TrendCategory {
-  name: string;
-  keywords: string[];
-}
-
-export const TRENDING_CATEGORIES: TrendCategory[] = [
-  {
-    name: "IT/테크",
-    keywords: ["아이폰", "갤럭시", "노트북추천", "태블릿", "AI", "챗GPT", "코딩", "블로그"],
-  },
-  {
-    name: "패션/뷰티",
-    keywords: ["봄옷코디", "원피스", "선크림", "향수추천", "네일아트", "헤어스타일", "운동화"],
-  },
-  {
-    name: "여행/레저",
-    keywords: ["국내여행", "해외여행", "제주도", "캠핑", "펜션", "항공권", "비행기표"],
-  },
-  {
-    name: "건강/운동",
-    keywords: ["다이어트", "헬스", "필라테스", "영양제", "프로바이오틱스", "단백질보충제", "러닝"],
-  },
-  {
-    name: "음식/맛집",
-    keywords: ["맛집추천", "카페추천", "배달음식", "밀키트", "레시피", "홈베이킹", "커피머신"],
-  },
-  {
-    name: "생활/경제",
-    keywords: ["부동산", "주식", "적금", "청약", "대출", "보험", "재테크", "연말정산"],
-  },
-  {
-    name: "교육/취업",
-    keywords: ["자격증", "공무원시험", "토익", "취업준비", "이력서", "자기소개서", "코딩테스트"],
-  },
-  {
-    name: "육아/가족",
-    keywords: ["유아용품", "이유식", "놀이공원", "키즈카페", "출산준비", "아기옷", "유모차"],
-  },
-];
-
-/** Flatten all category seeds into a single array. */
-export function getAllTrendingSeeds(): string[] {
-  return TRENDING_CATEGORIES.flatMap((cat) => cat.keywords);
+export interface TrendSeed {
+  keyword: string;
+  volume: number;
 }
 
 /** Maximum seed count to prevent unbounded DataLab quota consumption. */
@@ -59,70 +21,110 @@ const MAX_SEED_COUNT = 250;
 const MIN_RSS_KEYWORDS = 10;
 
 /**
- * Build dynamic trending seeds by combining external RSS trending keywords
- * (or static fallback seeds) with high-volume and recently discovered
- * keywords from keyword_corpus.
+ * Build dynamic trending seeds by combining Google Trends RSS discovery
+ * with high-volume and recently discovered keywords from keyword_corpus.
  *
- * Primary: Google Trends RSS daily trending keywords for Korea.
- * Fallback: Static category seeds (TRENDING_CATEGORIES) if RSS fails or
- *           returns fewer than MIN_RSS_KEYWORDS results.
+ * Returns TrendSeed[] with volume metadata for each keyword.
+ * Volume=0 seeds are filtered downstream by collect-trending.
  */
 export async function getDynamicTrendingSeeds(
   supabase: SupabaseClient
-): Promise<string[]> {
-  // 1. Try Google Trends RSS as primary seed source
-  let seedSet: Set<string>;
+): Promise<TrendSeed[]> {
+  // 1. Try Google Trends RSS as discovery source
+  let rssKeywords: string[] = [];
   try {
-    const rssKeywords = await fetchGoogleTrendsRSS();
-    if (rssKeywords.length >= MIN_RSS_KEYWORDS) {
-      seedSet = new Set<string>(rssKeywords);
+    const fetched = await fetchGoogleTrendsRSS();
+    if (fetched.length >= MIN_RSS_KEYWORDS) {
+      rssKeywords = fetched;
       console.log(`[trending-seeds] RSS source: ${rssKeywords.length} keywords`);
     } else {
       console.warn(
-        `[trending-seeds] RSS returned only ${rssKeywords.length} keywords (min: ${MIN_RSS_KEYWORDS}), using static fallback`
+        `[trending-seeds] RSS returned only ${fetched.length} keywords (min: ${MIN_RSS_KEYWORDS}), using empty RSS set`
       );
-      seedSet = new Set<string>(getAllTrendingSeeds());
     }
   } catch (err) {
     console.warn(
-      "[trending-seeds] RSS fetch failed, using static fallback:",
+      "[trending-seeds] RSS fetch failed, using empty RSS set:",
       err instanceof Error ? err.message : err
     );
-    seedSet = new Set<string>(getAllTrendingSeeds());
   }
 
-  // 2. Enrich with corpus keywords (parallel queries)
-  const threeDaysAgo = getKSTDateString(new Date(Date.now() - 3 * 86400000));
-
-  const [recentResult, topResult] = await Promise.allSettled([
+  // 2. Corpus enrichment: top 100 by volume + top 100 by recency
+  const [topVolumeResult, recentResult] = await Promise.allSettled([
     supabase
       .from("keyword_corpus")
-      .select("keyword")
-      .gte("first_seen_at", threeDaysAgo)
+      .select("keyword, total_volume")
       .order("total_volume", { ascending: false })
-      .limit(80),
+      .limit(100),
     supabase
       .from("keyword_corpus")
-      .select("keyword")
-      .order("total_volume", { ascending: false })
-      .limit(80),
+      .select("keyword, total_volume")
+      .order("first_seen_at", { ascending: false })
+      .limit(100),
   ]);
 
+  // Build corpusVolumeMap from corpus results
+  const corpusVolumeMap = new Map<string, number>();
+
+  if (topVolumeResult.status === "fulfilled" && topVolumeResult.value.data) {
+    for (const r of topVolumeResult.value.data as Array<{ keyword: string; total_volume: number }>) {
+      corpusVolumeMap.set(r.keyword, r.total_volume ?? 0);
+    }
+  } else if (topVolumeResult.status === "rejected") {
+    console.warn("[trending-seeds] Failed to fetch top-volume corpus keywords:", topVolumeResult.reason);
+  }
+
   if (recentResult.status === "fulfilled" && recentResult.value.data) {
-    for (const r of recentResult.value.data as Array<{ keyword: string }>) {
-      seedSet.add(r.keyword);
+    for (const r of recentResult.value.data as Array<{ keyword: string; total_volume: number }>) {
+      if (!corpusVolumeMap.has(r.keyword)) {
+        corpusVolumeMap.set(r.keyword, r.total_volume ?? 0);
+      }
     }
   } else if (recentResult.status === "rejected") {
-    console.warn("[trending-seeds] Failed to fetch recent keywords:", recentResult.reason);
+    console.warn("[trending-seeds] Failed to fetch recent corpus keywords:", recentResult.reason);
   }
 
-  if (topResult.status === "fulfilled" && topResult.value.data) {
-    for (const r of topResult.value.data as Array<{ keyword: string }>) {
-      seedSet.add(r.keyword);
+  // 3. Step 6: For RSS keywords NOT in corpus, fetch volume via SearchAd mini-batch
+  const rssOnly = rssKeywords.filter(kw => !corpusVolumeMap.has(kw));
+  if (rssOnly.length > 0) {
+    try {
+      const rssStats = await getKeywordStats(rssOnly.slice(0, 20));
+      for (const stat of rssStats) {
+        const pcVol = typeof stat.monthlyPcQcCnt === "number" ? stat.monthlyPcQcCnt : 0;
+        const mobileVol = typeof stat.monthlyMobileQcCnt === "number" ? stat.monthlyMobileQcCnt : 0;
+        const vol = pcVol + mobileVol;
+        if (vol > 0) {
+          corpusVolumeMap.set(stat.relKeyword, vol);
+        }
+      }
+      console.log(`[trending-seeds] SearchAd mini-batch: ${rssOnly.length} RSS-only keywords queried`);
+    } catch (err) {
+      console.warn("[trending-seeds] SearchAd mini-batch failed:", err instanceof Error ? err.message : err);
     }
-  } else if (topResult.status === "rejected") {
-    console.warn("[trending-seeds] Failed to fetch top keywords:", topResult.reason);
   }
 
-  return [...seedSet].slice(0, MAX_SEED_COUNT);
+  // 4. Bootstrap safeguard: if corpus empty AND RSS empty, use seasonal seeds
+  if (corpusVolumeMap.size === 0 && rssKeywords.length === 0) {
+    console.warn("[trending-seeds] Corpus and RSS both empty — using seasonal seeds as bootstrap fallback");
+    const currentMonth = new Date().getMonth() + 1;
+    const seasonalKeywords = getSeasonalSeeds(currentMonth);
+    return seasonalKeywords.slice(0, MAX_SEED_COUNT).map(keyword => ({ keyword, volume: 0 }));
+  }
+
+  // 5. Merge all keywords (RSS + corpus) into final TrendSeed[]
+  const allKeywords = new Set<string>([...rssKeywords, ...corpusVolumeMap.keys()]);
+  const seeds: TrendSeed[] = [];
+  for (const keyword of allKeywords) {
+    seeds.push({
+      keyword,
+      volume: corpusVolumeMap.get(keyword) ?? 0,
+    });
+  }
+
+  // Sort by volume descending for best quality seeds first
+  seeds.sort((a, b) => b.volume - a.volume);
+
+  console.log(`[trending-seeds] Total seeds: ${seeds.length} (RSS: ${rssKeywords.length}, corpus: ${corpusVolumeMap.size})`);
+
+  return seeds.slice(0, MAX_SEED_COUNT);
 }

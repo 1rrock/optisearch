@@ -1,6 +1,5 @@
 import { createServerClient } from "@/shared/lib/supabase";
 import { getRelatedKeywords } from "@/shared/lib/naver-searchad";
-import { getAllTrendingSeeds } from "@/shared/config/trending-seeds";
 import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
 import { getKSTDateString } from "@/shared/lib/date-utils";
 import { verifyCronAuth } from "@/shared/lib/cron-auth";
@@ -96,12 +95,7 @@ async function ensureTable() {
 async function collectSeeds(): Promise<string[]> {
   const seedSet = new Set<string>();
 
-  // Source 1: Trending category seeds
-  for (const kw of getAllTrendingSeeds()) {
-    seedSet.add(kw);
-  }
-
-  // Source 2: Current month seasonal seeds
+  // Source 1: Current month seasonal seeds
   const currentMonth = new Date().getMonth() + 1;
   for (const kw of getSeasonalSeeds(currentMonth)) {
     seedSet.add(kw);

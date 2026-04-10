@@ -1013,13 +1013,14 @@ function TrendingSectionWrapper() {
   const [order, setOrder] = useState<TrendingOrder>("desc");
   const [view, setView] = useState<TrendingView>("cloud");
 
-  const { data, isLoading } = useQuery<{ period: string; keywords: TrendingKw[] }>({
+  const { data, isLoading, isError } = useQuery<{ period: string; keywords: TrendingKw[]; lastUpdated?: string }>({
     queryKey: ["trending-keywords", period],
     queryFn: async () => {
       const res = await fetch(`/api/keywords/trending?period=${period}`);
       if (!res.ok) throw new Error("Failed to fetch trending keywords");
       return res.json();
     },
+    refetchInterval: 15 * 60 * 1000,
   });
 
   const rawKeywords = data?.keywords ?? [];
@@ -1049,10 +1050,17 @@ function TrendingSectionWrapper() {
     <div className="bg-gradient-to-br from-orange-50/50 to-amber-50/30 dark:from-orange-950/20 dark:to-amber-950/10 border border-muted/50 border-l-4 border-l-orange-500 rounded-2xl p-6 shadow-sm">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-        <h3 className="text-lg font-bold flex items-center gap-2">
-          <Flame className="size-5 text-orange-500" />
-          인기 급상승 키워드
-        </h3>
+        <div className="flex flex-col gap-0.5">
+          <h3 className="text-lg font-bold flex items-center gap-2">
+            <Flame className="size-5 text-orange-500" />
+            인기 급상승 키워드
+          </h3>
+          {data?.lastUpdated && (
+            <span className="text-xs text-muted-foreground">
+              마지막 업데이트: {new Date(data.lastUpdated + "T00:00:00+09:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {/* View toggle */}
           <div className="flex gap-1 bg-white/60 dark:bg-white/10 rounded-full p-0.5">
@@ -1105,6 +1113,11 @@ function TrendingSectionWrapper() {
       {isLoading ? (
         <div className="flex items-center justify-center py-10">
           <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-10 text-destructive text-sm">
+          <AlertCircle className="size-8 mb-2 opacity-50" />
+          데이터를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
         </div>
       ) : keywords.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-muted-foreground text-sm">

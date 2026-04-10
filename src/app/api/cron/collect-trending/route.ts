@@ -28,6 +28,17 @@ function sanitizeNewsUrl(url: string | undefined | null): string | null {
 }
 
 /**
+ * Compute composite ranking score combining change velocity and search volume.
+ * Formula: 0.6 * normalized|changeRate| + 0.4 * normalizedLogVolume
+ * Fixed bounds: changeRate capped at 200%, volume log10 capped at 7 (≈10M).
+ */
+function computeCompositeScore(changeRate: number, monthlyVolume: number): number {
+  const normalizedChangeRate = Math.min(Math.abs(changeRate), 200) / 200;
+  const normalizedLogVolume = Math.log10(monthlyVolume + 1) / 7;
+  return Math.round((normalizedChangeRate * 0.6 + normalizedLogVolume * 0.4) * 10000) / 10000;
+}
+
+/**
  * Vercel Cron job — runs daily to collect DataLab trend ratios
  * for dynamic seed keywords and store change rates.
  *
@@ -60,16 +71,26 @@ export async function GET(request: Request) {
       console.warn("[collect-trending] WARNING: collect-keywords may not have run today — corpus has no rows with last_seen_at = " + today);
     }
 
-    // 1. Collect dynamic seeds from corpus + static config
-    const seeds = await getDynamicTrendingSeeds(supabase);
-    console.log(`[collect-trending] ${seeds.length} dynamic seeds`);
+    // 1. Collect dynamic seeds from corpus + RSS discovery
+    const trendSeeds = await getDynamicTrendingSeeds(supabase);
+    const seedKeywords = trendSeeds.map(s => s.keyword);
+    const seedVolumeMap = new Map(trendSeeds.map(s => [s.keyword, s.volume]));
+
+    // Track seed stats for monitoring
+    const seedStats = {
+      totalSeeds: trendSeeds.length,
+      corpusSeeds: trendSeeds.filter(s => s.volume > 0).length,
+      rssSeeds: trendSeeds.filter(s => s.volume === 0).length,
+    };
+
+    console.log(`[collect-trending] ${trendSeeds.length} dynamic seeds`, seedStats);
 
     // 2. Fetch DataLab trends (14 days, daily granularity)
     const now = new Date();
     const startDate = formatDate(new Date(now.getTime() - 14 * 86400000));
     const endDate = formatDate(now);
 
-    const trendMap = await getSearchTrendBatch(seeds, {
+    const trendMap = await getSearchTrendBatch(seedKeywords, {
       startDate,
       endDate,
       timeUnit: "date",
@@ -78,26 +99,6 @@ export async function GET(request: Request) {
     console.log(`[collect-trending] DataLab returned ${trendMap.size} keywords`);
 
     // 3. Calculate change rates and build rows
-
-    // Fetch monthly volumes from corpus for estimatedDelta calculation
-    const corpusKeywords = [...trendMap.keys()];
-    const volumeMap = new Map<string, number>();
-
-    const CHUNK = 500;
-    for (let i = 0; i < corpusKeywords.length; i += CHUNK) {
-      const chunk = corpusKeywords.slice(i, i + CHUNK);
-      const { data } = await supabase
-        .from("keyword_corpus")
-        .select("keyword, total_volume")
-        .in("keyword", chunk);
-
-      if (data) {
-        for (const row of data as Array<{ keyword: string; total_volume: number }>) {
-          volumeMap.set(row.keyword, row.total_volume ?? 0);
-        }
-      }
-    }
-
     const rows: Array<{
       keyword: string;
       ratio_recent: number;
@@ -105,13 +106,20 @@ export async function GET(request: Request) {
       change_rate: number;
       monthly_volume: number;
       estimated_delta: number;
+      composite_score: number;
       recorded_date: string;
       news_title: string | null;
       news_link: string | null;
     }> = [];
 
+    let skippedForLength = 0;
+    let zeroVolumeDropped = 0;
+
     for (const [keyword, data] of trendMap) {
-      if (data.length < 4) continue;
+      if (data.length < 8) {
+        skippedForLength++;
+        continue;
+      }
 
       const changeRate = calculateDailyChangeRate(data);
       if (changeRate === null || Math.abs(changeRate) < 1) continue;
@@ -121,7 +129,13 @@ export async function GET(request: Request) {
       const recentAvg = recent.reduce((s, d) => s + d.ratio, 0) / recent.length;
       const prevAvg = previous.reduce((s, d) => s + d.ratio, 0) / (previous.length || 1);
 
-      const monthlyVolume = volumeMap.get(keyword) ?? 0;
+      const monthlyVolume = seedVolumeMap.get(keyword) ?? 0;
+
+      if (monthlyVolume === 0) {
+        zeroVolumeDropped++;
+        continue;
+      }
+
       const estimatedDelta = Math.round(
         (monthlyVolume * changeRate) / 100 / 30
       );
@@ -133,6 +147,7 @@ export async function GET(request: Request) {
         change_rate: Math.round(changeRate * 100) / 100,
         monthly_volume: monthlyVolume,
         estimated_delta: estimatedDelta,
+        composite_score: computeCompositeScore(changeRate, monthlyVolume),
         recorded_date: today,
         news_title: null,
         news_link: null,
@@ -194,6 +209,7 @@ export async function GET(request: Request) {
     }
 
     // 5. Upsert into keyword_trend_daily
+    const CHUNK = 500;
     let upserted = 0;
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK);
@@ -227,13 +243,31 @@ export async function GET(request: Request) {
       ]);
     }
 
+    // 8. Build quality stats for monitoring
+    const sortedRows = [...rows].sort((a, b) => b.composite_score - a.composite_score);
+    const scores = rows.map(r => r.composite_score);
+    const qualityStats = {
+      datalabResults: trendMap.size,
+      insufficientData: skippedForLength,
+      zeroVolumeDropped,
+      finalRows: rows.length,
+      avgVolume: rows.length > 0
+        ? Math.round(rows.reduce((s, r) => s + r.monthly_volume, 0) / rows.length)
+        : 0,
+      scoreRange: rows.length > 0
+        ? { min: Math.min(...scores), max: Math.max(...scores) }
+        : { min: 0, max: 0 },
+      top5: sortedRows.slice(0, 5).map(r => r.keyword),
+    };
+
     const elapsedSec = ((Date.now() - startTime) / 1000).toFixed(1);
     const stale = (freshCorpusCount ?? 0) === 0;
     const result = {
-      seeds: seeds.length,
-      datalabResults: trendMap.size,
+      seeds: trendSeeds.length,
+      seedStats,
       upserted,
       elapsed: `${elapsedSec}s`,
+      qualityStats,
       ...(stale && { stale: true }),
     };
 

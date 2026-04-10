@@ -2,7 +2,6 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getSearchTrendBatch } from "@/shared/lib/naver-datalab";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
-import { getAllTrendingSeeds } from "@/shared/config/trending-seeds";
 import { cached } from "@/services/cache-service";
 import { formatDate } from "@/shared/lib/utils";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
@@ -21,11 +20,12 @@ export interface TrendingKeywordItem {
 export interface TrendingResponse {
   period: "daily" | "monthly";
   keywords: TrendingKeywordItem[];
+  lastUpdated?: string;
 }
 
-// Daily: 1-hour cache (data changes once daily via cron)
+// Daily: 15-min cache (cron runs every 4h; stay within one cron window)
 // Monthly: 5-min cache (live DataLab calculation, avoid hammering API)
-const CACHE_TTL_DAILY = 60 * 60 * 1000;
+const CACHE_TTL_DAILY = 15 * 60 * 1000;  // 15 minutes
 const CACHE_TTL_MONTHLY = 5 * 60 * 1000;
 
 /**
@@ -93,11 +93,12 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
 
   const latestDate = (dateRow as Array<{ recorded_date: string }>)[0].recorded_date;
 
-  // Fetch only that date's data, sorted by absolute change
+  // Fetch that date's data, sorted by composite_score (NULLs last), fallback to |change_rate|
   const { data, error } = await supabase
     .from("keyword_trend_daily")
-    .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link")
+    .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link, composite_score")
     .eq("recorded_date", latestDate)
+    .order("composite_score", { ascending: false, nullsFirst: false })
     .limit(200);
 
   if (error || !data || data.length === 0) return null;
@@ -109,12 +110,18 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
     estimated_delta: number;
     news_title: string | null;
     news_link: string | null;
+    composite_score: number | null;
   };
 
-  // Sort by absolute change rate in JS (DB can't sort by ABS), take top 30
-  const sorted = (data as TrendRow[]).sort(
-    (a, b) => Math.abs(b.change_rate) - Math.abs(a.change_rate)
-  );
+  // DB sorts by composite_score; for NULL rows (pre-migration), fallback sort by |change_rate|
+  const sorted = (data as TrendRow[]).sort((a, b) => {
+    const sa = a.composite_score;
+    const sb = b.composite_score;
+    if (sa !== null && sb !== null) return sb - sa;
+    if (sa !== null) return -1;
+    if (sb !== null) return 1;
+    return Math.abs(b.change_rate) - Math.abs(a.change_rate);
+  });
 
   const keywords: TrendingKeywordItem[] = sorted.slice(0, 30).map((row) => ({
     keyword: row.keyword,
@@ -127,7 +134,7 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
     newsLink: row.news_link ?? null,
   }));
 
-  return { period: "daily", keywords };
+  return { period: "daily", keywords, lastUpdated: latestDate };
 }
 
 // ---------------------------------------------------------------------------
@@ -137,7 +144,16 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
 async function fetchLiveFallback(
   period: "daily" | "monthly"
 ): Promise<TrendingResponse> {
-  const allKeywords = getAllTrendingSeeds();
+  const supabase = await createServerClient();
+  const { data: corpusTop, error: corpusError } = await supabase
+    .from("keyword_corpus")
+    .select("keyword")
+    .order("total_volume", { ascending: false })
+    .limit(20);
+  if (corpusError) {
+    console.error("[trending] Corpus query failed:", corpusError.message);
+  }
+  const allKeywords = corpusTop?.map(r => r.keyword) ?? [];
   const now = new Date();
   const timeUnit = period === "daily" ? ("date" as const) : ("month" as const);
 
