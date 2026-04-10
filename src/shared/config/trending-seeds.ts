@@ -16,7 +16,7 @@ export interface TrendSeed {
 }
 
 /** Maximum seed count to prevent unbounded DataLab quota consumption. */
-const MAX_SEED_COUNT = 100;
+const MAX_SEED_COUNT = 50;
 
 /** Minimum RSS keywords required to use RSS as primary source. */
 const MIN_RSS_KEYWORDS = 10;
@@ -124,8 +124,12 @@ export async function getDynamicTrendingSeeds(
     });
   }
 
-  // Sort by volume descending for best quality seeds first
-  seeds.sort((a, b) => b.volume - a.volume);
+  // Partition: RSS seeds first (guaranteed inclusion), then corpus by volume
+  const rssSeeds = seeds.filter(s => s.source === "rss");
+  const corpusSeeds = seeds.filter(s => s.source === "corpus");
+  corpusSeeds.sort((a, b) => b.volume - a.volume);
+  seeds.length = 0;
+  seeds.push(...rssSeeds, ...corpusSeeds);
 
   console.log(`[trending-seeds] Total seeds: ${seeds.length} (RSS: ${rssKeywords.length}, corpus: ${corpusVolumeMap.size})`);
 
