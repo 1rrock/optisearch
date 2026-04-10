@@ -31,11 +31,22 @@ function sanitizeNewsUrl(url: string | undefined | null): string | null {
 
 /**
  * Compute composite ranking score combining change velocity and search volume.
- * Formula: 0.6 * normalized|changeRate| + 0.4 * normalizedLogVolume
+ *
+ * For keywords WITH volume (corpus):
+ *   0.6 * normalized|changeRate| + 0.4 * normalizedLogVolume
+ *
+ * For keywords WITHOUT volume (RSS news keywords):
+ *   changeRate-only score (volume weight = 0) so trending news topics
+ *   aren't penalized for lacking SearchAd volume data.
+ *
  * Fixed bounds: changeRate capped at 200%, volume log10 capped at 7 (≈10M).
  */
 function computeCompositeScore(changeRate: number, monthlyVolume: number): number {
   const normalizedChangeRate = Math.min(Math.abs(changeRate), 200) / 200;
+  if (monthlyVolume === 0) {
+    // RSS/news keywords: score purely on change velocity
+    return Math.round(normalizedChangeRate * 10000) / 10000;
+  }
   const normalizedLogVolume = Math.log10(monthlyVolume + 1) / 7;
   return Math.round((normalizedChangeRate * 0.6 + normalizedLogVolume * 0.4) * 10000) / 10000;
 }
@@ -77,12 +88,13 @@ export async function GET(request: Request) {
     const trendSeeds = await getDynamicTrendingSeeds(supabase);
     const seedKeywords = trendSeeds.map(s => s.keyword);
     const seedVolumeMap = new Map(trendSeeds.map(s => [s.keyword, s.volume]));
+    const seedSourceMap = new Map(trendSeeds.map(s => [s.keyword, s.source]));
 
     // Track seed stats for monitoring
     const seedStats = {
       totalSeeds: trendSeeds.length,
-      corpusSeeds: trendSeeds.filter(s => s.volume > 0).length,
-      rssSeeds: trendSeeds.filter(s => s.volume === 0).length,
+      corpusSeeds: trendSeeds.filter(s => s.source === "corpus").length,
+      rssSeeds: trendSeeds.filter(s => s.source === "rss").length,
     };
 
     console.log(`[collect-trending] ${trendSeeds.length} dynamic seeds`, seedStats);
@@ -132,15 +144,19 @@ export async function GET(request: Request) {
       const prevAvg = previous.reduce((s, d) => s + d.ratio, 0) / (previous.length || 1);
 
       const monthlyVolume = seedVolumeMap.get(keyword) ?? 0;
+      const isRssSource = seedSourceMap.get(keyword) === "rss";
 
-      if (monthlyVolume === 0) {
+      // Drop volume=0 corpus keywords (no search demand signal).
+      // RSS keywords pass regardless — they represent real-time trending topics
+      // that may lack SearchAd volume data (news figures, events, etc.).
+      if (monthlyVolume === 0 && !isRssSource) {
         zeroVolumeDropped++;
         continue;
       }
 
-      const estimatedDelta = Math.round(
-        (monthlyVolume * changeRate) / 100 / 30
-      );
+      const estimatedDelta = monthlyVolume > 0
+        ? Math.round((monthlyVolume * changeRate) / 100 / 30)
+        : 0;
 
       rows.push({
         keyword,

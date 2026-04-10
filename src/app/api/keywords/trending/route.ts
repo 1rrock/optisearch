@@ -93,12 +93,13 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
 
   const latestDate = (dateRow as Array<{ recorded_date: string }>)[0].recorded_date;
 
-  // Fetch that date's data, sorted by composite_score (NULLs last), fallback to |change_rate|
+  // Fetch that date's data, sorted by composite_score (NULLs last), fallback to |change_rate|.
+  // No volume filter — RSS-sourced trending keywords (news figures, events) may have
+  // volume=0 but are valid real-time trends ranked by composite_score.
   const { data, error } = await supabase
     .from("keyword_trend_daily")
     .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link, composite_score")
     .eq("recorded_date", latestDate)
-    .gt("monthly_volume", 0)
     .order("composite_score", { ascending: false, nullsFirst: false })
     .limit(200);
 

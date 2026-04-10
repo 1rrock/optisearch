@@ -12,6 +12,7 @@ import { getSeasonalSeeds } from "@/shared/config/seasonal-keywords";
 export interface TrendSeed {
   keyword: string;
   volume: number;
+  source: "rss" | "corpus";
 }
 
 /** Maximum seed count to prevent unbounded DataLab quota consumption. */
@@ -108,16 +109,18 @@ export async function getDynamicTrendingSeeds(
     console.warn("[trending-seeds] Corpus and RSS both empty — using seasonal seeds as bootstrap fallback");
     const currentMonth = new Date().getMonth() + 1;
     const seasonalKeywords = getSeasonalSeeds(currentMonth);
-    return seasonalKeywords.slice(0, MAX_SEED_COUNT).map(keyword => ({ keyword, volume: 0 }));
+    return seasonalKeywords.slice(0, MAX_SEED_COUNT).map(keyword => ({ keyword, volume: 0, source: "corpus" as const }));
   }
 
   // 5. Merge all keywords (RSS + corpus) into final TrendSeed[]
+  const rssSet = new Set(rssKeywords);
   const allKeywords = new Set<string>([...rssKeywords, ...corpusVolumeMap.keys()]);
   const seeds: TrendSeed[] = [];
   for (const keyword of allKeywords) {
     seeds.push({
       keyword,
       volume: corpusVolumeMap.get(keyword) ?? 0,
+      source: rssSet.has(keyword) ? "rss" : "corpus",
     });
   }
 
