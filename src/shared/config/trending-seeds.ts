@@ -16,7 +16,7 @@ export interface TrendSeed {
 }
 
 /** Maximum seed count to prevent unbounded DataLab quota consumption. */
-const MAX_SEED_COUNT = 250;
+const MAX_SEED_COUNT = 100;
 
 /** Minimum RSS keywords required to use RSS as primary source. */
 const MIN_RSS_KEYWORDS = 10;
