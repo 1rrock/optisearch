@@ -32,17 +32,21 @@ function sanitizeNewsUrl(url: string | undefined | null): string | null {
 /**
  * Compute composite ranking score combining change velocity and search volume.
  *
+ * Only RISING keywords get velocity credit — declining keywords score on
+ * volume alone (corpus) or 0 (RSS), naturally sinking to the bottom.
+ *
  * For keywords WITH volume (corpus):
- *   0.6 * normalized|changeRate| + 0.4 * normalizedLogVolume
+ *   0.6 * normalizedChangeRate + 0.4 * normalizedLogVolume
  *
  * For keywords WITHOUT volume (RSS news keywords):
  *   changeRate-only score (volume weight = 0) so trending news topics
  *   aren't penalized for lacking SearchAd volume data.
  *
- * Fixed bounds: changeRate capped at 200%, volume log10 capped at 7 (≈10M).
+ * Fixed bounds: changeRate clamped to [0, 200]%, volume log10 capped at 7 (≈10M).
  */
 function computeCompositeScore(changeRate: number, monthlyVolume: number): number {
-  const normalizedChangeRate = Math.min(Math.abs(changeRate), 200) / 200;
+  // Declining keywords get 0 velocity credit — only rising trends rank high
+  const normalizedChangeRate = Math.min(Math.max(changeRate, 0), 200) / 200;
   if (monthlyVolume === 0) {
     // RSS/news keywords: score purely on change velocity
     return Math.round(normalizedChangeRate * 10000) / 10000;
