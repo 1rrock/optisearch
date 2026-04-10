@@ -26,7 +26,7 @@ export interface TrendingResponse {
 // Daily: 15-min cache (cron runs every 4h; stay within one cron window)
 // Monthly: 5-min cache (live DataLab calculation, avoid hammering API)
 const CACHE_TTL_DAILY = 15 * 60 * 1000;  // 15 minutes
-const CACHE_TTL_MONTHLY = 5 * 60 * 1000;
+const CACHE_TTL_MONTHLY = 60 * 60 * 1000;  // 1 hour
 
 /**
  * GET /api/keywords/trending?period=daily|monthly
@@ -69,13 +69,17 @@ export async function GET(request: Request) {
 async function fetchTrendingData(
   period: "daily" | "monthly"
 ): Promise<TrendingResponse> {
-  // Daily: use cron-collected data from keyword_trend_daily
   if (period === "daily") {
     const precomputed = await fetchFromTrendDaily();
     if (precomputed) return precomputed;
   }
 
-  // Monthly or daily fallback: live DataLab calculation
+  if (period === "monthly") {
+    const monthlyAgg = await fetchFromTrendMonthlyAgg();
+    if (monthlyAgg) return monthlyAgg;
+  }
+
+  // Fallback: live DataLab calculation
   return fetchLiveFallback(period);
 }
 
@@ -93,13 +97,14 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
 
   const latestDate = (dateRow as Array<{ recorded_date: string }>)[0].recorded_date;
 
-  // Fetch that date's data, sorted by composite_score (NULLs last), fallback to |change_rate|.
+  // Fetch RISING keywords only (change_rate > 0), sorted by composite_score.
   // No volume filter — RSS-sourced trending keywords (news figures, events) may have
   // volume=0 but are valid real-time trends ranked by composite_score.
   const { data, error } = await supabase
     .from("keyword_trend_daily")
     .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link, composite_score")
     .eq("recorded_date", latestDate)
+    .gt("change_rate", 0)
     .order("composite_score", { ascending: false, nullsFirst: false })
     .limit(200);
 
@@ -137,6 +142,49 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
   }));
 
   return { period: "daily", keywords, lastUpdated: latestDate };
+}
+
+/**
+ * Monthly: aggregate keyword_trend_daily over a 30-day window.
+ * Uses the Postgres VIEW keyword_trend_monthly_agg (created by migration).
+ * Only rising keywords (avg_change_rate > 0) are included in the VIEW.
+ */
+async function fetchFromTrendMonthlyAgg(): Promise<TrendingResponse | null> {
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase
+    .from("keyword_trend_monthly_agg")
+    .select("keyword, avg_change_rate, monthly_volume, avg_composite_score, news_title, news_link, last_recorded_date")
+    .order("avg_composite_score", { ascending: false })
+    .limit(30);
+
+  if (error || !data || data.length === 0) return null;
+
+  type MonthlyRow = {
+    keyword: string;
+    avg_change_rate: number;
+    monthly_volume: number;
+    avg_composite_score: number;
+    news_title: string | null;
+    news_link: string | null;
+    last_recorded_date: string;
+  };
+
+  const keywords: TrendingKeywordItem[] = (data as MonthlyRow[]).map((row) => ({
+    keyword: row.keyword,
+    volume: row.monthly_volume,
+    changeRate: Math.round(row.avg_change_rate * 10) / 10,
+    estimatedDelta: row.monthly_volume > 0
+      ? Math.round((row.monthly_volume * row.avg_change_rate) / 100 / 30)
+      : 0,
+    direction: row.avg_change_rate > 5 ? "up" as const : row.avg_change_rate < -5 ? "down" as const : "stable" as const,
+    newsTitle: row.news_title ?? null,
+    newsLink: row.news_link ?? null,
+  }));
+
+  const lastUpdated = (data as MonthlyRow[])[0]?.last_recorded_date ?? undefined;
+
+  return { period: "monthly", keywords, lastUpdated };
 }
 
 // ---------------------------------------------------------------------------

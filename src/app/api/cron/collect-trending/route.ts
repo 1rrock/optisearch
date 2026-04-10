@@ -45,8 +45,10 @@ function sanitizeNewsUrl(url: string | undefined | null): string | null {
  * Fixed bounds: changeRate clamped to [0, 200]%, volume log10 capped at 7 (≈10M).
  */
 function computeCompositeScore(changeRate: number, monthlyVolume: number): number {
-  // Declining keywords get 0 velocity credit — only rising trends rank high
-  const normalizedChangeRate = Math.min(Math.max(changeRate, 0), 200) / 200;
+  // Declining keywords get score 0 — only rising trends should appear in results
+  if (changeRate <= 0) return 0;
+
+  const normalizedChangeRate = Math.min(changeRate, 200) / 200;
   if (monthlyVolume === 0) {
     // RSS/news keywords: score purely on change velocity
     return Math.round(normalizedChangeRate * 10000) / 10000;
