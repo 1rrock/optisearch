@@ -98,6 +98,7 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
     .from("keyword_trend_daily")
     .select("keyword, change_rate, monthly_volume, estimated_delta, news_title, news_link, composite_score")
     .eq("recorded_date", latestDate)
+    .gt("monthly_volume", 0)
     .order("composite_score", { ascending: false, nullsFirst: false })
     .limit(200);
 
