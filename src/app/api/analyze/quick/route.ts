@@ -2,6 +2,7 @@ import { z } from "zod";
 import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { recordAndEnforce } from "@/services/usage-service";
+import { signAnalysisToken } from "@/shared/lib/analysis-token";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
 import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
 import { PLAN_LIMITS } from "@/shared/config/constants";
@@ -126,6 +127,8 @@ export async function POST(request: Request) {
       );
     }
 
+    const analysisToken = signAnalysisToken({ userId: user.userId, keyword: effectiveKeyword, feature: "search" });
+
     // Save search history (non-blocking) — uses a minimal result for history
     const planLimits = PLAN_LIMITS[user.plan];
     const historyLimit = planLimits.historyLimit;
@@ -181,6 +184,7 @@ export async function POST(request: Request) {
       estimatedClicks,
       isEstimated: isEstimated || undefined,
       plan: user.plan,
+      analysisToken: analysisToken ?? undefined,
     });
   } catch (err) {
     console.error("[api/analyze/quick] Error:", err);

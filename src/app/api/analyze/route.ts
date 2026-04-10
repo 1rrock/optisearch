@@ -5,9 +5,11 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { recordAndEnforce } from "@/services/usage-service";
+import { verifyAnalysisToken } from "@/shared/lib/analysis-token";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
+  analysisToken: z.string().optional(),
 });
 
 export async function POST(request: Request) {
@@ -58,13 +60,20 @@ export async function POST(request: Request) {
 
     const analysis = await analyzeKeyword(effectiveKeyword);
 
-    // Record usage after successful analysis (prevents quota loss on server errors)
-    const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
-    if (!usage.allowed) {
-      return Response.json(
-        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
-        { status: 429 }
-      );
+    // Token verification: skip credit deduction if valid analysisToken from /quick
+    const tokenValid = parsed.data.analysisToken
+      ? verifyAnalysisToken(parsed.data.analysisToken, user.userId, effectiveKeyword, "search") !== null
+      : false;
+
+    if (!tokenValid) {
+      // No valid token — self-deduct (direct API call or expired/forged token)
+      const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
+      if (!usage.allowed) {
+        return Response.json(
+          { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+          { status: 429 }
+        );
+      }
     }
 
     // Apply plan-based restrictions

@@ -55,6 +55,7 @@ interface QuickResponse {
   estimatedClicks?: number;
   isEstimated?: boolean;
   plan: "free" | "basic" | "pro";
+  analysisToken?: string | null;
 }
 
 interface FullResponse {
@@ -112,11 +113,11 @@ async function fetchQuick(keyword: string, turnstileToken?: string): Promise<Qui
   return res.json();
 }
 
-async function fetchFull(keyword: string): Promise<FullResponse> {
+async function fetchFull(keyword: string, analysisToken?: string | null): Promise<FullResponse> {
   const res = await fetch("/api/analyze", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keyword }),
+    body: JSON.stringify({ keyword, analysisToken: analysisToken ?? undefined }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -131,11 +132,11 @@ async function fetchExtra(keyword: string, analysisContext?: {
   saturationLabel?: string;
   saturationScore?: number;
   clickRate?: number;
-}): Promise<ExtraResponse> {
+}, analysisToken?: string | null): Promise<ExtraResponse> {
   const res = await fetch("/api/analyze/extra", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ keyword, analysisContext }),
+    body: JSON.stringify({ keyword, analysisContext, analysisToken: analysisToken ?? undefined }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -903,7 +904,7 @@ function AnalyzePageInner() {
       // Phase 2+3: fire full and extra in parallel after quick succeeds
       const effectiveKeyword = result.keyword;
 
-      fetchFull(effectiveKeyword).then((fullResult) => {
+      fetchFull(effectiveKeyword, result.analysisToken).then((fullResult) => {
         setFullData(fullResult);
         setFullPending(false);
         queryClient.setQueryData(["analyze-full", effectiveKeyword], fullResult);
@@ -915,7 +916,7 @@ function AnalyzePageInner() {
         totalSearchVolume: result.totalSearchVolume,
         competition: result.competition,
         clickRate: result.clickRate,
-      }).then((extraResult) => {
+      }, result.analysisToken).then((extraResult) => {
         setExtraData(extraResult);
         setExtraPending(false);
         queryClient.setQueryData(["analyze-extra", effectiveKeyword], extraResult);

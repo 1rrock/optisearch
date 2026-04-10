@@ -4,10 +4,12 @@ import { searchNews, searchWeb, searchEncyclopedia } from "@/shared/lib/naver-se
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { checkUsageLimit, recordAndEnforce } from "@/services/usage-service";
+import { verifyAnalysisToken } from "@/shared/lib/analysis-token";
 import { classifyIntent, suggestStrategy, clusterKeywords } from "@/services/ai-service";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
+  analysisToken: z.string().optional(),
   analysisContext: z
     .object({
       totalSearchVolume: z.number().optional(),
@@ -64,13 +66,20 @@ export async function POST(request: Request) {
     return Response.json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." }, { status: 429 });
   }
 
-  // Early quota pre-check before expensive AI work
-  const preCheck = await checkUsageLimit(user.userId, user.plan, "search");
-  if (!preCheck.allowed) {
-    return Response.json(
-      { error: `일일 사용 한도를 초과했습니다. (${preCheck.used}/${preCheck.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: preCheck.used, limit: preCheck.limit },
-      { status: 429 }
-    );
+  // Token verification: skip credit deduction if valid analysisToken from /quick
+  const tokenValid = parsed.data.analysisToken
+    ? verifyAnalysisToken(parsed.data.analysisToken, user.userId, keyword, "search") !== null
+    : false;
+
+  // Early quota pre-check before expensive AI work (skip if token is valid)
+  if (!tokenValid) {
+    const preCheck = await checkUsageLimit(user.userId, user.plan, "search");
+    if (!preCheck.allowed) {
+      return Response.json(
+        { error: `일일 사용 한도를 초과했습니다. (${preCheck.used}/${preCheck.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: preCheck.used, limit: preCheck.limit },
+        { status: 429 }
+      );
+    }
   }
 
   try {
@@ -107,13 +116,15 @@ export async function POST(request: Request) {
       clusterKeywords(keyword, relKeywordStrings),
     ]);
 
-    // Record usage after successful work
-    const usage = await recordAndEnforce(user.userId, user.plan, "search", keyword);
-    if (!usage.allowed) {
-      return Response.json(
-        { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
-        { status: 429 }
-      );
+    // Credit deduction: skip if valid token, self-deduct otherwise
+    if (!tokenValid) {
+      const usage = await recordAndEnforce(user.userId, user.plan, "search", keyword);
+      if (!usage.allowed) {
+        return Response.json(
+          { error: `일일 사용 한도를 초과했습니다. (${usage.used}/${usage.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: usage.used, limit: usage.limit },
+          { status: 429 }
+        );
+      }
     }
 
     return Response.json({
