@@ -4,7 +4,7 @@ import { checkAdult, correctTypo } from "@/shared/lib/naver-search";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { PLAN_LIMITS } from "@/shared/config/constants";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
-import { recordAndEnforce } from "@/services/usage-service";
+import { checkUsageLimit, recordAndEnforce } from "@/services/usage-service";
 import { verifyAnalysisToken } from "@/shared/lib/analysis-token";
 
 const bodySchema = z.object({
@@ -58,15 +58,26 @@ export async function POST(request: Request) {
 
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
 
-    const analysis = await analyzeKeyword(effectiveKeyword);
-
     // Token verification: skip credit deduction if valid analysisToken from /quick
     const tokenValid = parsed.data.analysisToken
       ? verifyAnalysisToken(parsed.data.analysisToken, user.userId, effectiveKeyword, "search") !== null
       : false;
 
+    // Early quota pre-check before expensive AI work (skip if token is valid)
     if (!tokenValid) {
-      // No valid token — self-deduct (direct API call or expired/forged token)
+      const preCheck = await checkUsageLimit(user.userId, user.plan, "search");
+      if (!preCheck.allowed) {
+        return Response.json(
+          { error: `일일 사용 한도를 초과했습니다. (${preCheck.used}/${preCheck.limit})`, code: "USAGE_LIMIT_EXCEEDED", used: preCheck.used, limit: preCheck.limit },
+          { status: 429 }
+        );
+      }
+    }
+
+    const analysis = await analyzeKeyword(effectiveKeyword);
+
+    // Credit deduction: skip if valid token, self-deduct otherwise
+    if (!tokenValid) {
       const usage = await recordAndEnforce(user.userId, user.plan, "search", effectiveKeyword);
       if (!usage.allowed) {
         return Response.json(
