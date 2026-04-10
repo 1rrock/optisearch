@@ -1,1 +1,0 @@
-Verified wordcloud container height increased to 460. Verified ranked list layout updated with mt-6 pt-6 border-t and md:grid-cols-2 for better desktop/mobile balance.

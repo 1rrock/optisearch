@@ -134,6 +134,7 @@ export async function analyzeKeyword(
     let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
     let isEstimated = false;
+    const blogPostCount = blogResponse.total;
 
     // Reverse-estimate volume for censored keywords or anomalies (SearchAd returns 0, 10/10 floors, or suspicious lows)
     if (totalSearchVolume <= 20 || (totalSearchVolume < 500 && blogPostCount > 50000)) {
@@ -177,7 +178,6 @@ export async function analyzeKeyword(
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
     );
 
-    const blogPostCount = blogResponse.total;
     const saturationRatio =
       blogPostCount > 0 ? totalSearchVolume / blogPostCount : totalSearchVolume;
     const saturationIndex = buildSaturationIndex(saturationRatio);

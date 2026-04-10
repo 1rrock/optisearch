@@ -1,1 +1,0 @@
-Verified max-h-[400px] and overflow-y-auto successfully applied to New Keywords columns.

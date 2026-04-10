@@ -40,6 +40,16 @@ yarn-error.log*
 .omc/
 .sisyphus/
 
+# Supabase local dev config
+supabase/config.toml
+supabase/.gitignore
+
+# Legacy migration files (use supabase/migrations/ instead)
+supabase/migration-*.sql
+
+# Planning docs
+naver-content-optimizer.md
+
 # vercel
 .vercel
 
