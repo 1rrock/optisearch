@@ -13,7 +13,9 @@ const NEWS_ENRICHMENT_DEADLINE_MS = 45_000;
 /** Max keywords to enrich with news headlines. */
 const NEWS_ENRICHMENT_LIMIT = 50;
 /** Concurrency limit for parallel news fetches. */
-const NEWS_CONCURRENCY = 5;
+const NEWS_CONCURRENCY = 3;
+/** Delay between news fetch batches to avoid Naver 429 rate limiting. */
+const NEWS_BATCH_DELAY_MS = 300;
 
 /** Validate URL is https:// only — prevents open redirect / javascript: injection. */
 function sanitizeNewsUrl(url: string | undefined | null): string | null {
@@ -180,6 +182,11 @@ export async function GET(request: Request) {
             return { row, news };
           })
         );
+
+        // Rate limit delay between batches
+        if (i + NEWS_CONCURRENCY < sortedForNews.length) {
+          await new Promise((r) => setTimeout(r, NEWS_BATCH_DELAY_MS));
+        }
 
         for (const result of results) {
           if (result.status === "fulfilled") {
