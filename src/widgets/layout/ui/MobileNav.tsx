@@ -10,6 +10,7 @@ import {
   Home,
   Search,
   LineChart,
+  BarChart3,
   Layers,
   Sparkles,
   ShoppingBag,
@@ -41,6 +42,7 @@ const NAV_ITEMS = [
       { href: "/analyze", icon: Search, label: "키워드 분석" },
       { href: "/keywords", icon: Bookmark, label: "저장된 키워드" },
       { href: "/trends", icon: LineChart, label: "트렌드" },
+      { href: "/trends/analysis", icon: BarChart3, label: "트렌드 분석" },
       { href: "/shopping", icon: ShoppingBag, label: "쇼핑 인사이트" },
     ]
   },

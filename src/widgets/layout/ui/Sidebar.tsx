@@ -9,6 +9,7 @@ import {
   Home,
   Search,
   LineChart,
+  BarChart3,
   Layers,
   Sparkles,
   ShoppingBag,
@@ -63,6 +64,7 @@ export function Sidebar() {
           <NavItem href="/analyze" icon={<Search className="size-4" />} label="키워드 분석" active={pathname === "/analyze"} />
           <NavItem href="/keywords" icon={<Bookmark className="size-4" />} label="저장된 키워드" active={pathname === "/keywords"} />
           <NavItem href="/trends" icon={<LineChart className="size-4" />} label="트렌드" active={pathname === "/trends"} />
+          <NavItem href="/trends/analysis" icon={<BarChart3 className="size-4" />} label="트렌드 분석" active={pathname.startsWith("/trends/analysis")} />
           <NavItem href="/shopping" icon={<ShoppingBag className="size-4" />} label="쇼핑 인사이트" active={pathname === "/shopping"} />
 
           <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4">고급 도구</div>

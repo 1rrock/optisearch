@@ -1,0 +1,975 @@
+"use client";
+
+import { useState, useRef, useCallback } from "react";
+import {
+  TrendingUp,
+  Search,
+  Plus,
+  X,
+  Loader2,
+  AlertCircle,
+  Calendar,
+  Users,
+  Smartphone,
+  Monitor,
+  BarChart3,
+  PieChart,
+} from "lucide-react";
+import { cn } from "@/shared/lib/utils";
+import { PageHeader } from "@/shared/ui/page-header";
+import { UpgradeModal } from "@/shared/components/UpgradeModal";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface TrendPoint {
+  period: string;
+  ratio: number;
+}
+
+interface TrendResult {
+  keyword: string;
+  data: TrendPoint[];
+}
+
+interface DemographicData {
+  gender: { male: number; female: number };
+  age: { group: string; ratio: number }[];
+  device: { pc: number; mobile: number };
+}
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ef4444"];
+
+const PERIOD_OPTIONS = [
+  { label: "1개월", value: 1 },
+  { label: "3개월", value: 3 },
+  { label: "6개월", value: 6 },
+  { label: "1년", value: 12 },
+  { label: "2년", value: 24 },
+];
+
+const AGE_GROUPS = [
+  { label: "10대", values: ["1", "2"] },
+  { label: "20대", values: ["3", "4"] },
+  { label: "30대", values: ["5", "6"] },
+  { label: "40대", values: ["7", "8"] },
+  { label: "50대", values: ["9", "10"] },
+  { label: "60대+", values: ["11"] },
+];
+
+// ---------------------------------------------------------------------------
+// Line Chart Component (SVG)
+// ---------------------------------------------------------------------------
+
+function TrendLineChart({
+  trends,
+  height = 320,
+}: {
+  trends: TrendResult[];
+  height?: number;
+}) {
+  const [tooltip, setTooltip] = useState<{
+    x: number;
+    y: number;
+    period: string;
+    values: { keyword: string; ratio: number; color: string }[];
+  } | null>(null);
+
+  if (trends.length === 0 || trends.every((t) => t.data.length === 0)) {
+    return (
+      <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+        데이터가 없습니다.
+      </div>
+    );
+  }
+
+  const W = 900;
+  const H = height;
+  const PAD = { top: 20, right: 30, bottom: 50, left: 50 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const allPeriods = Array.from(
+    new Set(trends.flatMap((t) => t.data.map((d) => d.period)))
+  ).sort();
+
+  if (allPeriods.length === 0) return null;
+
+  const xStep = chartW / Math.max(allPeriods.length - 1, 1);
+  const xOf = (period: string) => PAD.left + allPeriods.indexOf(period) * xStep;
+  const yOf = (ratio: number) => PAD.top + chartH - (ratio / 100) * chartH;
+
+  const yTicks = [0, 25, 50, 75, 100];
+  const xTickStep = Math.max(1, Math.floor(allPeriods.length / 8));
+  const xTicks = allPeriods.filter((_, i) => i % xTickStep === 0);
+
+  // Create smooth path with bezier curves
+  function smoothPath(points: { x: number; y: number }[]): string {
+    if (points.length < 2) return "";
+    let d = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const cpx = (prev.x + curr.x) / 2;
+      d += ` C ${cpx} ${prev.y}, ${cpx} ${curr.y}, ${curr.x} ${curr.y}`;
+    }
+    return d;
+  }
+
+  return (
+    <div className="w-full overflow-x-auto relative">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full min-w-[500px]"
+        style={{ height: H }}
+        aria-label="키워드 트렌드 차트"
+        onMouseLeave={() => setTooltip(null)}
+      >
+        {/* Background gradient */}
+        <defs>
+          {trends.map((_, ti) => (
+            <linearGradient
+              key={ti}
+              id={`gradient-${ti}`}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop offset="0%" stopColor={COLORS[ti % COLORS.length]} stopOpacity="0.15" />
+              <stop offset="100%" stopColor={COLORS[ti % COLORS.length]} stopOpacity="0" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* Grid lines */}
+        {yTicks.map((v) => (
+          <line
+            key={v}
+            x1={PAD.left}
+            x2={W - PAD.right}
+            y1={yOf(v)}
+            y2={yOf(v)}
+            stroke="currentColor"
+            strokeOpacity={0.06}
+            strokeWidth={1}
+          />
+        ))}
+
+        {/* Y-axis labels */}
+        {yTicks.map((v) => (
+          <text
+            key={v}
+            x={PAD.left - 12}
+            y={yOf(v) + 4}
+            textAnchor="end"
+            fontSize={11}
+            fill="currentColor"
+            fillOpacity={0.4}
+            fontFamily="system-ui"
+          >
+            {v}
+          </text>
+        ))}
+
+        {/* X-axis labels */}
+        {xTicks.map((period) => (
+          <text
+            key={period}
+            x={xOf(period)}
+            y={H - 10}
+            textAnchor="middle"
+            fontSize={10}
+            fill="currentColor"
+            fillOpacity={0.4}
+            fontFamily="system-ui"
+          >
+            {period.slice(0, 7)}
+          </text>
+        ))}
+
+        {/* Area fills */}
+        {trends.map((trend, ti) => {
+          const points = trend.data
+            .filter((d) => allPeriods.includes(d.period))
+            .sort((a, b) => a.period.localeCompare(b.period))
+            .map((pt) => ({ x: xOf(pt.period), y: yOf(pt.ratio) }));
+
+          if (points.length < 2) return null;
+
+          const areaPath =
+            smoothPath(points) +
+            ` L ${points[points.length - 1].x} ${yOf(0)} L ${points[0].x} ${yOf(0)} Z`;
+
+          return (
+            <path
+              key={`area-${trend.keyword}`}
+              d={areaPath}
+              fill={`url(#gradient-${ti})`}
+            />
+          );
+        })}
+
+        {/* Lines */}
+        {trends.map((trend, ti) => {
+          const color = COLORS[ti % COLORS.length];
+          const points = trend.data
+            .filter((d) => allPeriods.includes(d.period))
+            .sort((a, b) => a.period.localeCompare(b.period))
+            .map((pt) => ({ x: xOf(pt.period), y: yOf(pt.ratio) }));
+
+          if (points.length < 2) return null;
+
+          return (
+            <path
+              key={trend.keyword}
+              d={smoothPath(points)}
+              fill="none"
+              stroke={color}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          );
+        })}
+
+        {/* Data points */}
+        {trends.map((trend, ti) => {
+          const color = COLORS[ti % COLORS.length];
+          return trend.data.map((pt) => (
+            <circle
+              key={`${trend.keyword}-${pt.period}`}
+              cx={xOf(pt.period)}
+              cy={yOf(pt.ratio)}
+              r={3}
+              fill="white"
+              stroke={color}
+              strokeWidth={2}
+              className="cursor-pointer"
+              onMouseEnter={(e) => {
+                const svgRect = (e.target as SVGElement)
+                  .closest("svg")
+                  ?.getBoundingClientRect();
+                if (!svgRect) return;
+                setTooltip({
+                  x: xOf(pt.period),
+                  y: yOf(pt.ratio),
+                  period: pt.period,
+                  values: trends
+                    .map((t, i) => {
+                      const d = t.data.find((dp) => dp.period === pt.period);
+                      return {
+                        keyword: t.keyword,
+                        ratio: d?.ratio ?? 0,
+                        color: COLORS[i % COLORS.length],
+                      };
+                    })
+                    .filter((v) => v.ratio > 0),
+                });
+              }}
+              onMouseLeave={() => setTooltip(null)}
+            />
+          ));
+        })}
+
+        {/* Tooltip */}
+        {tooltip && (
+          <g>
+            <line
+              x1={tooltip.x}
+              x2={tooltip.x}
+              y1={PAD.top}
+              y2={PAD.top + chartH}
+              stroke="currentColor"
+              strokeOpacity={0.15}
+              strokeWidth={1}
+              strokeDasharray="4,4"
+            />
+            <foreignObject
+              x={Math.min(tooltip.x + 10, W - 180)}
+              y={Math.max(tooltip.y - 50, PAD.top)}
+              width={160}
+              height={24 + tooltip.values.length * 22}
+            >
+              <div className="bg-card border border-muted/50 shadow-lg rounded-lg p-2.5 text-xs">
+                <p className="font-semibold text-foreground/80 mb-1">
+                  {tooltip.period.slice(0, 7)}
+                </p>
+                {tooltip.values.map((v) => (
+                  <div key={v.keyword} className="flex items-center gap-1.5">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ backgroundColor: v.color }}
+                    />
+                    <span className="text-muted-foreground truncate">{v.keyword}</span>
+                    <span className="ml-auto font-bold">{v.ratio}</span>
+                  </div>
+                ))}
+              </div>
+            </foreignObject>
+          </g>
+        )}
+      </svg>
+
+      {/* Legend */}
+      {trends.length > 1 && (
+        <div className="flex flex-wrap gap-4 mt-3 px-1">
+          {trends.map((trend, ti) => (
+            <div key={trend.keyword} className="flex items-center gap-1.5">
+              <span
+                className="inline-block w-3 h-3 rounded-full"
+                style={{ backgroundColor: COLORS[ti % COLORS.length] }}
+              />
+              <span className="text-sm font-medium">{trend.keyword}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Demographics Charts
+// ---------------------------------------------------------------------------
+
+function GenderChart({ data }: { data: DemographicData["gender"] }) {
+  const total = data.male + data.female;
+  if (total === 0) return <p className="text-sm text-muted-foreground text-center py-8">데이터 없음</p>;
+
+  const malePercent = Math.round((data.male / total) * 100);
+  const femalePercent = 100 - malePercent;
+
+  // Donut chart
+  const R = 60;
+  const r = 40;
+  const cx = 80;
+  const cy = 80;
+
+  const maleAngle = (malePercent / 100) * 360;
+
+  function arcPath(startAngle: number, endAngle: number, radius: number): string {
+    const start = polarToCartesian(cx, cy, radius, startAngle);
+    const end = polarToCartesian(cx, cy, radius, endAngle);
+    const largeArc = endAngle - startAngle > 180 ? 1 : 0;
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
+  }
+
+  function polarToCartesian(cx: number, cy: number, radius: number, angleDeg: number) {
+    const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+    return {
+      x: cx + radius * Math.cos(angleRad),
+      y: cy + radius * Math.sin(angleRad),
+    };
+  }
+
+  return (
+    <div className="flex items-center gap-6">
+      <svg width={160} height={160} viewBox="0 0 160 160">
+        {/* Female arc (background full) */}
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="#f472b6" strokeWidth={20} opacity={0.9} />
+        {/* Male arc overlay */}
+        {malePercent > 0 && malePercent < 100 && (
+          <path
+            d={arcPath(0, maleAngle, R)}
+            fill="none"
+            stroke="#60a5fa"
+            strokeWidth={20}
+            strokeLinecap="round"
+          />
+        )}
+        {malePercent === 100 && (
+          <circle cx={cx} cy={cy} r={R} fill="none" stroke="#60a5fa" strokeWidth={20} />
+        )}
+        {/* Center text */}
+        <circle cx={cx} cy={cy} r={r - 5} className="fill-background" />
+      </svg>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-blue-400" />
+          <span className="text-sm">남성</span>
+          <span className="ml-auto text-lg font-extrabold">{malePercent}%</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-pink-400" />
+          <span className="text-sm">여성</span>
+          <span className="ml-auto text-lg font-extrabold">{femalePercent}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgeChart({ data }: { data: DemographicData["age"] }) {
+  if (data.length === 0) return <p className="text-sm text-muted-foreground text-center py-8">데이터 없음</p>;
+
+  const maxRatio = Math.max(...data.map((d) => d.ratio), 1);
+
+  return (
+    <div className="space-y-3">
+      {data.map((item) => {
+        const pct = Math.round((item.ratio / maxRatio) * 100);
+        return (
+          <div key={item.group} className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground w-12 shrink-0">
+              {item.group}
+            </span>
+            <div className="flex-1 h-7 bg-muted/30 rounded-lg overflow-hidden relative">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-blue-400 rounded-lg transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
+              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold">
+                {Math.round(item.ratio)}%
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DeviceChart({ data }: { data: DemographicData["device"] }) {
+  const total = data.pc + data.mobile;
+  if (total === 0) return <p className="text-sm text-muted-foreground text-center py-8">데이터 없음</p>;
+
+  const pcPercent = Math.round((data.pc / total) * 100);
+  const mobilePercent = 100 - pcPercent;
+
+  return (
+    <div className="flex items-center gap-6">
+      <div className="flex-1 space-y-4">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Monitor className="size-4 text-blue-500" />
+              <span className="text-sm font-medium">PC</span>
+            </div>
+            <span className="text-lg font-extrabold">{pcPercent}%</span>
+          </div>
+          <div className="h-3 bg-muted/30 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-500"
+              style={{ width: `${pcPercent}%` }}
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Smartphone className="size-4 text-emerald-500" />
+              <span className="text-sm font-medium">모바일</span>
+            </div>
+            <span className="text-lg font-extrabold">{mobilePercent}%</span>
+          </div>
+          <div className="h-3 bg-muted/30 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${mobilePercent}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Period Pill
+// ---------------------------------------------------------------------------
+
+function PeriodPill({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all border ${active
+        ? "bg-foreground text-background border-foreground shadow-sm"
+        : "bg-card text-muted-foreground border-muted/50 hover:border-foreground/30 hover:text-foreground"
+        }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main Page
+// ---------------------------------------------------------------------------
+
+export default function TrendAnalysisPage() {
+  // Primary keyword
+  const [primaryKeyword, setPrimaryKeyword] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Comparison keywords
+  const [compareKeywords, setCompareKeywords] = useState<string[]>([]);
+  const [compareInput, setCompareInput] = useState("");
+  const compareRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const [showCompare, setShowCompare] = useState(false);
+
+  // Period
+  const [months, setMonths] = useState(12);
+
+  // Data state
+  const [trends, setTrends] = useState<TrendResult[]>([]);
+  const [demographics, setDemographics] = useState<DemographicData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [hasFetched, setHasFetched] = useState(false);
+
+  // Upgrade modal
+  const [upgradeModal, setUpgradeModal] = useState<{
+    open: boolean;
+    feature?: string;
+    used?: number;
+    limit?: number;
+  }>({ open: false });
+
+  function handlePrimarySearch() {
+    const kw = inputValue.trim();
+    if (!kw) return;
+    setPrimaryKeyword(kw);
+    setInputValue("");
+    // Auto-fetch
+    fetchTrends(kw, compareKeywords, months);
+  }
+
+  function addCompareKeyword() {
+    const kw = compareInput.trim();
+    if (!kw || compareKeywords.includes(kw) || kw === primaryKeyword || compareKeywords.length >= 4) return;
+    const newCompare = [...compareKeywords, kw];
+    setCompareKeywords(newCompare);
+    setCompareInput("");
+    compareRef.current?.focus();
+    if (primaryKeyword) {
+      fetchTrends(primaryKeyword, newCompare, months);
+    }
+  }
+
+  function removeCompareKeyword(kw: string) {
+    const newCompare = compareKeywords.filter((k) => k !== kw);
+    setCompareKeywords(newCompare);
+    if (primaryKeyword) {
+      fetchTrends(primaryKeyword, newCompare, months);
+    }
+  }
+
+  function handlePeriodChange(newMonths: number) {
+    setMonths(newMonths);
+    if (primaryKeyword) {
+      fetchTrends(primaryKeyword, compareKeywords, newMonths);
+    }
+  }
+
+  const fetchTrends = useCallback(
+    async (primary: string, compare: string[], period: number) => {
+      // Cancel any in-flight requests
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      const { signal } = controller;
+
+      const keywords = [primary, ...compare];
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Fetch main trend data
+        const res = await fetch("/api/trends", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ keywords, months: period }),
+          signal,
+        });
+
+        if (res.status === 429) {
+          const data = await res.json().catch(() => ({}));
+          setUpgradeModal({
+            open: true,
+            feature: "트렌드 분석",
+            used: data.used,
+            limit: data.limit,
+          });
+          return;
+        }
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error ?? `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        setTrends(data.trends ?? []);
+        setHasFetched(true);
+
+        // Fetch demographics for the primary keyword (gender/age/device)
+        await fetchDemographics(primary, period, signal);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        setError(err instanceof Error ? err.message : "오류가 발생했습니다.");
+      } finally {
+        if (!signal.aborted) setLoading(false);
+      }
+    },
+    []
+  );
+
+  async function fetchDemographics(keyword: string, period: number, signal?: AbortSignal) {
+    try {
+      const fetchOpts = (body: object) => ({
+        method: "POST" as const,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal,
+      });
+
+      // Gender split
+      const [maleRes, femaleRes, pcRes, moRes] = await Promise.all([
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, gender: "m" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, gender: "f" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, device: "pc" })),
+        fetch("/api/trends", fetchOpts({ keywords: [keyword], months: period, device: "mo" })),
+      ]);
+
+      const [maleData, femaleData, pcData, moData] = await Promise.all([
+        maleRes.ok ? maleRes.json() : null,
+        femaleRes.ok ? femaleRes.json() : null,
+        pcRes.ok ? pcRes.json() : null,
+        moRes.ok ? moRes.json() : null,
+      ]);
+
+      // Calculate average ratios for gender
+      const avgRatio = (trends: TrendResult[] | undefined): number => {
+        if (!trends?.[0]?.data?.length) return 0;
+        const sum = trends[0].data.reduce((acc, d) => acc + d.ratio, 0);
+        return sum / trends[0].data.length;
+      };
+
+      const maleAvg = avgRatio(maleData?.trends);
+      const femaleAvg = avgRatio(femaleData?.trends);
+      const pcAvg = avgRatio(pcData?.trends);
+      const moAvg = avgRatio(moData?.trends);
+
+      // Age demographics — fetch all age groups in parallel
+      const ageResults = await Promise.all(
+        AGE_GROUPS.map(async (ag) => {
+          try {
+            const ageRes = await fetch("/api/trends", fetchOpts({
+              keywords: [keyword],
+              months: period,
+              ages: ag.values,
+            }));
+            if (ageRes.ok) {
+              const ageData = await ageRes.json();
+              return { group: ag.label, ratio: avgRatio(ageData?.trends) };
+            }
+            return { group: ag.label, ratio: 0 };
+          } catch {
+            return { group: ag.label, ratio: 0 };
+          }
+        })
+      );
+
+      // Normalize age ratios to percentages
+      const totalAge = ageResults.reduce((sum, a) => sum + a.ratio, 0) || 1;
+      const normalizedAge = ageResults.map((a) => ({
+        group: a.group,
+        ratio: (a.ratio / totalAge) * 100,
+      }));
+
+      setDemographics({
+        gender: { male: maleAvg, female: femaleAvg },
+        age: normalizedAge,
+        device: { pc: pcAvg, mobile: moAvg },
+      });
+    } catch {
+      // Demographics are supplementary — don't fail the whole page
+      setDemographics(null);
+    }
+  }
+
+  function clearAll() {
+    setPrimaryKeyword("");
+    setCompareKeywords([]);
+    setTrends([]);
+    setDemographics(null);
+    setHasFetched(false);
+    setShowCompare(false);
+    setError(null);
+    inputRef.current?.focus();
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <PageHeader
+        icon={<TrendingUp className="size-8 text-primary" />}
+        title="트렌드 분석"
+        description="네이버 DataLab 기반 키워드 검색 트렌드 분석 · 인구통계 · 기기별 비교"
+      />
+
+      {/* Search Section — subtle primary border on focus-within */}
+      <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm space-y-4 transition-colors focus-within:border-primary/30">
+        {/* Primary keyword input */}
+        <div>
+          <label className="text-sm font-semibold text-foreground/80 mb-2 block">
+            키워드 입력
+          </label>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    handlePrimarySearch();
+                  }
+                }}
+                placeholder="분석할 키워드를 입력하세요..."
+                className="w-full pl-10 pr-4 py-3 bg-background border border-muted/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handlePrimarySearch}
+              disabled={!inputValue.trim() || loading}
+              className="px-6 py-3 bg-foreground text-background rounded-xl text-sm font-bold flex items-center gap-2 hover:opacity-90 transition-opacity disabled:opacity-40"
+            >
+              {loading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Search className="size-4" />
+              )}
+              분석
+            </button>
+          </div>
+        </div>
+
+        {/* Active primary keyword + compare toggle */}
+        {primaryKeyword && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-white bg-blue-500">
+              {primaryKeyword}
+              <button
+                type="button"
+                onClick={clearAll}
+                className="hover:opacity-70"
+                aria-label="초기화"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+
+            {!showCompare && (
+              <button
+                type="button"
+                onClick={() => setShowCompare(true)}
+                className="text-sm text-muted-foreground hover:text-foreground font-medium flex items-center gap-1 transition-colors"
+              >
+                <Plus className="size-3.5" />
+                비교 키워드 추가
+              </button>
+            )}
+
+            {/* Compare keyword chips */}
+            {compareKeywords.map((kw, i) => (
+              <span
+                key={kw}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-bold text-white"
+                style={{ backgroundColor: COLORS[(i + 1) % COLORS.length] }}
+              >
+                {kw}
+                <button
+                  type="button"
+                  onClick={() => removeCompareKeyword(kw)}
+                  className="hover:opacity-70"
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Compare keyword input */}
+        {showCompare && primaryKeyword && compareKeywords.length < 4 && (
+          <div className="flex gap-2">
+            <input
+              ref={compareRef}
+              type="text"
+              value={compareInput}
+              onChange={(e) => setCompareInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  addCompareKeyword();
+                }
+              }}
+              placeholder="비교할 키워드 입력 (최대 4개)..."
+              className="flex-1 px-4 py-2.5 bg-background border border-muted/60 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <button
+              type="button"
+              onClick={addCompareKeyword}
+              disabled={!compareInput.trim()}
+              className="px-4 py-2.5 bg-muted/50 text-foreground rounded-xl text-sm font-semibold flex items-center gap-1.5 hover:bg-muted/80 transition-colors disabled:opacity-40"
+            >
+              <Plus className="size-4" />
+              추가
+            </button>
+          </div>
+        )}
+
+        {/* Period selector */}
+        {primaryKeyword && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Calendar className="size-4 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground font-medium mr-1">기간</span>
+            {PERIOD_OPTIONS.map((opt) => (
+              <PeriodPill
+                key={opt.value}
+                active={months === opt.value}
+                onClick={() => handlePeriodChange(opt.value)}
+              >
+                {opt.label}
+              </PeriodPill>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Error */}
+      {error && (
+        <div className="flex items-center gap-3 px-5 py-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          {error}
+        </div>
+      )}
+
+      {/* Results */}
+      {hasFetched && !loading && (
+        <div className="space-y-6">
+          {/* Trend Chart — PRIMARY card: bigger shadow, subtle primary border */}
+          <div className="bg-card border border-primary/10 rounded-2xl p-8 shadow-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <BarChart3 className="size-5 text-blue-500" />
+                검색 트렌드
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                상대적 검색 관심도 (0-100)
+              </span>
+            </div>
+            <TrendLineChart trends={trends} />
+          </div>
+
+          {/* Demographics Section — lighter weight cards */}
+          {demographics && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Gender */}
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
+                <h3 className="text-base font-bold flex items-center gap-2 mb-5">
+                  <Users className="size-4 text-pink-500" />
+                  성별 분포
+                </h3>
+                <GenderChart data={demographics.gender} />
+              </div>
+
+              {/* Age */}
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
+                <h3 className="text-base font-bold flex items-center gap-2 mb-5">
+                  <PieChart className="size-4 text-purple-500" />
+                  연령대 분포
+                </h3>
+                <AgeChart data={demographics.age} />
+              </div>
+
+              {/* Device */}
+              <div className="bg-card border border-muted/30 rounded-2xl p-6">
+                <h3 className="text-base font-bold flex items-center gap-2 mb-5">
+                  <Smartphone className="size-4 text-emerald-500" />
+                  기기별 비율
+                </h3>
+                <DeviceChart data={demographics.device} />
+              </div>
+            </div>
+          )}
+
+          {/* Loading demographics indicator */}
+          {!demographics && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="bg-card border border-muted/30 rounded-2xl p-6 flex items-center justify-center h-48"
+                >
+                  <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                    <Loader2 className="size-5 animate-spin" />
+                    <span className="text-xs">인구통계 로딩중...</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!hasFetched && !loading && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-muted/30 flex items-center justify-center mb-4">
+            <TrendingUp className="size-8 text-muted-foreground/50" />
+          </div>
+          <h3 className="text-lg font-bold text-foreground/70 mb-2">
+            키워드를 검색하세요
+          </h3>
+          <p className="text-sm text-muted-foreground max-w-md">
+            키워드를 입력하면 네이버 DataLab 데이터를 기반으로
+            <br />
+            검색 트렌드, 성별·연령대·기기별 분포를 분석합니다.
+          </p>
+        </div>
+      )}
+
+      {/* Loading state */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-20 gap-3">
+          <Loader2 className="size-8 animate-spin text-primary" />
+          <span className="text-sm font-medium text-muted-foreground">
+            트렌드 데이터를 불러오는 중...
+          </span>
+        </div>
+      )}
+
+      {/* Upgrade modal */}
+      <UpgradeModal
+        isOpen={upgradeModal.open}
+        onClose={() => setUpgradeModal({ open: false })}
+        feature={upgradeModal.feature ?? "트렌드 분석"}
+        used={upgradeModal.used ?? 0}
+        limit={upgradeModal.limit ?? 0}
+      />
+    </div>
+  );
+}
