@@ -8,6 +8,7 @@ import {
   searchKin,
   searchShopping,
   searchNews,
+  getAutocompleteSuggestions,
 } from "@/shared/lib/naver-search";
 import { estimateVolumeFromBlogRatio, estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
 import type { ConfidenceLevel } from "@/shared/lib/naver-datalab";
@@ -319,10 +320,51 @@ export async function getRelatedKeywords(
   keyword: string
 ): Promise<RelatedKeyword[]> {
   return cached(CacheKeys.relatedKeywords(keyword), CacheTTL.RELATED, async () => {
-    const stats = await getRelatedKeywordsRaw(keyword);
+    // Stage 1: Parallel fetch — SearchAd + Autocomplete
+    const [stats, autocompleteSuggestions] = await Promise.all([
+      getRelatedKeywordsRaw(keyword),
+      getAutocompleteSuggestions(keyword),
+    ]);
 
-    // Sort and slice first to minimize API calls
-    const top20 = stats
+    // Deduplicate: normalize whitespace for comparison
+    const normalize = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+    const searchAdKeywords = new Set(stats.map(s => normalize(s.relKeyword)));
+
+    // Filter new autocomplete keywords not in SearchAd, cap at 10
+    const newKeywords = autocompleteSuggestions
+      .filter(kw => !searchAdKeywords.has(normalize(kw)))
+      .slice(0, 10);
+
+    // Stage 2: Get volumes for new keywords via SearchAd (5s timeout)
+    // getKeywordStats returns the queried keywords PLUS their related keywords.
+    // Filter to only the keywords we asked about to avoid polluting results.
+    const newKeywordsSet = new Set(newKeywords.map(normalize));
+    let newStats: Awaited<ReturnType<typeof getKeywordStats>> = [];
+    if (newKeywords.length > 0) {
+      try {
+        const raw = await Promise.race([
+          getKeywordStats(newKeywords),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("getKeywordStats timeout")), 5000)
+          ),
+        ]);
+        newStats = raw.filter(s => newKeywordsSet.has(normalize(s.relKeyword)));
+      } catch {
+        // Timeout or failure: proceed with SearchAd-only results
+      }
+    }
+
+    // Merge and deduplicate across both sources
+    const seen = new Set<string>();
+    const allStats = [...stats, ...newStats].filter(s => {
+      const key = normalize(s.relKeyword);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Sort by total volume, take top 20
+    const top20 = allStats
       .map((s) => ({
         stat: s,
         pc: s.monthlyPcQcCnt,
@@ -332,9 +374,8 @@ export async function getRelatedKeywords(
       .sort((a, b) => b.total - a.total)
       .slice(0, 20);
 
-    // Fetch blog counts with concurrency limit to avoid rate-limit spikes
+    // Stage 3: Fetch blog counts with concurrency limit (unchanged)
     const CONCURRENCY = 5;
-    // -1 = not fetched yet, 0+ = actual blog count
     const blogCounts: number[] = new Array(top20.length).fill(-1);
     let timedOut = false;
 
@@ -368,9 +409,6 @@ export async function getRelatedKeywords(
     return top20.map((item, i) => {
       const competition = toCompetitionLevel(item.stat.compIdx);
       const blogPostCount = blogCounts[i];
-      // -1 = lookup failed/timed out → use neutral saturation (previous default)
-      // 0 = no blog posts found → high opportunity
-      // >0 = real data
       const saturationIndex = blogPostCount < 0
         ? NEUTRAL_SATURATION
         : buildSaturationIndex(blogPostCount > 0 ? item.total / blogPostCount : item.total);

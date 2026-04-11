@@ -307,3 +307,54 @@ export async function searchEncyclopedia(
   });
   return fetchSearch<EncycSearchResponse>(`/encyc.json?${params}`);
 }
+
+// ---------------------------------------------------------------------------
+// Naver Autocomplete (unofficial — may be blocked without notice)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch autocomplete suggestions from Naver's unofficial autocomplete API.
+ * Returns an array of suggested keywords. Returns [] on any failure.
+ *
+ * WARNING: This is an unofficial, unauthenticated endpoint.
+ * It may be blocked or changed without notice.
+ */
+export async function getAutocompleteSuggestions(keyword: string): Promise<string[]> {
+  if (!keyword.trim()) return [];
+  try {
+    const params = new URLSearchParams({
+      q: keyword,
+      con: "1",
+      frm: "nv",
+      ans: "2",
+      r_format: "json",
+      r_enc: "UTF-8",
+      r_unicode: "0",
+      t_koreng: "1",
+      q_enc: "UTF-8",
+      st: "100",
+      q_gen: "0",
+    });
+    const response = await fetch(
+      `https://ac.search.naver.com/nx/ac?${params}`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!response.ok) return [];
+
+    const text = await response.text();
+    if (text.length > 50_000) return [];
+    const data = JSON.parse(text);
+
+    // Validate response structure
+    if (!data?.items?.[0] || !Array.isArray(data.items[0])) return [];
+
+    const normalizedKeyword = keyword.trim().replace(/\s+/g, " ").toLowerCase();
+    return data.items[0]
+      .map((item: string[]) => item?.[0])
+      .filter((s: unknown): s is string =>
+        typeof s === "string" && s.trim().replace(/\s+/g, " ").toLowerCase() !== normalizedKeyword
+      );
+  } catch {
+    return [];
+  }
+}
