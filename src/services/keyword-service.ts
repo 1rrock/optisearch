@@ -18,7 +18,10 @@ import type {
   RelatedKeyword,
   CompetitionLevel,
   SaturationIndex,
+  AdMetrics,
+  EstimateResponse,
 } from "@/entities/keyword/model/types";
+import { getRedis } from "@/shared/lib/redis";
 import { gradeFromScore, getSaturationThreshold, CENSORED_VOLUME_THRESHOLD, ANOMALY_VOLUME_THRESHOLD, ANOMALY_BLOG_THRESHOLD } from "@/shared/config/constants";
 import { cached, CacheKeys, CacheTTL } from "@/services/cache-service";
 
@@ -188,6 +191,37 @@ export async function analyzeKeyword(
 
     const stat = statsResults.find((s) => s.relKeyword === keyword) ?? statsResults[0];
 
+    // Tier 1 ad metrics: extracted from existing stat data (zero new API calls)
+    // plAvgDepth, monthlyAvePcClkCnt, monthlyAveMobileClkCnt are fetched by getKeywordStats()
+    // but currently discarded — we extract them here.
+    const adMetricsTier1: AdMetrics = {
+      plAvgDepth: stat?.plAvgDepth ?? 0,
+      monthlyPcClkCnt: stat?.monthlyAvePcClkCnt ?? 0,
+      monthlyMobileClkCnt: stat?.monthlyAveMobileClkCnt ?? 0,
+    };
+
+    // Tier 2 ad metrics: opportunistic read from existing estimate cache
+    // /api/keywords/estimate endpoint populates `estimate:${keyword}` at 24h TTL
+    // IMPORTANT: use keyword as-is (no toLowerCase) — matches estimate route's cache key format
+    const adMetrics: AdMetrics = { ...adMetricsTier1 };
+    const redis = getRedis();
+    if (redis) {
+      try {
+        const estimateCache = await redis.get<EstimateResponse>(`estimate:${keyword}`);
+        if (estimateCache) {
+          const pcCpc = estimateCache.pcEstimate?.avgCpc ?? 0;
+          const mobileCpc = estimateCache.mobileEstimate?.avgCpc ?? 0;
+          // Weighted avg: 30% PC + 70% mobile (Korean market is mobile-dominant)
+          adMetrics.avgCpc = (pcCpc > 0 || mobileCpc > 0)
+            ? Math.round(pcCpc * 0.3 + mobileCpc * 0.7)
+            : undefined;
+          adMetrics.minBid = estimateCache.minimumBid ?? undefined;
+        }
+      } catch {
+        // Non-fatal: Tier 1 data still returned even if Redis read fails
+      }
+    }
+
     let pcSearchVolume = stat?.monthlyPcQcCnt ?? 0;
     let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
@@ -307,6 +341,7 @@ export async function analyzeKeyword(
       isEstimated: isEstimated || undefined,
       confidence: confidence || undefined,
       estimatedClicks,
+      adMetrics,
     };
   });
 }
@@ -435,6 +470,11 @@ export async function getRelatedKeywords(
         competition,
         keywordGrade: gradeFromScore(compositeScore),
         saturationIndex,
+        adMetrics: {
+          plAvgDepth: item.stat.plAvgDepth,
+          monthlyPcClkCnt: item.stat.monthlyAvePcClkCnt,
+          monthlyMobileClkCnt: item.stat.monthlyAveMobileClkCnt,
+        },
       } satisfies RelatedKeyword;
     });
   });

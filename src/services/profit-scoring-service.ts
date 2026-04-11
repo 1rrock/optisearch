@@ -7,6 +7,10 @@ export interface ProfitScoringInput {
   expectedClicks: number;
   competition: CompetitionLevel;
   conversionRate: number;
+  /** Optional: actual CPC from SearchAD estimate cache (KRW) */
+  avgCpc?: number;
+  /** Optional: average order value for ROAS calculation (KRW) */
+  avgOrderValue?: number;
 }
 
 interface NormalizedMetrics {
@@ -75,6 +79,40 @@ export function scoreProfitability(input: ProfitScoringInput) {
   const baseProfitScore = Math.round(clamp(weightedScore, 0, 100));
   const profitSignal = getOpportunityTier(baseProfitScore);
 
+  // CPC-based ROAS calculation (only when avgCpc is provided)
+  // Formula: (revenue - adSpend) / adSpend
+  let roasResult:
+    | {
+        value: number;
+        score: number;
+        monthlyAdSpend: number;
+        monthlyAdRevenue: number;
+        signal: "HIGH" | "MEDIUM" | "LOW";
+      }
+    | undefined;
+
+  if (input.avgCpc && input.avgCpc > 0) {
+    const aov = input.avgOrderValue ?? 30000; // default 30,000 KRW
+    const spend = input.expectedClicks * input.avgCpc;
+    const revenue = input.expectedClicks * input.conversionRate * aov;
+    const roas = spend > 0 ? (revenue - spend) / spend : 0;
+
+    // ROAS score: 0-100 scale with breakpoints at 0, 1, 3
+    let score: number;
+    if (roas <= 0) score = 0;
+    else if (roas <= 1) score = Math.round(roas * 30);
+    else if (roas <= 3) score = Math.round(30 + ((roas - 1) / 2) * 40);
+    else score = Math.round(Math.min(100, 70 + ((roas - 3) / 5) * 30));
+
+    roasResult = {
+      value: Math.round(roas * 100) / 100,
+      score,
+      monthlyAdSpend: spend,
+      monthlyAdRevenue: revenue,
+      signal: score >= 70 ? "HIGH" : score >= 40 ? "MEDIUM" : "LOW",
+    };
+  }
+
   return {
     keyword: input.keyword,
     baseProfitScore,
@@ -90,5 +128,6 @@ export function scoreProfitability(input: ProfitScoringInput) {
     },
     weights: SCORING_WEIGHTS,
     calculatedAt: new Date().toISOString(),
+    roas: roasResult,
   };
 }

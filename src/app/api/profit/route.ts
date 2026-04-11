@@ -8,8 +8,10 @@ const bodySchema = z.object({
   keyword: z.string().min(1),
   searchVolume: z.coerce.number().int().min(0),
   expectedClicks: z.coerce.number().int().min(0),
-  competition: z.enum(["LOW", "MEDIUM", "HIGH"]),
+  competition: z.enum(["LOW", "MEDIUM", "HIGH", "낮음", "중간", "높음"]),
   conversionRate: z.coerce.number().min(0).max(1).optional().default(0.02),
+  avgCpc: z.coerce.number().int().min(0).optional(),
+  avgOrderValue: z.coerce.number().int().min(0).optional(),
 });
 
 export async function POST(request: Request) {
@@ -46,7 +48,23 @@ export async function POST(request: Request) {
     );
   }
 
-  const scoring = scoreProfitability(parsed.data);
+  // Map Korean competition labels to English for profit-scoring-service
+  const competitionMap = {
+    "낮음": "LOW",
+    "중간": "MEDIUM",
+    "높음": "HIGH",
+    "LOW": "LOW",
+    "MEDIUM": "MEDIUM",
+    "HIGH": "HIGH",
+  } as const;
+  const competitionEn = competitionMap[parsed.data.competition as keyof typeof competitionMap] ?? "HIGH";
+
+  const scoring = scoreProfitability({
+    ...parsed.data,
+    competition: competitionEn,
+    avgCpc: parsed.data.avgCpc,
+    avgOrderValue: parsed.data.avgOrderValue,
+  });
 
   return Response.json({
     ...scoring,

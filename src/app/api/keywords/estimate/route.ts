@@ -8,28 +8,13 @@ import {
 import { cached } from "@/services/cache-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { createErrorResponse } from "@/shared/lib/api-handler";
+import type { EstimateResponse } from "@/entities/keyword/model/types";
+
+export type { EstimateResponse } from "@/entities/keyword/model/types";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
 });
-
-export interface EstimateResponse {
-  keyword: string;
-  pcEstimate: {
-    impressions: number;
-    clicks: number;
-    avgCpc: number;
-    cost: number;
-  } | null;
-  mobileEstimate: {
-    impressions: number;
-    clicks: number;
-    avgCpc: number;
-    cost: number;
-  } | null;
-  minimumBid: number | null;
-  positionBids: Array<{ position: number; bid: number }>;
-}
 
 // 24-hour cache — CPC data changes slowly
 const ESTIMATE_TTL = 24 * 60 * 60 * 1000;

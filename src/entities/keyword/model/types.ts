@@ -70,6 +70,7 @@ export interface KeywordSearchResult {
   /** Estimated monthly click count (PC + Mobile) derived from SearchAd CTR data */
   estimatedClicks?: number;
   profitSignal?: ProfitSignal;
+  adMetrics?: AdMetrics;
 }
 
 // ---------------------------------------------------------------------------
@@ -85,6 +86,7 @@ export interface RelatedKeyword {
   keywordGrade: KeywordGrade;
   /** Real saturation data from blog post count lookup (optional for backwards compat) */
   saturationIndex?: SaturationIndex;
+  adMetrics?: Pick<AdMetrics, 'plAvgDepth' | 'monthlyPcClkCnt' | 'monthlyMobileClkCnt'>;
 }
 
 // ---------------------------------------------------------------------------
@@ -139,6 +141,44 @@ export interface ShoppingInsight {
   }>;
   /** Category path string, e.g. "패션의류 > 여성의류" */
   category: string;
+}
+
+// ---------------------------------------------------------------------------
+// Estimate (CPC / bid data from Naver SearchAd Estimate API)
+// ---------------------------------------------------------------------------
+
+export interface EstimateResponse {
+  keyword: string;
+  pcEstimate: {
+    impressions: number;
+    clicks: number;
+    avgCpc: number;
+    cost: number;
+  } | null;
+  mobileEstimate: {
+    impressions: number;
+    clicks: number;
+    avgCpc: number;
+    cost: number;
+  } | null;
+  minimumBid: number | null;
+  positionBids: Array<{ position: number; bid: number }>;
+}
+
+/** Ad performance metrics from Naver SearchAD API.
+ * Tier 1 (plAvgDepth, click counts): always present from getKeywordStats().
+ * Tier 2 (avgCpc, minBid): populated from estimate cache when available. */
+export interface AdMetrics {
+  /** Average ad placement depth — how many ads show for this keyword */
+  plAvgDepth: number;
+  /** Monthly average PC click count */
+  monthlyPcClkCnt: number;
+  /** Monthly average mobile click count */
+  monthlyMobileClkCnt: number;
+  /** Weighted average CPC across devices (KRW) — from estimate cache, optional */
+  avgCpc?: number;
+  /** Minimum bid required for ad exposure (KRW) — from estimate cache, optional */
+  minBid?: number;
 }
 
 // ---------------------------------------------------------------------------

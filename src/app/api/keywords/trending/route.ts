@@ -15,6 +15,8 @@ export interface TrendingKeywordItem {
   direction: "up" | "down" | "stable";
   newsTitle?: string | null;
   newsLink?: string | null;
+  /** Commercial value score (0-100): log-normalized plAvgDepth × volume × trend momentum */
+  commercialScore?: number;
 }
 
 export interface TrendingResponse {
@@ -130,16 +132,45 @@ async function fetchFromTrendDaily(): Promise<TrendingResponse | null> {
     return Math.abs(b.change_rate) - Math.abs(a.change_rate);
   });
 
-  const keywords: TrendingKeywordItem[] = sorted.slice(0, 30).map((row) => ({
-    keyword: row.keyword,
-    volume: row.monthly_volume,
-    changeRate: Math.round(row.change_rate * 10) / 10,
-    estimatedDelta: row.estimated_delta,
-    direction:
-      row.change_rate > 5 ? "up" : row.change_rate < -5 ? "down" : "stable",
-    newsTitle: row.news_title ?? null,
-    newsLink: row.news_link ?? null,
-  }));
+  // Enrich top 10 with ad depth for commercial scoring (1 batch API call, optional)
+  const plMap = new Map<string, number>();
+  try {
+    const stats = await getKeywordStats(sorted.slice(0, 10).map((r) => r.keyword));
+    for (const s of stats) {
+      if (s.plAvgDepth > 0) {
+        plMap.set(s.relKeyword, s.plAvgDepth);
+      }
+    }
+  } catch {
+    // enrichment is optional — missing data → commercialScore: undefined
+  }
+
+  const keywords: TrendingKeywordItem[] = sorted.slice(0, 30).map((row) => {
+    const depth = plMap.get(row.keyword);
+    const commercialScore =
+      depth !== undefined
+        ? Math.min(
+            Math.round(
+              Math.log10(depth + 1) *
+                Math.log10((row.monthly_volume ?? 1) + 1) *
+                Math.min(Math.abs(row.change_rate ?? 0), 100) /
+                10
+            ),
+            100
+          )
+        : undefined;
+    return {
+      keyword: row.keyword,
+      volume: row.monthly_volume,
+      changeRate: Math.round(row.change_rate * 10) / 10,
+      estimatedDelta: row.estimated_delta,
+      direction:
+        row.change_rate > 5 ? "up" : row.change_rate < -5 ? "down" : "stable",
+      newsTitle: row.news_title ?? null,
+      newsLink: row.news_link ?? null,
+      commercialScore,
+    };
+  });
 
   return { period: "daily", keywords, lastUpdated: latestDate };
 }
