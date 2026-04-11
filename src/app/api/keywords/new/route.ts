@@ -2,6 +2,7 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { getKSTDateString } from "@/shared/lib/date-utils";
+import { getRedis } from "@/shared/lib/redis";
 
 export interface NewKeywordItem {
   keyword: string;
@@ -54,6 +55,48 @@ export async function GET(request: Request) {
   }
 }
 
+/**
+ * Reads verified new keywords from Redis for each date in range.
+ * Returns partial results (per-day hybrid): dates present in Redis use cached data,
+ * dates missing from Redis are returned with empty keywords so callers can fill them
+ * from DB if needed. Returns null only when Redis is unavailable.
+ */
+async function fetchFromRedis(
+  days: number,
+  endDate: Date
+): Promise<{ columns: NewKeywordDateColumn[]; missingDates: string[] } | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+
+  const columns: NewKeywordDateColumn[] = [];
+  const missingDates: string[] = [];
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date(endDate);
+    d.setDate(d.getDate() - i);
+    const dateStr = getKSTDateString(d);
+    const kstD = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const dayOfWeek = DAY_NAMES[kstD.getUTCDay()];
+
+    try {
+      const cached = await redis.get<string>(`new-keywords:verified:${dateStr}`);
+      if (cached === null) {
+        missingDates.push(dateStr);
+        columns.push({ date: dateStr, label: `${dateStr} ${dayOfWeek}`, dayOfWeek, keywords: [] });
+      } else {
+        const keywords: Array<{ keyword: string; volume: number }> =
+          typeof cached === "string" ? JSON.parse(cached) : cached;
+        columns.push({ date: dateStr, label: `${dateStr} ${dayOfWeek}`, dayOfWeek, keywords });
+      }
+    } catch {
+      missingDates.push(dateStr);
+      columns.push({ date: dateStr, label: `${dateStr} ${dayOfWeek}`, dayOfWeek, keywords: [] });
+    }
+  }
+
+  return { columns, missingDates };
+}
+
 async function fetchNewKeywords(
   days: number,
   centerDate: string | null
@@ -66,11 +109,32 @@ async function fetchNewKeywords(
   const startStr = formatDateISO(startDate);
   const endStr = formatDateISO(endDate);
 
-  // Try corpus first (primary source)
+  // Redis first — per-day hybrid: use cached data where available, DB for missing dates
+  const redisResult = await fetchFromRedis(days, endDate);
+  if (redisResult) {
+    const { columns, missingDates } = redisResult;
+
+    if (missingDates.length === 0) {
+      // All days cached — return Redis data directly
+      return { dates: columns, totalCount: columns.reduce((s, c) => s + c.keywords.length, 0), source: "corpus" };
+    }
+
+    // Fill missing dates from DB corpus
+    const corpusFull = await fetchFromCorpus(startStr, endStr, days, endDate);
+    if (corpusFull) {
+      const dbMap = new Map(corpusFull.dates.map((col) => [col.date, col]));
+      const merged = columns.map((col) =>
+        col.keywords.length === 0 && dbMap.has(col.date) ? dbMap.get(col.date)! : col
+      );
+      return { dates: merged, totalCount: merged.reduce((s, c) => s + c.keywords.length, 0), source: "corpus" };
+    }
+  }
+
+  // Full DB fallback
   const corpusResult = await fetchFromCorpus(startStr, endStr, days, endDate);
   if (corpusResult) return corpusResult;
 
-  // Fallback: keyword_searches
+  // Last resort: keyword_searches
   return fetchFromSearches(startStr, endStr, days, endDate);
 }
 

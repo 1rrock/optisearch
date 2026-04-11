@@ -127,7 +127,6 @@ export async function POST(request: Request) {
               source_seed: "blog-ratio",
               pc_volume: blogEstimated.pcSearchVolume,
               mobile_volume: blogEstimated.mobileSearchVolume,
-              first_seen_at: new Date().toISOString().split("T")[0],
               last_seen_at: new Date().toISOString().split("T")[0],
             },
             { onConflict: "keyword" }
@@ -151,7 +150,6 @@ export async function POST(request: Request) {
                 source_seed: "datalab-auto",
                 pc_volume: estimated.pcSearchVolume,
                 mobile_volume: estimated.mobileSearchVolume,
-                first_seen_at: new Date().toISOString().split("T")[0],
                 last_seen_at: new Date().toISOString().split("T")[0],
               },
               { onConflict: "keyword" }

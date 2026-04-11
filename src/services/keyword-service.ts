@@ -158,7 +158,6 @@ function upsertCorpus(
       source_seed: sourceSeed,
       pc_volume: pcVolume,
       mobile_volume: mobileVolume,
-      first_seen_at: today,
       last_seen_at: today,
     },
     { onConflict: "keyword" }

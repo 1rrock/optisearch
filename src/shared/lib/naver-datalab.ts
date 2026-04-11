@@ -623,7 +623,8 @@ export async function getSearchTrendBatch(
   }
 
   // Fire all batches in parallel (DataLab can handle concurrent requests within quota)
-  const responses = await Promise.all(
+  // allSettled so a single batch failure doesn't discard all other results
+  const settled = await Promise.allSettled(
     batches.map((batch) => {
       const keywordGroups = batch.map((kw) => ({
         groupName: kw,
@@ -638,8 +639,12 @@ export async function getSearchTrendBatch(
     })
   );
 
-  for (const response of responses) {
-    for (const r of response.results) {
+  for (const outcome of settled) {
+    if (outcome.status === "rejected") {
+      console.warn("[getSearchTrendBatch] batch failed:", outcome.reason instanceof Error ? outcome.reason.message : outcome.reason);
+      continue;
+    }
+    for (const r of outcome.value.results) {
       result.set(r.title, r.data);
     }
   }

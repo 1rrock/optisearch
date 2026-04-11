@@ -112,7 +112,6 @@ export async function POST(request: Request) {
               source_seed: "censored-seed",
               pc_volume: est.pcSearchVolume,
               mobile_volume: est.mobileSearchVolume,
-              first_seen_at: new Date().toISOString().split("T")[0],
               last_seen_at: new Date().toISOString().split("T")[0],
             },
             { onConflict: "keyword" }
