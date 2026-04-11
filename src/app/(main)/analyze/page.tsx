@@ -1413,30 +1413,32 @@ function AnalyzePageInner() {
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-4 lg:gap-6 mb-12">
             {/* Monthly Volume */}
             {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
                 <p className="text-sm font-bold text-muted-foreground mb-2">월간 검색량</p>
-                <div className="flex items-center gap-3 mb-4">
-                  <h2 className="text-3xl font-extrabold tracking-tight">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mb-4">
+                  <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight truncate">
                     {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
                   </h2>
-                  {isEstimated && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" title="SearchAd API가 차단한 키워드로, 블로그 비례 추정치입니다">
-                      추정
-                    </span>
-                  )}
-                  {isEstimated && confidence === "low" && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400" title="앵커 키워드 간 편차가 커 정확도가 낮을 수 있습니다">
-                      정확도 낮음
-                    </span>
-                  )}
-                  {gradeConfig && (
-                    <span
-                      className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white"
-                      style={{ backgroundColor: gradeConfig.color }}
-                    >
-                      {analysis?.keywordGrade}
-                    </span>
-                  )}
+                  <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                    {isEstimated && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 whitespace-nowrap" title="SearchAd API가 차단한 키워드로, 블로그 비례 추정치입니다">
+                        추정
+                      </span>
+                    )}
+                    {isEstimated && confidence === "low" && (
+                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 whitespace-nowrap" title="앵커 키워드 간 편차가 커 정확도가 낮을 수 있습니다">
+                        정확도 낮음
+                      </span>
+                    )}
+                    {gradeConfig && (
+                      <span
+                        className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white whitespace-nowrap"
+                        style={{ backgroundColor: gradeConfig.color }}
+                      >
+                        {analysis?.keywordGrade}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-xs font-medium">
@@ -1453,11 +1455,11 @@ function AnalyzePageInner() {
 
             {/* Competition */}
             {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
                 <p className="text-sm font-bold text-muted-foreground mb-2">경쟁도</p>
-                <div className="flex items-center gap-2 mb-4">
-                  <h2 className="text-3xl font-extrabold tracking-tight">{displayVolume.competition}</h2>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase ${competitionBadgeClass(displayVolume.competition)}`}>
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight truncate">{displayVolume.competition}</h2>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase whitespace-nowrap shrink-0 ${competitionBadgeClass(displayVolume.competition)}`}>
                     {displayVolume.competition}
                   </span>
                 </div>
@@ -1473,16 +1475,16 @@ function AnalyzePageInner() {
 
             {/* Monthly Clicks */}
             {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
                 <p className="text-sm font-bold text-muted-foreground mb-2">월간 예상 유입량</p>
-                <h2 className="text-3xl font-extrabold tracking-tight mb-2">
+                <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight mb-2 truncate">
                   {monthlyClicks.toLocaleString("ko-KR")}
                 </h2>
-                <div className="flex items-center gap-2 mt-4">
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full">
+                <div className="flex flex-wrap items-center gap-2 mt-4">
+                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                     CTR {(displayVolume.clickRate * 100).toFixed(1)}%
                   </span>
-                  <span className="text-[11px] text-muted-foreground">검색량 x 클릭률</span>
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">검색량 x 클릭률</span>
                 </div>
               </div>
             ) : <SkeletonCard />}
@@ -1499,14 +1501,14 @@ function AnalyzePageInner() {
 
             {/* Blog Posts — requires full analysis data */}
             {analysis ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50">
+              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
                 <p className="text-sm font-bold text-muted-foreground mb-2">블로그 글 수</p>
-                <h2 className="text-3xl font-extrabold tracking-tight mb-4">
+                <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight mb-4 truncate">
                   {analysis.blogPostCount.toLocaleString("ko-KR")}개
                 </h2>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-                  <TrendingUp className="size-4 text-emerald-500" />
-                  포화도: {analysis.saturationIndex.label}
+                <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground mt-2">
+                  <TrendingUp className="size-4 text-emerald-500 shrink-0" />
+                  <span className="whitespace-nowrap">포화도: {analysis.saturationIndex.label}</span>
                 </div>
               </div>
             ) : <SkeletonCard />}

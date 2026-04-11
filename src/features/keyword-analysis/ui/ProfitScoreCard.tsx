@@ -44,7 +44,7 @@ export function ProfitScoreCard({
   const scoreTone = signal === "HIGH" ? "text-emerald-400" : "text-cyan-400";
 
   return (
-    <div className="bg-card text-card-foreground p-6 rounded-xl shadow-sm border border-muted/50">
+    <div className="bg-card text-card-foreground p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
       <p className="text-sm font-bold text-muted-foreground mb-2">수익성 점수</p>
 
       {isLoading && score === undefined ? (
@@ -54,10 +54,10 @@ export function ProfitScoreCard({
         </>
       ) : (
         <>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex flex-wrap items-center gap-2 mb-4">
             <h2
               className={cn(
-                "text-3xl font-extrabold tracking-tight drop-shadow-[0_0_10px_rgba(34,211,238,0.45)]",
+                "text-2xl 2xl:text-3xl font-extrabold tracking-tight drop-shadow-[0_0_10px_rgba(34,211,238,0.45)] truncate",
                 signal === "HIGH" && "drop-shadow-[0_0_10px_rgba(52,211,153,0.45)]",
                 scoreTone,
               )}
@@ -65,7 +65,7 @@ export function ProfitScoreCard({
               {score ?? "-"}
             </h2>
             {signal && (
-              <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted/40", scoreTone)}>
+              <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full bg-muted/40 whitespace-nowrap shrink-0", scoreTone)}>
                 {SIGNAL_LABEL[signal]}
               </span>
             )}
