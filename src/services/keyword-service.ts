@@ -336,8 +336,9 @@ export async function getRelatedKeywords(
       .slice(0, 10);
 
     // Stage 2: Get volumes for new keywords via SearchAd (5s timeout)
-    // getKeywordStats returns the queried keywords PLUS their related keywords.
-    // Filter to only the keywords we asked about to avoid polluting results.
+    // Strategy: batch getKeywordStats first; if it returns nothing (400 errors),
+    // fall back to getRelatedKeywordsRaw with the first autocomplete keyword
+    // as seed to fetch volume-enriched related keywords.
     const newKeywordsSet = new Set(newKeywords.map(normalize));
     let newStats: Awaited<ReturnType<typeof getKeywordStats>> = [];
     if (newKeywords.length > 0) {
@@ -350,7 +351,22 @@ export async function getRelatedKeywords(
         ]);
         newStats = raw.filter(s => newKeywordsSet.has(normalize(s.relKeyword)));
       } catch {
-        // Timeout or failure: proceed with SearchAd-only results
+        // Timeout or failure: try fallback below
+      }
+
+      // Fallback: if batch stats returned nothing, use first autocomplete keyword
+      // as seed for getRelatedKeywordsRaw to get its related keywords with volume
+      if (newStats.length === 0) {
+        try {
+          newStats = await Promise.race([
+            getRelatedKeywordsRaw(newKeywords[0]),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("fallback timeout")), 5000)
+            ),
+          ]);
+        } catch {
+          // Total failure: proceed with SearchAd-only results
+        }
       }
     }
 
