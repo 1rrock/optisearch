@@ -49,12 +49,7 @@ export async function POST(request: Request) {
   const effectiveKeyword = (typoResult.errata ? typoResult.errata : null) ?? keyword;
 
   try {
-    if (adultResult.adult === "1") {
-      return Response.json(
-        { error: "성인 키워드는 분석할 수 없습니다." },
-        { status: 400 }
-      );
-    }
+    const isAdult = adultResult.adult === "1";
 
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
 
@@ -101,6 +96,7 @@ export async function POST(request: Request) {
       analysis: filteredAnalysis,
       correctedKeyword,
       plan: user.plan,
+      isAdult: isAdult || undefined,
     });
   } catch (err) {
     console.error("[api/analyze] Error:", err);

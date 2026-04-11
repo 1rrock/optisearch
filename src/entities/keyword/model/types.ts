@@ -65,6 +65,8 @@ export interface KeywordSearchResult {
   createdAt: string;
   /** True when search volume was estimated via DataLab reverse-calculation (censored keywords) */
   isEstimated?: boolean;
+  /** Confidence level for estimated volumes (high/medium/low based on anchor CV) */
+  confidence?: "high" | "medium" | "low";
   /** Estimated monthly click count (PC + Mobile) derived from SearchAd CTR data */
   estimatedClicks?: number;
   profitSignal?: ProfitSignal;

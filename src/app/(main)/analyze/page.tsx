@@ -54,6 +54,8 @@ interface QuickResponse {
   clickRate: number;
   estimatedClicks?: number;
   isEstimated?: boolean;
+  confidence?: "high" | "medium" | "low";
+  isAdult?: boolean;
   plan: "free" | "basic" | "pro";
   analysisToken?: string | null;
 }
@@ -62,6 +64,8 @@ interface FullResponse {
   analysis: KeywordSearchResult;
   correctedKeyword: string | null;
   plan: "free" | "basic" | "pro";
+  isAdult?: boolean;
+  confidence?: "high" | "medium" | "low";
 }
 
 interface ExtraResponse {
@@ -154,10 +158,6 @@ function stripHtml(str: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Competition helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Volatility (이슈성 지수) helper
 // ---------------------------------------------------------------------------
 
@@ -202,10 +202,6 @@ function toProfitCompetitionLevel(competition: string): ProfitCompetitionLevel {
   if (competition === "높음") return "HIGH";
   return "MEDIUM";
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // TrendSeries type
@@ -1218,6 +1214,7 @@ function AnalyzePageInner() {
   const monthlyClicks = quickData?.estimatedClicks
     ?? (displayVolume ? Math.round(displayVolume.totalSearchVolume * displayVolume.clickRate) : 0);
   const isEstimated = quickData?.isEstimated || analysis?.isEstimated;
+  const confidence = quickData?.confidence || analysis?.confidence;
   const displayCompetition = displayVolume?.competition;
   const displayTotalSearchVolume = displayVolume?.totalSearchVolume;
   const mutateProfit = profitMutation.mutate;
@@ -1354,6 +1351,13 @@ function AnalyzePageInner() {
       {/* Results — render progressively as data arrives */}
       {hasAnyData && (
         <>
+          {/* Adult keyword warning */}
+          {(quickData?.isAdult || fullData?.isAdult) && (
+            <div className="max-w-2xl mx-auto flex items-center gap-3 px-5 py-4 mb-4 bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 rounded-xl text-orange-700 dark:text-orange-400">
+              <AlertCircle className="size-5 shrink-0" />
+              <p className="text-sm font-medium">성인 키워드로 분류된 검색어입니다. 검색량 데이터가 제한적일 수 있습니다.</p>
+            </div>
+          )}
           {/* Results Header with Tag Copy and Bookmark */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0 mb-4">
             <h2 className="text-base font-bold text-muted-foreground">
@@ -1416,8 +1420,13 @@ function AnalyzePageInner() {
                     {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
                   </h2>
                   {isEstimated && (
-                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" title="SearchAd API가 차단한 키워드로, DataLab 데이터 기반 추정치입니다">
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400" title="SearchAd API가 차단한 키워드로, 블로그 비례 추정치입니다">
                       추정
+                    </span>
+                  )}
+                  {isEstimated && confidence === "low" && (
+                    <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400" title="앵커 키워드 간 편차가 커 정확도가 낮을 수 있습니다">
+                      정확도 낮음
                     </span>
                   )}
                   {gradeConfig && (

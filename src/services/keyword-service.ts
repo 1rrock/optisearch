@@ -9,7 +9,8 @@ import {
   searchShopping,
   searchNews,
 } from "@/shared/lib/naver-search";
-import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
+import { estimateVolumeFromBlogRatio, estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
+import type { ConfidenceLevel } from "@/shared/lib/naver-datalab";
 import { createServerClient } from "@/shared/lib/supabase";
 import type {
   KeywordSearchResult,
@@ -17,7 +18,7 @@ import type {
   CompetitionLevel,
   SaturationIndex,
 } from "@/entities/keyword/model/types";
-import { gradeFromScore, getSaturationThreshold } from "@/shared/config/constants";
+import { gradeFromScore, getSaturationThreshold, CENSORED_VOLUME_THRESHOLD, ANOMALY_VOLUME_THRESHOLD, ANOMALY_BLOG_THRESHOLD } from "@/shared/config/constants";
 import { cached, CacheKeys, CacheTTL } from "@/services/cache-service";
 
 // ---------------------------------------------------------------------------
@@ -106,6 +107,27 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function upsertCorpus(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  keyword: string,
+  sourceSeed: string,
+  pcVolume: number,
+  mobileVolume: number
+): void {
+  const today = new Date().toISOString().split("T")[0];
+  supabase.from("keyword_corpus").upsert(
+    {
+      keyword,
+      source_seed: sourceSeed,
+      pc_volume: pcVolume,
+      mobile_volume: mobileVolume,
+      first_seen_at: today,
+      last_seen_at: today,
+    },
+    { onConflict: "keyword" }
+  ).then(() => {}, () => {});
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -134,10 +156,11 @@ export async function analyzeKeyword(
     let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
     let isEstimated = false;
+    let confidence: ConfidenceLevel | undefined;
     const blogPostCount = blogResponse.total;
 
     // Reverse-estimate volume for censored keywords or anomalies (SearchAd returns 0, 10/10 floors, or suspicious lows)
-    if (totalSearchVolume <= 20 || (totalSearchVolume < 500 && blogPostCount > 50000)) {
+    if (totalSearchVolume <= CENSORED_VOLUME_THRESHOLD || (totalSearchVolume < ANOMALY_VOLUME_THRESHOLD && blogPostCount > ANOMALY_BLOG_THRESHOLD)) {
       // 1. Check keyword_corpus first — may have historical volume from before censorship
       const supabase = await createServerClient();
       const { data: corpusRow } = await supabase
@@ -146,23 +169,41 @@ export async function analyzeKeyword(
         .eq("keyword", keyword)
         .single();
 
-      if (corpusRow && (corpusRow.pc_volume > 0 || corpusRow.mobile_volume > 0)) {
+      if (corpusRow && (corpusRow.pc_volume + corpusRow.mobile_volume) > CENSORED_VOLUME_THRESHOLD) {
+        // Corpus value is above censored floor — trust it
         pcSearchVolume = corpusRow.pc_volume;
         mobileSearchVolume = corpusRow.mobile_volume;
         totalSearchVolume = pcSearchVolume + mobileSearchVolume;
         isEstimated = true;
-      }
+      } else {
+        // 2. Blog-ratio estimation (primary fallback — unlimited API, perfect ranking)
+        const blogEstimated = await estimateVolumeFromBlogRatio(
+          keyword,
+          (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase),
+          async (kw) => { const r = await searchBlog(kw, 1); return r.total; }
+        ).catch(() => null);
 
-      // 2. Fall back to DataLab estimation if corpus miss
-      const estimated = totalSearchVolume === 0
-        ? await estimateVolumeFromDataLab(keyword, (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase))
-        : null;
+        if (blogEstimated) {
+          pcSearchVolume = blogEstimated.pcSearchVolume;
+          mobileSearchVolume = blogEstimated.mobileSearchVolume;
+          totalSearchVolume = blogEstimated.totalSearchVolume;
+          isEstimated = true;
+          confidence = blogEstimated.confidence;
 
-      if (estimated) {
-        pcSearchVolume = estimated.pcSearchVolume;
-        mobileSearchVolume = estimated.mobileSearchVolume;
-        totalSearchVolume = estimated.totalSearchVolume;
-        isEstimated = true;
+          upsertCorpus(supabase, keyword, "blog-ratio", blogEstimated.pcSearchVolume, blogEstimated.mobileSearchVolume);
+        } else {
+          // 3. DataLab estimation (last resort — limited API)
+          const estimated = await estimateVolumeFromDataLab(keyword, (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase));
+          if (estimated) {
+            pcSearchVolume = estimated.pcSearchVolume;
+            mobileSearchVolume = estimated.mobileSearchVolume;
+            totalSearchVolume = estimated.totalSearchVolume;
+            isEstimated = true;
+            confidence = estimated.confidence ?? "low";
+
+            upsertCorpus(supabase, keyword, "datalab-auto", estimated.pcSearchVolume, estimated.mobileSearchVolume);
+          }
+        }
       }
     }
 
@@ -220,6 +261,7 @@ export async function analyzeKeyword(
       shoppingData: null,
       createdAt: new Date().toISOString(),
       isEstimated: isEstimated || undefined,
+      confidence: confidence || undefined,
       estimatedClicks,
     };
   });

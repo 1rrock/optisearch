@@ -392,11 +392,14 @@ const MOVING_AVG_MONTHS = 3;
 /** DataLab API allows max 5 keyword groups per request (target + references) */
 const MAX_DATALAB_GROUPS = 5;
 
+export type ConfidenceLevel = "high" | "medium" | "low";
+
 export interface EstimatedVolume {
   pcSearchVolume: number;
   mobileSearchVolume: number;
   totalSearchVolume: number;
   isEstimated: true;
+  confidence?: ConfidenceLevel;
 }
 
 /**
@@ -575,6 +578,14 @@ export async function estimateVolumeFromDataLab(
     const estPc = Math.round(refVolume.pc * scale);
     const estMobile = Math.round(refVolume.mobile * scale);
 
+    if (process.env.NODE_ENV === "development") {
+      console.warn(`[datalab] Estimated volume for "${targetKeyword}":`, {
+        bestRef: bestRef.keyword,
+        scale: scale.toFixed(4),
+        estimated: { pc: estPc, mobile: estMobile, total: estPc + estMobile },
+      });
+    }
+
     return {
       pcSearchVolume: estPc,
       mobileSearchVolume: estMobile,
@@ -634,4 +645,113 @@ export async function getSearchTrendBatch(
   }
 
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Blog-ratio estimation — uses blog post count as proxy for search volume
+// ---------------------------------------------------------------------------
+
+/**
+ * Estimate search volume for a censored keyword using blog-count proportional method.
+ *
+ * Algorithm:
+ * 1. For each anchor keyword: ratio_i = SearchAd_volume_i / blog_count_i
+ * 2. Take median of all ratios → median_ratio
+ * 3. estimated_volume = target_blog_count × median_ratio
+ * 4. PC/mobile split based on median PC ratio from anchors
+ * 5. Confidence from CV of anchor ratios
+ *
+ * Advantages over DataLab:
+ * - Perfect ranking accuracy (same source as comparison)
+ * - No DataLab API quota usage (searchBlog is unlimited)
+ * - Simpler and more robust
+ */
+export async function estimateVolumeFromBlogRatio(
+  targetKeyword: string,
+  getAnchorVolumes: (keywords: string[]) => Promise<Map<string, { pc: number; mobile: number }>>,
+  getBlogCount: (keyword: string) => Promise<number>
+): Promise<EstimatedVolume | null> {
+  const { ANCHOR_KEYWORDS, CONFIDENCE_CV_THRESHOLDS } = await import("@/shared/config/constants");
+
+  // 1. Get blog count for target
+  let targetBlogCount: number;
+  try {
+    targetBlogCount = await getBlogCount(targetKeyword);
+  } catch {
+    return null;
+  }
+  if (targetBlogCount <= 0) return null;
+
+  // 2. Get SearchAd volumes for all anchors
+  const anchorKws = [...ANCHOR_KEYWORDS] as string[];
+  const anchorVolumes = await getAnchorVolumes(anchorKws);
+
+  // 3. Get blog counts for each anchor and compute ratios
+  const ratios: number[] = [];
+  const pcRatios: number[] = [];
+
+  for (const anchor of anchorKws) {
+    const vol = anchorVolumes.get(anchor);
+    if (!vol || (vol.pc + vol.mobile) <= 0) continue;
+
+    let anchorBlogCount: number;
+    try {
+      anchorBlogCount = await getBlogCount(anchor);
+    } catch {
+      continue;
+    }
+    if (anchorBlogCount <= 0) continue;
+
+    const totalVol = vol.pc + vol.mobile;
+    ratios.push(totalVol / anchorBlogCount);
+    pcRatios.push(vol.pc / totalVol);
+  }
+
+  if (ratios.length < 2) return null;
+
+  // 4. Calculate median ratio
+  const sortedRatios = [...ratios].sort((a, b) => a - b);
+  const mid = Math.floor(sortedRatios.length / 2);
+  const medianRatio = sortedRatios.length % 2
+    ? sortedRatios[mid]
+    : (sortedRatios[mid - 1] + sortedRatios[mid]) / 2;
+
+  // 5. Calculate median PC ratio for split
+  const sortedPcRatios = [...pcRatios].sort((a, b) => a - b);
+  const pcMid = Math.floor(sortedPcRatios.length / 2);
+  const medianPcRatio = sortedPcRatios.length % 2
+    ? sortedPcRatios[pcMid]
+    : (sortedPcRatios[pcMid - 1] + sortedPcRatios[pcMid]) / 2;
+
+  // 6. Estimate volume
+  const totalEstimated = Math.round(targetBlogCount * medianRatio);
+  const pcEstimated = Math.round(totalEstimated * medianPcRatio);
+  const mobileEstimated = totalEstimated - pcEstimated;
+
+  // 7. Calculate confidence from CV of ratios
+  const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  const variance = ratios.reduce((sum, r) => sum + (r - mean) ** 2, 0) / ratios.length;
+  const cv = Math.sqrt(variance) / mean;
+
+  const confidence: ConfidenceLevel =
+    cv < CONFIDENCE_CV_THRESHOLDS.high ? "high" :
+    cv < CONFIDENCE_CV_THRESHOLDS.medium ? "medium" : "low";
+
+  if (process.env.NODE_ENV === "development") {
+    console.warn(`[blog-ratio] Estimated volume for "${targetKeyword}":`, {
+      blogCount: targetBlogCount,
+      medianRatio: medianRatio.toFixed(6),
+      cv: cv.toFixed(3),
+      confidence,
+      estimated: { pc: pcEstimated, mobile: mobileEstimated, total: totalEstimated },
+    });
+  }
+
+  return {
+    pcSearchVolume: pcEstimated,
+    mobileSearchVolume: mobileEstimated,
+    totalSearchVolume: totalEstimated,
+    isEstimated: true,
+    confidence,
+  };
 }

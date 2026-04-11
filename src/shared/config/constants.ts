@@ -1,6 +1,35 @@
 import type { KeywordGrade } from "@/shared/model/keyword-grade";
 
 // ---------------------------------------------------------------------------
+// Censored / anomaly detection thresholds
+// ---------------------------------------------------------------------------
+
+/** SearchAd total volume at or below this is treated as censored (triggers fallback) */
+export const CENSORED_VOLUME_THRESHOLD = 20;
+
+/** SearchAd total volume below this triggers anomaly check against blog count */
+export const ANOMALY_VOLUME_THRESHOLD = 500;
+
+/** Blog post count above this (combined with low SearchAd volume) signals censorship anomaly */
+export const ANOMALY_BLOG_THRESHOLD = 50_000;
+
+/**
+ * Non-censored anchor keywords for blog-ratio estimation.
+ * Spread across small / medium / large volume tiers for robust median.
+ */
+export const ANCHOR_KEYWORDS = [
+  "아이폰",      // ~174K vol, tech
+  "삼성전자",    // ~20M vol, mega
+  "볼보",        // ~130K vol, auto
+  "제주도맛집",  // ~44K vol, small
+  "건조기",      // ~65K vol, appliance
+  "기아차",      // ~176K vol, auto
+] as const;
+
+/** CV thresholds for blog-ratio estimation confidence */
+export const CONFIDENCE_CV_THRESHOLDS = { high: 0.3, medium: 0.6 } as const;
+
+// ---------------------------------------------------------------------------
 // Chart colors
 // ---------------------------------------------------------------------------
 

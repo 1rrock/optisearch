@@ -4,8 +4,10 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { recordAndEnforce } from "@/services/usage-service";
 import { signAnalysisToken } from "@/shared/lib/analysis-token";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
-import { estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
-import { PLAN_LIMITS } from "@/shared/config/constants";
+import { estimateVolumeFromBlogRatio, estimateVolumeFromDataLab } from "@/shared/lib/naver-datalab";
+import type { ConfidenceLevel } from "@/shared/lib/naver-datalab";
+import { PLAN_LIMITS, CENSORED_VOLUME_THRESHOLD, ANOMALY_VOLUME_THRESHOLD, ANOMALY_BLOG_THRESHOLD } from "@/shared/config/constants";
+import { searchBlog } from "@/shared/lib/naver-search";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { saveSearchHistory } from "@/services/history-service";
@@ -59,12 +61,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    if (adultResult.adult === "1") {
-      return Response.json(
-        { error: "성인 키워드는 분석할 수 없습니다." },
-        { status: 400 }
-      );
-    }
+    const isAdult = adultResult.adult === "1";
 
     const correctedKeyword = typoResult.errata ? typoResult.errata : null;
     const effectiveKeyword = correctedKeyword ?? keyword;
@@ -78,9 +75,22 @@ export async function POST(request: Request) {
     let mobileSearchVolume = stat?.monthlyMobileQcCnt ?? 0;
     let totalSearchVolume = pcSearchVolume + mobileSearchVolume;
     let isEstimated = false;
+    let confidence: ConfidenceLevel | undefined;
 
     // Reverse-estimate volume for censored keywords (SearchAd returns 0 or 10/10 floors)
-    if (totalSearchVolume <= 20) {
+    // Also detect anomalies: low SearchAd volume + high blog count = likely censored
+    let needsFallback = totalSearchVolume <= CENSORED_VOLUME_THRESHOLD;
+
+    if (!needsFallback && totalSearchVolume < ANOMALY_VOLUME_THRESHOLD) {
+      try {
+        const blogResult = await searchBlog(effectiveKeyword, 1);
+        needsFallback = blogResult.total > ANOMALY_BLOG_THRESHOLD;
+      } catch {
+        // Anomaly detection is best-effort; skip fallback on API failure
+      }
+    }
+
+    if (needsFallback) {
       // 1. Check keyword_corpus first — may have historical volume from before censorship
       const supabase = await createServerClient();
       const { data: corpusRow } = await supabase
@@ -89,22 +99,64 @@ export async function POST(request: Request) {
         .eq("keyword", effectiveKeyword)
         .single();
 
-      if (corpusRow && (corpusRow.pc_volume > 0 || corpusRow.mobile_volume > 0)) {
+      if (corpusRow && (corpusRow.pc_volume + corpusRow.mobile_volume) > CENSORED_VOLUME_THRESHOLD) {
+        // Corpus value is above censored floor — trust it
         pcSearchVolume = corpusRow.pc_volume;
         mobileSearchVolume = corpusRow.mobile_volume;
         totalSearchVolume = pcSearchVolume + mobileSearchVolume;
-        isEstimated = true; // still flagged as estimated (historical, not current)
+        isEstimated = true;
       } else {
-        // 2. Fall back to DataLab estimation, using corpus for reference volumes too
-        const estimated = await estimateVolumeFromDataLab(
+        // 2. Blog-ratio estimation (primary fallback — unlimited API, perfect ranking)
+        const blogEstimated = await estimateVolumeFromBlogRatio(
           effectiveKeyword,
-          (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase)
-        );
-        if (estimated) {
-          pcSearchVolume = estimated.pcSearchVolume;
-          mobileSearchVolume = estimated.mobileSearchVolume;
-          totalSearchVolume = estimated.totalSearchVolume;
+          (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase),
+          async (kw) => { const r = await searchBlog(kw, 1); return r.total; }
+        ).catch(() => null);
+
+        if (blogEstimated) {
+          pcSearchVolume = blogEstimated.pcSearchVolume;
+          mobileSearchVolume = blogEstimated.mobileSearchVolume;
+          totalSearchVolume = blogEstimated.totalSearchVolume;
           isEstimated = true;
+          confidence = blogEstimated.confidence;
+
+          // Cache to corpus for future requests
+          supabase.from("keyword_corpus").upsert(
+            {
+              keyword: effectiveKeyword,
+              source_seed: "blog-ratio",
+              pc_volume: blogEstimated.pcSearchVolume,
+              mobile_volume: blogEstimated.mobileSearchVolume,
+              first_seen_at: new Date().toISOString().split("T")[0],
+              last_seen_at: new Date().toISOString().split("T")[0],
+            },
+            { onConflict: "keyword" }
+          ).then(() => {}, () => {});
+        } else {
+          // 3. DataLab estimation (last resort — limited API)
+          const estimated = await estimateVolumeFromDataLab(
+            effectiveKeyword,
+            (keywords) => getVolumeMapFromCorpusOrSearchAd(keywords, supabase)
+          );
+          if (estimated) {
+            pcSearchVolume = estimated.pcSearchVolume;
+            mobileSearchVolume = estimated.mobileSearchVolume;
+            totalSearchVolume = estimated.totalSearchVolume;
+            isEstimated = true;
+            confidence = estimated.confidence ?? "low";
+
+            supabase.from("keyword_corpus").upsert(
+              {
+                keyword: effectiveKeyword,
+                source_seed: "datalab-auto",
+                pc_volume: estimated.pcSearchVolume,
+                mobile_volume: estimated.mobileSearchVolume,
+                first_seen_at: new Date().toISOString().split("T")[0],
+                last_seen_at: new Date().toISOString().split("T")[0],
+              },
+              { onConflict: "keyword" }
+            ).then(() => {}, () => {});
+          }
         }
       }
     }
@@ -183,6 +235,8 @@ export async function POST(request: Request) {
       clickRate,
       estimatedClicks,
       isEstimated: isEstimated || undefined,
+      confidence: confidence || undefined,
+      isAdult: isAdult || undefined,
       plan: user.plan,
       analysisToken: analysisToken ?? undefined,
     });
