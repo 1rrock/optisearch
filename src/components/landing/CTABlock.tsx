@@ -7,7 +7,7 @@ export function CTABlock() {
     <section className="py-32 relative overflow-hidden bg-background">
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-accent/20 to-purple-600/30 mix-blend-screen opacity-50 blur-[100px] animate-pulse" style={{ animationDuration: '8s' }}></div>
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.05] pointer-events-none"></div>
+        <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.05] pointer-events-none"></div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 relative z-10 text-center">

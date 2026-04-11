@@ -49,7 +49,7 @@ export function Hero() {
                 </div>
               </div>
               <div className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-sm text-xs font-black tracking-widest">
-                고마진
+                참고 지표
               </div>
             </div>
 
@@ -57,7 +57,7 @@ export function Hero() {
               <div>
                 <div className="flex justify-between text-xs text-muted-foreground mb-2 font-mono">
                   <span>현재 순위</span>
-                  <span>예상 순위</span>
+                  <span>시뮬레이션 순위</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex-1 bg-muted rounded-lg p-3 border border-border text-center relative overflow-hidden">

@@ -116,6 +116,28 @@ export function MobileNav() {
               })}
             </div>
           ))}
+          
+          {userPlan === "free" && (
+            <div className="mt-6 rounded-xl bg-gradient-to-br from-primary/15 via-primary/5 to-background border border-primary/20 p-4 mb-2 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                  <Sparkles className="size-3.5" />
+                </div>
+                <span className="text-[13px] font-bold text-foreground tracking-tight">제한 없이 분석하세요 🚀</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-4 leading-relaxed break-keep">
+                일일 10회 제한으로 부족하신가요? 무제한 검색과 강력한 AI 도구로 가치를 창출하세요.
+              </p>
+              <SheetClose asChild>
+                <Link 
+                  href="/pricing" 
+                  className="flex items-center justify-center w-full py-2.5 text-xs font-bold text-primary-foreground bg-primary rounded-lg shadow-md shadow-primary/20 active:scale-[0.98] transition-all"
+                >
+                  지금 혜택 확인하기
+                </Link>
+              </SheetClose>
+            </div>
+          )}
         </nav>
 
         <div className="mt-auto border-t p-3">

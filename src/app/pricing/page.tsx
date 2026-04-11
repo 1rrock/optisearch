@@ -2,11 +2,12 @@
 
 import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
 import { CheckCircle2, X } from "lucide-react";
+import Link from "next/link";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { toast } from "sonner";
 
 type FeatureValue = string | boolean;
 
@@ -58,11 +59,12 @@ interface PlanCardProps {
   planId: PlanId;
   currentPlan: PlanId | null;
   isPopular?: boolean;
-  onSubscribe: (planId: PlanId) => void;
+  checkoutHref: string;
+  onPaidPlanClick: () => void;
   isLoading?: boolean;
 }
 
-function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: PlanCardProps) {
+function PlanCard({ planId, currentPlan, isPopular, checkoutHref, onPaidPlanClick, isLoading }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
   const isCurrent = currentPlan === planId;
 
@@ -77,10 +79,10 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
     : isSubscribed
     ? "현재 플랜"
     : planId === "free"
-    ? "무료로 시작하기"
+    ? "시작하기"
     : planId === "basic"
-    ? "베이직 시작하기"
-    : "프로 시작하기";
+    ? "결제하기"
+    : "결제하기";
 
   return (
     <Card
@@ -143,24 +145,32 @@ function PlanCard({ planId, currentPlan, isPopular, onSubscribe, isLoading }: Pl
         </ul>
 
         {/* CTA */}
-        <Button
-          size="lg"
-          variant={planId === "free" || !canUpgrade ? "outline" : "default"}
-          disabled={isCurrent || isSubscribed || isLoading}
-          className={[
-            "w-full rounded-xl font-bold h-12",
-            isPopular && canUpgrade
-              ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
-              : "",
-          ].join(" ")}
-          onClick={() => {
-            if (canUpgrade && planId !== "free") {
-              onSubscribe(planId);
-            }
-          }}
-        >
-          {ctaLabel}
-        </Button>
+        {planId === "free" ? (
+          <Button
+            asChild
+            size="lg"
+            variant="outline"
+            disabled={isCurrent || isSubscribed || isLoading}
+            className="w-full rounded-xl font-bold h-12"
+          >
+            <Link href={checkoutHref}>{ctaLabel}</Link>
+          </Button>
+        ) : (
+          <Button
+            size="lg"
+            variant={!canUpgrade ? "outline" : "default"}
+            disabled={isCurrent || isSubscribed || isLoading}
+            onClick={onPaidPlanClick}
+            className={[
+              "w-full rounded-xl font-bold h-12",
+              isPopular && canUpgrade
+                ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+                : "",
+            ].join(" ")}
+          >
+            {ctaLabel}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );
@@ -176,9 +186,22 @@ function PricingContent() {
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
 
-  const handleSubscribe = (planId: PlanId) => {
-    if (planId === "free") return;
+  const showComingSoon = () => {
     toast.info("결제 시스템 준비 중입니다. 곧 서비스가 오픈됩니다!");
+  };
+
+  const checkoutPathByPlan: Record<PlanId, string> = {
+    free: "/dashboard",
+    basic: "/checkout?plan=basic",
+    pro: "/checkout?plan=pro",
+  };
+
+  const getCheckoutHref = (planId: PlanId) => {
+    const targetPath = checkoutPathByPlan[planId];
+    if (isAuthenticated) {
+      return targetPath;
+    }
+    return `/login?callbackUrl=${encodeURIComponent(targetPath)}`;
   };
 
   return (
@@ -193,9 +216,28 @@ function PricingContent() {
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto w-full items-start">
-        <PlanCard planId="free" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
-        <PlanCard planId="basic" currentPlan={currentPlan} isPopular onSubscribe={handleSubscribe} isLoading={false} />
-        <PlanCard planId="pro" currentPlan={currentPlan} onSubscribe={handleSubscribe} isLoading={false} />
+        <PlanCard
+          planId="free"
+          currentPlan={currentPlan}
+          checkoutHref={getCheckoutHref("free")}
+          onPaidPlanClick={showComingSoon}
+          isLoading={false}
+        />
+        <PlanCard
+          planId="basic"
+          currentPlan={currentPlan}
+          isPopular
+          checkoutHref={getCheckoutHref("basic")}
+          onPaidPlanClick={showComingSoon}
+          isLoading={false}
+        />
+        <PlanCard
+          planId="pro"
+          currentPlan={currentPlan}
+          checkoutHref={getCheckoutHref("pro")}
+          onPaidPlanClick={showComingSoon}
+          isLoading={false}
+        />
       </div>
 
       {/* Feature comparison table (desktop) */}

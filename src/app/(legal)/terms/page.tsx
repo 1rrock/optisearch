@@ -81,13 +81,9 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제5조 (결제 및 환불)</h2>
+        <h2 className="text-xl font-bold mb-4">제5조 (결제)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>유료 플랜 이용 요금은 결제일 기준 월 단위로 청구됩니다.</li>
-          <li>
-            결제일로부터 30일 이내에는 사유에 관계없이 전액 환불을 요청할 수 있습니다.
-            환불 요청은 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 문의하시기 바랍니다.
-          </li>
           <li>구독 취소 후에는 해당 결제 기간 종료 시까지 서비스를 이용할 수 있으며, 이후 무료 플랜으로 전환됩니다.</li>
           <li>결제 오류 또는 이중 청구 발생 시 즉시 전액 환불 처리합니다.</li>
         </ul>
@@ -111,7 +107,23 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제7조 (서비스 변경 및 중단)</h2>
+        <h2 className="text-xl font-bold mb-4">제7조 (청약철회 및 환불)</h2>
+        <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+          <li>
+            유료 플랜 결제 후 AI 쿼리 사용 이력이 없는 경우, 결제일로부터 7일 이내에 청약철회 및 100% 환불을 요청할 수 있습니다.
+          </li>
+          <li>
+            AI 쿼리를 1회라도 사용한 경우에는 디지털 콘텐츠 특성상 전자상거래 등에서의 소비자보호에 관한 법률에 따라 청약철회 및 환불이 제한됩니다.
+          </li>
+          <li>
+            환불 요청은 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 접수하며,
+            접수일로부터 영업일 기준 3일 이내 처리 결과를 안내합니다.
+          </li>
+        </ul>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-4">제8조 (서비스 변경 및 중단)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>서비스는 운영 및 기술적 필요에 의해 기능 일부 또는 전부를 변경·추가·제거할 수 있습니다.</li>
           <li>서비스 종료 시 최소 30일 전 서비스 내 공지사항을 통해 사전 고지합니다.</li>
@@ -121,7 +133,7 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제8조 (면책 조항)</h2>
+        <h2 className="text-xl font-bold mb-4">제9조 (면책 조항)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>
             서비스는 AI를 통해 생성된 콘텐츠의 정확성, 완전성, 적법성을 보장하지 않습니다. 생성된 콘텐츠의 최종 검토 및
@@ -135,7 +147,7 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제9조 (지식재산권)</h2>
+        <h2 className="text-xl font-bold mb-4">제10조 (지식재산권)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>서비스 내 UI, 로고, 소프트웨어, 데이터베이스 등의 지식재산권은 옵티써치에 귀속됩니다.</li>
           <li>이용자가 서비스를 통해 생성한 콘텐츠의 권리는 이용자에게 귀속됩니다.</li>
@@ -147,7 +159,7 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제10조 (분쟁 해결)</h2>
+        <h2 className="text-xl font-bold mb-4">제11조 (분쟁 해결)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>서비스 이용과 관련한 분쟁은 먼저 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>을 통한 협의로 해결을 시도합니다.</li>
           <li>협의가 이루어지지 않을 경우, 소비자분쟁조정위원회에 조정을 신청하거나 소 제기를 통해 해결할 수 있습니다.</li>
@@ -156,7 +168,7 @@ export default function TermsPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">제11조 (약관 변경)</h2>
+        <h2 className="text-xl font-bold mb-4">제12조 (약관 변경)</h2>
         <p className="text-muted-foreground leading-relaxed">
           서비스는 법령 변경 또는 서비스 정책 변경 시 본 약관을 수정할 수 있습니다. 변경된 약관은 서비스 내 공지사항을 통해
           시행 7일 전(중요 사항의 경우 30일 전)에 안내하며, 이후에도 서비스를 계속 이용하면 변경된 약관에 동의한 것으로 간주합니다.

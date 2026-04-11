@@ -159,7 +159,7 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
 export const PLAN_PRICING: Record<PlanId, { monthly: number; label: string }> = {
   free: { monthly: 0, label: "무료" },
   basic: { monthly: 9900, label: "베이직" },
-  pro: { monthly: 29000, label: "프로" },
+  pro: { monthly: 29900, label: "프로" },
 } as const;
 
 // ---------------------------------------------------------------------------

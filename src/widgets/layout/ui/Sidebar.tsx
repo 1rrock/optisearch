@@ -71,9 +71,27 @@ export function Sidebar() {
           <NavItem href="/bulk" icon={<Layers className="size-4" />} label="대량 분석" active={pathname === "/bulk"} />
           <NavItem href="/compare" icon={<ListPlus className="size-4" />} label="키워드 비교" active={pathname === "/compare"} />
           <NavItem href="/ai" icon={<Sparkles className="size-4" />} label="AI 도구" active={pathname === "/ai"} />
-
-          <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider mt-4">계정</div>
         </nav>
+
+        {userPlan === "free" && (
+          <div className="mt-10 rounded-xl bg-gradient-to-br from-primary/15 via-primary/5 to-background border border-primary/20 p-4 mx-1 mb-2 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/20 text-primary">
+                <Sparkles className="size-3.5" />
+              </div>
+              <span className="text-[13px] font-bold text-foreground tracking-tight">제한 없이 분석하세요 🚀</span>
+            </div>
+            <p className="text-[11px] text-muted-foreground mb-4 leading-relaxed break-keep">
+              일일 10회 제한으로 부족하신가요? 무제한 검색과 강력한 AI 도구로 시장을 선점하세요.
+            </p>
+            <Link 
+              href="/pricing" 
+              className="flex items-center justify-center w-full py-2.5 text-xs font-bold text-primary-foreground bg-primary rounded-lg shadow-md shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+            >
+              지금 혜택 확인하기
+            </Link>
+          </div>
+        )}
       </div>
       <div className="mt-auto p-4 border-t bg-card/50 relative" ref={menuRef}>
         {/* Popup menu */}

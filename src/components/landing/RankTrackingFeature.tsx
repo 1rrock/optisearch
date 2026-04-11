@@ -52,7 +52,7 @@ export function RankTrackingFeature() {
         </div>
 
         <div className="relative h-[450px] bg-muted/30 backdrop-blur-md rounded-3xl border border-border shadow-[0_0_50px_hsl(var(--accent)/0.05)] p-8">
-          <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.02] pointer-events-none rounded-3xl"></div>
+          <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.02] pointer-events-none rounded-3xl"></div>
           
           <div className="flex justify-between items-center mb-8 border-b border-border/50 pb-6">
             <div>

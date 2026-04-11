@@ -47,7 +47,7 @@ export function ProfitScoringFeature() {
                     <span className="text-xl font-bold text-muted-foreground">&quot;운동화&quot;</span>
                   </div>
                   <div className="text-right">
-                    <div className="text-xs text-muted-foreground font-mono mb-1">수익 점수</div>
+                    <div className="text-xs text-muted-foreground font-mono mb-1">시장성 점수</div>
                     <div className="text-2xl font-black text-destructive/80">14</div>
                   </div>
                 </div>
@@ -71,7 +71,7 @@ export function ProfitScoringFeature() {
 
                   <div className="mt-6">
                     <div className="flex justify-between items-end mb-2">
-                      <span className="text-sm font-bold text-muted-foreground">수익 점수</span>
+                      <span className="text-sm font-bold text-muted-foreground">시장성 점수</span>
                       <span className="text-4xl font-black text-primary drop-shadow-[0_0_15px_hsl(var(--primary)/0.8)]">
                         {isVisible ? '98' : '0'}
                       </span>
@@ -107,10 +107,10 @@ export function ProfitScoringFeature() {
         <div className="order-1 lg:order-2 space-y-8">
           <h2 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-foreground leading-[1.1]">
             데이터에 기반한 <br/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-muted-foreground to-foreground">수익성 평가</span>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-muted-foreground to-foreground">키워드 가치 평가</span>
           </h2>
           <p className="text-xl text-muted-foreground font-medium leading-relaxed max-w-xl">
-            단순 검색량 지표를 넘어 실제 수익 창출 가능성을 분석합니다. OptiSearch는 경쟁 강도와 예상 마진율을 계산하여, 각 키워드의 실질적인 <span className="text-foreground font-bold">수익 점수</span>를 제공합니다.
+            단순 검색량 지표를 넘어 실제 시장 진입 가능성을 분석합니다. OptiSearch는 경쟁 강도와 예상 마진율을 계산하여, 각 키워드의 실질적인 <span className="text-foreground font-bold">시장성 점수</span>를 제공합니다.
           </p>
           <p className="text-lg text-muted-foreground max-w-xl">
             막연한 감이 아닌 정량적 데이터를 바탕으로, 효율적인 상품 기획과 안정적인 마진 확보가 가능한 키워드를 선별하세요.

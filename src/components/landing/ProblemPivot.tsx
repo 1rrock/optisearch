@@ -30,7 +30,7 @@ export function ProblemPivot() {
 
         <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
           <div className="p-10 rounded-3xl bg-muted/30 border border-border shadow-inner relative overflow-hidden group">
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] pointer-events-none"></div>
             <div className="flex items-center gap-4 mb-8 relative z-10">
               <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center border border-destructive/20">
                 <XCircle className="size-6 text-destructive" />
@@ -48,7 +48,7 @@ export function ProblemPivot() {
           </div>
 
           <div className="p-10 rounded-3xl bg-gradient-to-b from-primary/10 to-background border border-primary/30 shadow-[0_0_50px_hsl(var(--primary)/0.1)] relative overflow-hidden">
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none"></div>
+            <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] pointer-events-none"></div>
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
             
             <div className="flex items-center gap-4 mb-8 relative z-10">

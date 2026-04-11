@@ -213,7 +213,7 @@ export default function DashboardPage() {
               <span className="text-primary text-3xl">📈</span> 내 상품 순위 추적
             </h2>
             <p className="text-muted-foreground text-sm mt-2">
-              스마트스토어 URL과 키워드를 등록하면 매일 자동으로 네이버 쇼핑 순위 변동을 우상향으로 만들어드립니다.
+              스마트스토어 URL과 키워드를 등록하면 매일 네이버 쇼핑 순위 변동을 자동으로 추적하여 보여드립니다.
             </p>
           </div>
           <div className="shrink-0 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 flex items-center gap-2 self-start md:self-auto">
