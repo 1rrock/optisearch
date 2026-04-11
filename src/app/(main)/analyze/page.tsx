@@ -30,6 +30,11 @@ import {
   ChevronUp,
   ChevronDown,
   Download,
+  BarChart3,
+  Zap,
+  Coins,
+  MousePointerClick,
+  Megaphone,
 } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
 import { getKeywordGradeConfig, CHART_COLORS } from "@/shared/config/constants";
@@ -38,6 +43,7 @@ import type { TrendPoint, SeasonalityInfo } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
 import { SearchInputWithHistory } from "@/shared/components/SearchInputWithHistory";
+import { cn } from "@/shared/lib/utils";
 import { competitionBadgeClass } from "@/shared/lib/keyword-utils";
 
 // ---------------------------------------------------------------------------
@@ -154,7 +160,17 @@ async function fetchExtra(keyword: string, analysisContext?: {
 // ---------------------------------------------------------------------------
 
 function stripHtml(str: string): string {
-  return str.replace(/<[^>]*>/g, "");
+  if (!str) return "";
+  // 1. Remove tags
+  const withoutTags = str.replace(/<[^>]*>/g, "");
+  // 2. Decode common entities
+  return withoutTags
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ");
 }
 
 // ---------------------------------------------------------------------------
@@ -658,9 +674,9 @@ function RelatedRow({ word, vol, comp, onClick, onCompare }: { word: string; vol
   );
 }
 
-function SkeletonCard() {
+function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 animate-pulse">
+    <div className={cn("bg-card p-6 rounded-xl shadow-sm border border-muted/50 animate-pulse", className)}>
       <div className="h-3 w-20 bg-muted rounded mb-4"></div>
       <div className="h-8 w-28 bg-muted rounded mb-4"></div>
       <div className="h-2 w-full bg-muted rounded"></div>
@@ -1409,86 +1425,84 @@ function AnalyzePageInner() {
             </div>
           )}
 
-          {/* Row 1: Key Metrics (renders with quickData) */}
-          <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-5 gap-4 lg:gap-6 mb-12">
-            {/* Monthly Volume */}
+          {/* Dashboard Header */}
+          <div className="flex items-center gap-3 mb-8 px-1">
+            <div className="size-10 bg-primary/10 rounded-xl flex items-center justify-center">
+              <Sparkles className="size-6 text-primary" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black">핵심 인사이트 분석</h3>
+              <p className="text-xs text-muted-foreground font-medium">시장 규모와 경쟁도, 수익성을 종합 분석한 지표입니다.</p>
+            </div>
+          </div>
+
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 items-stretch">
+            {/* Row 1, Col 1: Monthly Volume (Market Core) */}
             {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
-                <p className="text-sm font-bold text-muted-foreground mb-2">월간 검색량</p>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-2 mb-4">
-                  <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight truncate">
-                    {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-                    {isEstimated && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 whitespace-nowrap" title="SearchAd API가 차단한 키워드로, 블로그 비례 추정치입니다">
-                        추정
-                      </span>
-                    )}
-                    {isEstimated && confidence === "low" && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400 whitespace-nowrap" title="앵커 키워드 간 편차가 커 정확도가 낮을 수 있습니다">
-                        정확도 낮음
-                      </span>
-                    )}
-                    {gradeConfig && (
-                      <span
-                        className="px-2 py-0.5 text-[11px] font-extrabold rounded text-white whitespace-nowrap"
-                        style={{ backgroundColor: gradeConfig.color }}
-                      >
-                        {analysis?.keywordGrade}
-                      </span>
-                    )}
-                  </div>
+              <div className="bg-card/40 backdrop-blur-sm p-7 rounded-[2rem] shadow-sm border border-muted/50 hover:border-primary/30 transition-all group h-full relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-[0.02] pointer-events-none blur-[2px] group-hover:opacity-[0.06] transition-opacity">
+                  <BarChart3 className="size-20 rotate-12" />
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-muted-foreground">PC: {displayVolume.pcSearchVolume.toLocaleString("ko-KR")}</span>
-                    <span className="text-muted-foreground">모바일: {displayVolume.mobileSearchVolume.toLocaleString("ko-KR")}</span>
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-1 bg-blue-500/10 text-blue-500 text-[10px] font-black rounded-lg uppercase tracking-wider">Market Size</span>
                   </div>
-                  <div className="w-full h-1.5 bg-muted rounded-full flex overflow-hidden">
-                    <div className="h-full bg-blue-600" style={{ width: `${pcRatio}%` }}></div>
-                    <div className="h-full bg-emerald-500" style={{ width: `${mobileRatio}%` }}></div>
+                  <p className="text-sm font-bold text-muted-foreground mb-3">월간 검색량</p>
+                  <div className="flex flex-wrap items-end gap-2 mb-6">
+                    <h2 className="text-4xl font-black tracking-tighter group-hover:text-primary transition-colors">
+                      {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-1.5 pb-2">
+                       {gradeConfig && (
+                        <span className="px-2 py-1 text-[11px] font-black rounded-lg text-white shadow-sm" style={{ backgroundColor: gradeConfig.color }}>{analysis?.keywordGrade}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-auto space-y-3">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-blue-600 dark:text-blue-400">PC {displayVolume.pcSearchVolume.toLocaleString("ko-KR")}</span>
+                      <span className="text-emerald-600 dark:text-emerald-400">모바일 {displayVolume.mobileSearchVolume.toLocaleString("ko-KR")}</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-muted/50 rounded-full flex overflow-hidden p-0.5 border border-muted/30">
+                      <div className="h-full bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.4)]" style={{ width: `${pcRatio}%` }}></div>
+                      <div className="h-full bg-emerald-500 rounded-full ml-0.5 shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: `${mobileRatio}%` }}></div>
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : <SkeletonCard />}
+            ) : <SkeletonCard className="h-full rounded-[2rem]" />}
 
-            {/* Competition */}
+            {/* Row 1, Col 2: Competition (Comp Core) */}
             {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
-                <p className="text-sm font-bold text-muted-foreground mb-2">경쟁도</p>
-                <div className="flex flex-wrap items-center gap-2 mb-4">
-                  <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight truncate">{displayVolume.competition}</h2>
-                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded uppercase whitespace-nowrap shrink-0 ${competitionBadgeClass(displayVolume.competition)}`}>
-                    {displayVolume.competition}
-                  </span>
+              <div className="bg-card/40 backdrop-blur-sm p-7 rounded-[2rem] shadow-sm border border-muted/50 hover:border-primary/30 transition-all h-full relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-[0.02] pointer-events-none blur-[2px] group-hover:opacity-[0.06] transition-opacity font-black">
+                  <Zap className="size-20 -rotate-12 fill-current" />
                 </div>
-                <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${competitionBarClass(displayVolume.competition)}`}
-                    style={{ width: competitionBarWidth(displayVolume.competition) }}
-                  ></div>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-2">{competitionDescription(displayVolume.competition)}</p>
-              </div>
-            ) : <SkeletonCard />}
-
-            {/* Monthly Clicks */}
-            {displayVolume ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
-                <p className="text-sm font-bold text-muted-foreground mb-2">월간 예상 유입량</p>
-                <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight mb-2 truncate">
-                  {monthlyClicks.toLocaleString("ko-KR")}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 mt-4">
-                  <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
-                    CTR {(displayVolume.clickRate * 100).toFixed(1)}%
-                  </span>
-                  <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0">검색량 x 클릭률</span>
+                <div className="relative z-10 flex flex-col h-full">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-1 bg-emerald-500/10 text-emerald-500 text-[10px] font-black rounded-lg uppercase tracking-wider">Difficulty</span>
+                  </div>
+                  <p className="text-sm font-bold text-muted-foreground mb-3">검색 광고 경쟁도</p>
+                  <div className="flex items-center gap-3 mb-6">
+                    <h2 className="text-4xl font-black tracking-tighter">{displayVolume.competition}</h2>
+                    <span className={cn("px-2.5 py-1 text-[11px] font-black rounded-lg uppercase border border-current shadow-sm", competitionBadgeClass(displayVolume.competition))}>
+                      {displayVolume.competition}
+                    </span>
+                  </div>
+                  <div className="mt-auto">
+                    <div className="w-full h-2.5 bg-muted/50 rounded-full overflow-hidden p-0.5 border border-muted/30 mb-3">
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-1000", competitionBarClass(displayVolume.competition))}
+                        style={{ width: competitionBarWidth(displayVolume.competition) }}
+                      ></div>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed font-medium">{competitionDescription(displayVolume.competition)}</p>
+                  </div>
                 </div>
               </div>
-            ) : <SkeletonCard />}
+            ) : <SkeletonCard className="h-full rounded-[2rem]" />}
 
+            {/* Row 1, Col 3: Profitability (Revenue Core) */}
             {displayVolume ? (
               <ProfitScoreCard
                 score={profitResult?.profitScore}
@@ -1496,22 +1510,129 @@ function AnalyzePageInner() {
                 competition={profitResult?.inputMetrics.competition ?? toProfitCompetitionLevel(displayVolume.competition)}
                 isLoading={profitMutation.isPending && !profitResult}
                 errorMessage={profitErrorMessage}
+                roas={profitResult?.roas}
               />
-            ) : <SkeletonCard />}
+            ) : <SkeletonCard className="h-full rounded-[2rem]" />}
 
-            {/* Blog Posts — requires full analysis data */}
-            {analysis ? (
-              <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 overflow-hidden">
-                <p className="text-sm font-bold text-muted-foreground mb-2">블로그 글 수</p>
-                <h2 className="text-2xl 2xl:text-3xl font-extrabold tracking-tight mb-4 truncate">
-                  {analysis.blogPostCount.toLocaleString("ko-KR")}개
-                </h2>
-                <div className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground mt-2">
-                  <TrendingUp className="size-4 text-emerald-500 shrink-0" />
-                  <span className="whitespace-nowrap">포화도: {analysis.saturationIndex.label}</span>
+            {/* Row 2, Col 1: Monthly Clicks (Market Detail) */}
+            {displayVolume ? (
+              <div className="bg-card/40 backdrop-blur-sm p-7 rounded-[2rem] shadow-sm border border-muted/50 hover:border-primary/30 transition-all h-full relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-[0.02] pointer-events-none blur-[2px] group-hover:opacity-[0.06] transition-opacity">
+                  <MousePointerClick className="size-20 rotate-6" />
+                </div>
+                <p className="relative z-10 text-sm font-bold text-muted-foreground mb-4">월간 예상 유입량</p>
+                <div className="mb-6">
+                  <h2 className="text-4xl font-black tracking-tighter mb-1">
+                    {monthlyClicks.toLocaleString("ko-KR")}
+                    <span className="text-sm text-muted-foreground font-bold ml-1.5 uppercase">Clicks/Month</span>
+                  </h2>
+                </div>
+                <div className="mt-auto space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-muted-foreground">예상 클릭률 (CTR)</span>
+                    <span className="text-xs font-black text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-lg border border-indigo-500/20">
+                      {(displayVolume.clickRate * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-muted/50 rounded-full overflow-hidden p-0.5 border border-muted/30">
+                    <div className="h-full bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.4)]" style={{ width: `${displayVolume.clickRate * 100}%` }}></div>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium leading-relaxed italic text-center">
+                    &quot;검색량 대비 유입 효율이 우수한 키워드입니다.&quot;
+                  </p>
                 </div>
               </div>
-            ) : <SkeletonCard />}
+            ) : <SkeletonCard className="h-full rounded-[2rem]" />}
+
+            {/* Row 2, Col 2: Blog Posts (Comp Detail) */}
+            {analysis ? (
+              <div className="bg-card/40 backdrop-blur-sm p-7 rounded-[2rem] shadow-sm border border-muted/50 hover:border-primary/30 transition-all h-full flex flex-col relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-[0.02] pointer-events-none blur-[1px] group-hover:opacity-[0.06] transition-opacity">
+                  <BookOpen className="size-20 -rotate-6" />
+                </div>
+                <p className="relative z-10 text-sm font-bold text-muted-foreground mb-4">블로그 포화도</p>
+                <div className="mb-6">
+                  <h2 className="text-4xl font-black tracking-tighter">
+                    {analysis.blogPostCount.toLocaleString("ko-KR")}
+                    <span className="text-sm text-muted-foreground font-bold ml-1.5 uppercase">Posts</span>
+                  </h2>
+                </div>
+                <div className="mt-auto space-y-4">
+                  <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-[1.5rem] border border-muted/30">
+                    <div className={cn(
+                      "size-12 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                      analysis.saturationIndex.score >= 70 ? "bg-emerald-500 text-white shadow-emerald-500/20" :
+                        analysis.saturationIndex.score >= 40 ? "bg-amber-500 text-white shadow-amber-500/20" : "bg-rose-500 text-white shadow-rose-500/20"
+                    )}>
+                      <BookOpen className="size-6" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Saturation</p>
+                        <p className="text-xs font-black text-primary">{Math.round(analysis.saturationIndex.score)}/100</p>
+                      </div>
+                      <p className="text-sm font-black">{analysis.saturationIndex.label}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : <SkeletonCard className="h-full rounded-[2rem]" />}
+
+            {/* Row 2, Col 3: Ad Metrics (Revenue Detail) */}
+            {analysis?.adMetrics ? (
+              <div className="bg-card/40 backdrop-blur-sm p-7 rounded-[2rem] shadow-sm border border-muted/50 hover:border-primary/30 transition-all h-full flex flex-col relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] dark:opacity-[0.02] pointer-events-none blur-[1px] group-hover:opacity-[0.06] transition-opacity">
+                  <Megaphone className="size-20 rotate-12" />
+                </div>
+                <p className="relative z-10 text-sm font-bold text-muted-foreground mb-4">검색 광고 성과 (광고주 기준)</p>
+                <div className="space-y-4 flex-1 flex flex-col">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-4 bg-muted/20 rounded-[1.5rem] border border-muted/30 flex flex-col justify-center">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Clicks</p>
+                      <p className="text-xl font-black tabular-nums">
+                        {(analysis.adMetrics.monthlyPcClkCnt + analysis.adMetrics.monthlyMobileClkCnt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                    <div className="p-4 bg-muted/20 rounded-[1.5rem] border border-muted/30 flex flex-col justify-center">
+                      <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mb-1">Depth</p>
+                      <p className="text-xl font-black tabular-nums">
+                        {analysis.adMetrics.plAvgDepth}
+                        <span className={cn(
+                          "ml-1.5 text-[10px] font-bold",
+                          analysis.adMetrics.plAvgDepth <= 5 ? "text-emerald-500" : "text-amber-500"
+                        )}>
+                          {analysis.adMetrics.plAvgDepth <= 5 ? "안정" : "경쟁"}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto p-5 bg-gradient-to-br from-muted/30 to-muted/50 rounded-[1.5rem] border border-muted/30">
+                    <div className="flex items-center justify-between mb-4 border-b border-muted/30 pb-3">
+                      <span className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Pricing Strategy</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="size-2 rounded-full bg-orange-500 animate-pulse shadow-[0_0_8px_rgba(249,115,22,0.6)]" />
+                        <span className="text-[11px] font-black text-orange-600 dark:text-orange-400">MARKET LIVE</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 divide-x divide-muted/40">
+                      <div className="pr-4">
+                        <p className="text-[10px] text-muted-foreground font-bold mb-1 uppercase">Avg. CPC</p>
+                        <p className={cn("text-base font-black tabular-nums", !analysis.adMetrics.avgCpc && "text-muted-foreground/40")}>
+                          {analysis.adMetrics.avgCpc ? `${analysis.adMetrics.avgCpc.toLocaleString("ko-KR")}원` : "—"}
+                        </p>
+                      </div>
+                      <div className="pl-4">
+                        <p className="text-[10px] text-muted-foreground font-bold mb-1 uppercase">Min. Bid</p>
+                        <p className={cn("text-base font-black tabular-nums", !analysis.adMetrics.minBid && "text-muted-foreground/40")}>
+                          {analysis.adMetrics.minBid ? `${analysis.adMetrics.minBid.toLocaleString("ko-KR")}원~` : "—"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (fullPending ? <SkeletonCard className="h-full rounded-[2rem]" /> : null)}
           </section>
 
           {/* Row 2: Charts & Tables */}

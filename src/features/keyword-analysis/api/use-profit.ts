@@ -43,6 +43,13 @@ export interface ProfitScoreResponse {
     resetAt: string;
     tier: "free" | "basic" | "pro";
   };
+  roas?: {
+    value: number;
+    score: number;
+    monthlyAdSpend: number;
+    monthlyAdRevenue: number;
+    signal: "HIGH" | "MEDIUM" | "LOW";
+  };
 }
 
 async function scoreProfit(payload: ProfitScoreRequest): Promise<ProfitScoreResponse> {

@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useQuery } from "@tanstack/react-query";
 import {
   TrendingUp,
-  Loader2,
   AlertCircle,
   Flame,
   Sparkles,
@@ -19,6 +18,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PageHeader } from "@/shared/ui/page-header";
+import { Skeleton } from "@/shared/ui/skeleton";
 import type { TrendingWordCloudItem } from "@/features/trends/ui/TrendingWordCloud";
 
 const TrendingWordCloud = dynamic(
@@ -128,13 +128,29 @@ function TrendsNewsListSection({ top10, isLoading: isTrendingLoading, selectedKe
 
   if (isTrendingLoading) {
     return (
-      <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
+      <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 mb-5">
-          <Newspaper className="size-5 text-blue-500" />
-          <h3 className="text-lg font-bold">트렌드 뉴스</h3>
+          <Skeleton className="size-5 rounded-md" />
+          <Skeleton className="h-6 w-24 rounded-md" />
         </div>
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <div className="space-y-4">
+          <div className="flex gap-2 overflow-hidden border-b border-muted/30 pb-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Skeleton key={i} className="h-10 w-24 shrink-0 rounded-lg" />
+            ))}
+          </div>
+          <Skeleton className="h-6 w-48 mb-4" />
+          <div className="space-y-6">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -194,8 +210,16 @@ function TrendsNewsListSection({ top10, isLoading: isTrendingLoading, selectedKe
       {/* 3. News List Section */}
       <div className="px-6 pb-4">
         {isNewsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          <div className="space-y-6 py-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex justify-between">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ))}
           </div>
         ) : (newsData?.items ?? []).length === 0 ? (
           <div className="py-12 text-center text-muted-foreground text-sm">
@@ -396,8 +420,22 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-10">
-          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="lg:w-2/3 aspect-video bg-white/40 dark:bg-white/5 rounded-xl border border-muted/20 flex items-center justify-center relative overflow-hidden">
+             {/* Word Cloud Skeleton: A central blob and some smaller ones */}
+             <Skeleton className="size-48 rounded-full opacity-60" />
+             <Skeleton className="size-24 rounded-full absolute top-1/4 left-1/4 opacity-40" />
+             <Skeleton className="size-32 rounded-full absolute bottom-1/4 right-1/4 opacity-40" />
+             <Skeleton className="size-20 rounded-full absolute top-1/3 right-1/3 opacity-30" />
+          </div>
+          <div className="lg:w-1/3 space-y-3">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="size-6 rounded-full shrink-0" />
+                <Skeleton className="h-8 flex-1 rounded-lg" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : isError ? (
         <div className="flex flex-col items-center justify-center py-10 text-destructive text-sm">
@@ -451,6 +489,16 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                     {kw.direction === "up" ? <ArrowUpRight className="size-3 inline" /> : kw.direction === "down" ? <ArrowDownRight className="size-3 inline" /> : null}
                     {Math.abs(kw.changeRate)}%
                   </span>
+                  {kw.commercialScore && kw.commercialScore >= 40 && (
+                    <span className={cn(
+                      "text-[9px] font-bold px-1 py-0.5 rounded mt-0.5",
+                      kw.commercialScore >= 70 
+                        ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" 
+                        : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                    )}>
+                      {kw.commercialScore >= 70 ? "🔥 광고가치 높음" : "광고가치 보통"}
+                    </span>
+                  )}
                   <span className="text-[10px] text-muted-foreground tabular-nums">
                     {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
                   </span>
@@ -537,6 +585,16 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                       )}
                       {Math.abs(kw.changeRate)}%
                     </span>
+                    {kw.commercialScore && kw.commercialScore >= 40 && (
+                      <div className={cn(
+                        "mt-1 inline-flex items-center text-[9px] font-bold px-1.5 py-0.5 rounded",
+                        kw.commercialScore >= 70 
+                          ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" 
+                          : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                      )} title={`상업적 가치 점수: ${kw.commercialScore}`}>
+                        {kw.commercialScore >= 70 ? "🔥 광고가치 높음" : "광고가치 보통"}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -595,11 +653,24 @@ function NewKeywordsContent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2 overflow-hidden">
+            {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+              <Skeleton key={i} className="h-8 w-16 rounded-lg shrink-0" />
+            ))}
+          </div>
+          <Skeleton className="h-4 w-12 shrink-0" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((i) => (
+            <Skeleton key={i} className="h-[68px] w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
+
 
   if (dates.length === 0) {
     return (
@@ -756,11 +827,14 @@ function SeasonalKeywordsContent() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-10">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          <Skeleton key={i} className="h-32 w-full rounded-xl" />
+        ))}
       </div>
     );
   }
+
 
   if (keywords.length === 0) {
     return (

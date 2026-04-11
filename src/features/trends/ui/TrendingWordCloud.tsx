@@ -12,6 +12,7 @@ export interface TrendingWordCloudItem {
   direction: "up" | "down" | "stable";
   newsTitle?: string | null;
   newsLink?: string | null;
+  commercialScore?: number;
 }
 
 interface PlacedWord {
