@@ -83,6 +83,8 @@ export interface RelatedKeyword {
   mobileSearchVolume: number;
   competition: CompetitionLevel;
   keywordGrade: KeywordGrade;
+  /** Real saturation data from blog post count lookup (optional for backwards compat) */
+  saturationIndex?: SaturationIndex;
 }
 
 // ---------------------------------------------------------------------------

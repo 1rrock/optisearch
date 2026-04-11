@@ -11,7 +11,7 @@ import { searchBlog } from "@/shared/lib/naver-search";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { saveSearchHistory } from "@/services/history-service";
-import { getVolumeMapFromCorpusOrSearchAd } from "@/services/keyword-service";
+import { getVolumeMapFromCorpusOrSearchAd, estimateCtrFromPeers } from "@/services/keyword-service";
 import { createServerClient } from "@/shared/lib/supabase";
 
 const bodySchema = z.object({
@@ -163,9 +163,19 @@ export async function POST(request: Request) {
 
     const competition = stat?.compIdx ?? "중간";
 
-    const pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
-    const mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
-    const clickRate = (pcCtr + mobileCtr) / 2;
+    let pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
+    let mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
+
+    // Censored keywords: SearchAd returns CTR=0 → estimate from peers in the same batch
+    if (pcCtr === 0 && mobileCtr === 0 && totalSearchVolume > 0) {
+      const fallback = estimateCtrFromPeers(stats, stat?.compIdx ?? "중간");
+      pcCtr = fallback.pcCtr;
+      mobileCtr = fallback.mobileCtr;
+    }
+
+    const clickRate = totalSearchVolume > 0
+      ? (pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr) / totalSearchVolume
+      : 0;
     const estimatedClicks = Math.round(
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
     );

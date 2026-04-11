@@ -78,6 +78,42 @@ function buildSaturationIndex(ratio: number): SaturationIndex {
 }
 
 /**
+ * Estimate CTR for censored keywords using non-censored peers from the same
+ * SearchAd batch response. Falls back through 3 tiers:
+ *   1. Same compIdx peers → average CTR
+ *   2. All non-censored peers → average CTR
+ *   3. Hardcoded conservative defaults (typical Naver averages)
+ */
+export function estimateCtrFromPeers(
+  stats: Array<{ monthlyAvePcCtr: number; monthlyAveMobileCtr: number; compIdx: string }>,
+  targetCompIdx: string
+): { pcCtr: number; mobileCtr: number } {
+  const nonCensored = stats.filter(
+    (s) => s.monthlyAvePcCtr > 0 || s.monthlyAveMobileCtr > 0
+  );
+
+  // Tier 1: same compIdx peers
+  const sameComp = nonCensored.filter((s) => s.compIdx === targetCompIdx);
+  if (sameComp.length > 0) {
+    return {
+      pcCtr: sameComp.reduce((sum, s) => sum + s.monthlyAvePcCtr, 0) / sameComp.length / 100,
+      mobileCtr: sameComp.reduce((sum, s) => sum + s.monthlyAveMobileCtr, 0) / sameComp.length / 100,
+    };
+  }
+
+  // Tier 2: all non-censored peers
+  if (nonCensored.length > 0) {
+    return {
+      pcCtr: nonCensored.reduce((sum, s) => sum + s.monthlyAvePcCtr, 0) / nonCensored.length / 100,
+      mobileCtr: nonCensored.reduce((sum, s) => sum + s.monthlyAveMobileCtr, 0) / nonCensored.length / 100,
+    };
+  }
+
+  // Tier 3: hardcoded conservative defaults
+  return { pcCtr: 0.02, mobileCtr: 0.03 };
+}
+
+/**
  * Composite score (0–100):
  *   - Search volume score (0–35): log-scaled
  *   - Saturation score   (0–35): from getSaturationThreshold
@@ -208,8 +244,16 @@ export async function analyzeKeyword(
     }
 
     const competition = toCompetitionLevel(stat?.compIdx ?? "높음");
-    const pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
-    const mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
+    let pcCtr = (stat?.monthlyAvePcCtr ?? 0) / 100;
+    let mobileCtr = (stat?.monthlyAveMobileCtr ?? 0) / 100;
+
+    // Censored keywords: SearchAd returns CTR=0 → estimate from peers in the same batch
+    if (pcCtr === 0 && mobileCtr === 0 && totalSearchVolume > 0) {
+      const fallback = estimateCtrFromPeers(statsResults, stat?.compIdx ?? "높음");
+      pcCtr = fallback.pcCtr;
+      mobileCtr = fallback.mobileCtr;
+    }
+
     const clickRate = totalSearchVolume > 0
       ? (pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr) / totalSearchVolume
       : 0;
@@ -277,26 +321,69 @@ export async function getRelatedKeywords(
   return cached(CacheKeys.relatedKeywords(keyword), CacheTTL.RELATED, async () => {
     const stats = await getRelatedKeywordsRaw(keyword);
 
-    const neutralSaturation = buildSaturationIndex(0.25);
-
-    return stats
-      .map((s) => {
-        const pc = s.monthlyPcQcCnt;
-        const mobile = s.monthlyMobileQcCnt;
-        const total = pc + mobile;
-        const competition = toCompetitionLevel(s.compIdx);
-        const saturationIndex = neutralSaturation;
-        const compositeScore = calcCompositeScore(total, saturationIndex.score, competition);
-        return {
-          keyword: s.relKeyword,
-          pcSearchVolume: pc,
-          mobileSearchVolume: mobile,
-          competition,
-          keywordGrade: gradeFromScore(compositeScore),
-        } satisfies RelatedKeyword;
-      })
-      .sort((a, b) => b.pcSearchVolume + b.mobileSearchVolume - (a.pcSearchVolume + a.mobileSearchVolume))
+    // Sort and slice first to minimize API calls
+    const top20 = stats
+      .map((s) => ({
+        stat: s,
+        pc: s.monthlyPcQcCnt,
+        mobile: s.monthlyMobileQcCnt,
+        total: s.monthlyPcQcCnt + s.monthlyMobileQcCnt,
+      }))
+      .sort((a, b) => b.total - a.total)
       .slice(0, 20);
+
+    // Fetch blog counts with concurrency limit to avoid rate-limit spikes
+    const CONCURRENCY = 5;
+    // -1 = not fetched yet, 0+ = actual blog count
+    const blogCounts: number[] = new Array(top20.length).fill(-1);
+    let timedOut = false;
+
+    try {
+      await Promise.race([
+        (async () => {
+          for (let i = 0; i < top20.length; i += CONCURRENCY) {
+            if (timedOut) break;
+            const batch = top20.slice(i, i + CONCURRENCY);
+            const results = await Promise.all(
+              batch.map((item) =>
+                searchBlog(item.stat.relKeyword, 1)
+                  .then((r) => r.total)
+                  .catch(() => 0)
+              )
+            );
+            results.forEach((count, j) => { blogCounts[i + j] = count; });
+          }
+        })(),
+        new Promise<never>((_, reject) => setTimeout(() => {
+          timedOut = true;
+          reject(new Error("timeout"));
+        }, 3000)),
+      ]);
+    } catch {
+      // Timeout or total failure: remaining blogCounts stay at -1 (not fetched)
+    }
+
+    const NEUTRAL_SATURATION = buildSaturationIndex(0.25);
+
+    return top20.map((item, i) => {
+      const competition = toCompetitionLevel(item.stat.compIdx);
+      const blogPostCount = blogCounts[i];
+      // -1 = lookup failed/timed out → use neutral saturation (previous default)
+      // 0 = no blog posts found → high opportunity
+      // >0 = real data
+      const saturationIndex = blogPostCount < 0
+        ? NEUTRAL_SATURATION
+        : buildSaturationIndex(blogPostCount > 0 ? item.total / blogPostCount : item.total);
+      const compositeScore = calcCompositeScore(item.total, saturationIndex.score, competition);
+      return {
+        keyword: item.stat.relKeyword,
+        pcSearchVolume: item.pc,
+        mobileSearchVolume: item.mobile,
+        competition,
+        keywordGrade: gradeFromScore(compositeScore),
+        saturationIndex,
+      } satisfies RelatedKeyword;
+    });
   });
 }
 
