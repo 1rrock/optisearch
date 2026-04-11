@@ -31,43 +31,12 @@ const TrendingWordCloud = dynamic(
 // ---------------------------------------------------------------------------
 
 export default function TrendsPage() {
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        icon={<TrendingUp className="size-8 text-primary" />}
-        title="키워드 트렌드"
-        description="실시간 인기 키워드 · 뉴스 · 새 키워드 · 시즌 키워드"
-      />
+  const [selectedKeyword, setSelectedKeyword] = useState<string | null>(null);
 
-      <TrendingSectionWrapper />
-      <NewsCardGridSection />
-      <NewKeywordsSection />
-      <SeasonalKeywordsSection />
-    </div>
-  );
-}
-
-// ===========================================================================
-// News Card Grid Section — clickable news article cards from trending data
-// ===========================================================================
-
-type NewsCardItem = {
-  keyword: string;
-  newsTitle: string;
-  newsLink: string;
-  changeRate: number;
-  direction: "up" | "down" | "stable";
-};
-
-function NewsCardGridSection() {
-  const { data, isLoading } = useQuery<{
-    keywords: Array<{
-      keyword: string;
-      newsTitle?: string | null;
-      newsLink?: string | null;
-      changeRate: number;
-      direction: "up" | "down" | "stable";
-    }>;
+  // Shared trending data fetch — both sections use this same sorted list
+  const { data: trendingData, isLoading: isTrendingLoading } = useQuery<{
+    keywords: TrendingWordCloudItem[];
+    lastUpdated?: string;
   }>({
     queryKey: ["trending-keywords", "daily"],
     queryFn: async () => {
@@ -78,12 +47,86 @@ function NewsCardGridSection() {
     refetchInterval: 15 * 60 * 1000,
   });
 
-  const newsCards: NewsCardItem[] = (data?.keywords ?? [])
-    .filter((kw): kw is NewsCardItem =>
-      kw.newsTitle != null && kw.newsTitle !== "" && kw.newsLink != null && kw.newsLink !== ""
-    );
+  // Default sort: by |changeRate| desc — same as TrendingSectionWrapper default
+  const sortedKeywords = [...(trendingData?.keywords ?? [])].sort(
+    (a, b) => Math.abs(b.changeRate) - Math.abs(a.changeRate)
+  );
+  const top10 = sortedKeywords.slice(0, 10);
 
-  if (isLoading) {
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={<TrendingUp className="size-8 text-primary" />}
+        title="키워드 트렌드"
+        description="실시간 인기 키워드 · 뉴스 · 새 키워드 · 시즌 키워드"
+      />
+
+      <TrendingSectionWrapper
+        sharedKeywords={sortedKeywords}
+        isSharedLoading={isTrendingLoading}
+        lastUpdated={trendingData?.lastUpdated}
+        onSelectKeyword={(kw) => {
+          setSelectedKeyword(kw);
+          document.getElementById("trending-news-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        selectedKeyword={selectedKeyword}
+      />
+
+      <div id="trending-news-section">
+        <TrendsNewsListSection
+          top10={top10}
+          isLoading={isTrendingLoading}
+          selectedKeyword={selectedKeyword}
+          onSelectKeyword={setSelectedKeyword}
+        />
+      </div>
+
+      <NewKeywordsSection />
+      <SeasonalKeywordsSection />
+    </div>
+  );
+}
+
+// ===========================================================================
+// Trends News List Section — matched to "Keyword Master" reference
+// ===========================================================================
+
+type NewsItem = {
+  title: string;
+  originallink: string;
+  link: string;
+  description: string;
+  pubDate: string;
+};
+
+interface TrendsNewsListSectionProps {
+  top10: TrendingWordCloudItem[];
+  isLoading: boolean;
+  selectedKeyword: string | null;
+  onSelectKeyword: (kw: string) => void;
+}
+
+function TrendsNewsListSection({ top10, isLoading: isTrendingLoading, selectedKeyword, onSelectKeyword }: TrendsNewsListSectionProps) {
+  // Active keyword: use selected or default to first in the shared sorted list
+  const activeKeyword = selectedKeyword || top10[0]?.keyword;
+
+  // 2. Fetch Multiple News Items for the selected keyword
+  const { data: newsData, isLoading: isNewsLoading } = useQuery<{
+    items: NewsItem[];
+    total: number;
+  }>({
+    queryKey: ["keyword-news-list", activeKeyword],
+    queryFn: async () => {
+      if (!activeKeyword) return { items: [], total: 0 };
+      const res = await fetch(`/api/keywords/news?keyword=${encodeURIComponent(activeKeyword)}`);
+      if (!res.ok) throw new Error("Failed to fetch news");
+      return res.json();
+    },
+    enabled: !!activeKeyword,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+
+  if (isTrendingLoading) {
     return (
       <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
         <div className="flex items-center gap-2 mb-5">
@@ -97,44 +140,94 @@ function NewsCardGridSection() {
     );
   }
 
-  if (newsCards.length === 0) return null;
+  if (top10.length === 0) return null;
+
+  function formatDate(dateStr: string) {
+    try {
+      const date = new Date(dateStr);
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${month}-${day} ${hours}:${minutes}`;
+    } catch {
+      return dateStr;
+    }
+  }
 
   return (
-    <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm">
-      <div className="flex items-center gap-2 mb-5">
-        <Newspaper className="size-5 text-blue-500" />
-        <h3 className="text-lg font-bold">트렌드 뉴스</h3>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {newsCards.map((card) => (
-          <a
-            key={card.keyword}
-            href={card.newsLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group flex flex-col gap-2 p-4 rounded-xl bg-muted/20 hover:bg-muted/40 dark:bg-white/5 dark:hover:bg-white/10 border border-muted/30 hover:border-primary/30 transition-all"
-          >
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
-                {card.keyword}
-              </span>
+    <div className="bg-card border border-muted/50 rounded-2xl overflow-hidden shadow-sm">
+      {/* 1. Keyword Tabs (Numbered) */}
+      <div className="flex overflow-x-auto bg-muted/20 border-b border-muted/30 scrollbar-hide">
+        {top10.map((item, idx) => {
+          const isSelected = activeKeyword === item.keyword;
+          return (
+            <button
+              key={item.keyword}
+              onClick={() => onSelectKeyword(item.keyword)}
+              className={cn(
+                "flex items-center gap-2 px-4 py-3 text-sm font-bold whitespace-nowrap transition-all border-b-2",
+                isSelected
+                  ? "bg-white dark:bg-white/5 border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/10"
+              )}
+            >
               <span className={cn(
-                "text-xs font-bold flex items-center gap-0.5",
-                card.direction === "up" ? "text-rose-500" : card.direction === "down" ? "text-blue-500" : "text-muted-foreground"
+                "flex items-center justify-center size-5 rounded text-[10px] font-extrabold",
+                isSelected ? "bg-primary text-white" : "bg-muted-foreground/20 text-muted-foreground"
               )}>
-                {card.direction === "up" ? <ArrowUpRight className="size-3" /> : card.direction === "down" ? <ArrowDownRight className="size-3" /> : null}
-                {Math.abs(card.changeRate)}%
+                {idx + 1}
               </span>
-            </div>
-            <p className="text-sm font-medium text-foreground/80 group-hover:text-foreground transition-colors line-clamp-2">
-              {card.newsTitle}
-            </p>
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1 mt-auto">
-              <ExternalLink className="size-2.5" />
-              기사 보기
-            </span>
-          </a>
-        ))}
+              {item.keyword}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 2. News Title Section */}
+      <div className="px-6 pt-6 pb-2">
+        <h4 className="text-lg font-bold text-foreground">
+          <span className="text-primary">'{activeKeyword}'</span>에 대한 뉴스
+        </h4>
+      </div>
+
+      {/* 3. News List Section */}
+      <div className="px-6 pb-4">
+        {isNewsLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (newsData?.items ?? []).length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground text-sm">
+            관련 뉴스를 찾을 수 없습니다.
+          </div>
+        ) : (
+          <div className="divide-y divide-muted/30">
+            {newsData?.items.map((news, idx) => (
+              <a
+                key={idx}
+                href={news.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group block py-4 first:pt-2 last:pb-2 hover:bg-muted/30 -mx-6 px-6 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-4 mb-1">
+                  <h5
+                    className="text-[15px] font-bold text-foreground group-hover:text-primary transition-colors leading-snug line-clamp-1"
+                    dangerouslySetInnerHTML={{ __html: news.title }}
+                  />
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap tabular-nums mt-1 font-medium">
+                    {formatDate(news.pubDate)}
+                  </span>
+                </div>
+                <p 
+                  className="text-xs text-muted-foreground leading-relaxed line-clamp-2"
+                  dangerouslySetInnerHTML={{ __html: news.description }}
+                />
+              </a>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -186,25 +279,38 @@ type TrendingView = "cloud" | "table";
 
 type TrendingKw = TrendingWordCloudItem;
 
-function TrendingSectionWrapper() {
+interface TrendingSectionWrapperProps {
+  sharedKeywords: TrendingKw[];
+  isSharedLoading: boolean;
+  lastUpdated?: string;
+  onSelectKeyword: (kw: string) => void;
+  selectedKeyword: string | null;
+}
+
+function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, onSelectKeyword, selectedKeyword }: TrendingSectionWrapperProps) {
+  // period/monthly toggle still fetches separately for monthly view
   const [period, setPeriod] = useState<"daily" | "monthly">("daily");
   const [sort, setSort] = useState<TrendingSort>("changeRate");
   const [order, setOrder] = useState<TrendingOrder>("desc");
   const [view, setView] = useState<TrendingView>("cloud");
 
-  const { data, isLoading, isError } = useQuery<{ period: string; keywords: TrendingKw[]; lastUpdated?: string }>({
-    queryKey: ["trending-keywords", period],
+  const { data: monthlyData, isLoading: isMonthlyLoading, isError: isMonthlyError } = useQuery<{ period: string; keywords: TrendingKw[]; lastUpdated?: string }>({
+    queryKey: ["trending-keywords", "monthly"],
     queryFn: async () => {
-      const res = await fetch(`/api/keywords/trending?period=${period}`);
+      const res = await fetch("/api/keywords/trending?period=monthly");
       if (!res.ok) throw new Error("Failed to fetch trending keywords");
       return res.json();
     },
+    enabled: period === "monthly",
     refetchInterval: 15 * 60 * 1000,
   });
 
-  const rawKeywords = data?.keywords ?? [];
+  const isLoading = period === "daily" ? isSharedLoading : isMonthlyLoading;
+  const isError = period === "monthly" && isMonthlyError;
+  const rawKeywords = period === "daily" ? sharedKeywords : (monthlyData?.keywords ?? []);
 
-  // Sort
+  // Sort — default changeRate desc matches the shared sort already for daily,
+  // but user can override by clicking column headers
   const keywords = [...rawKeywords].sort((a, b) => {
     const valA = sort === "volume" ? a.volume : Math.abs(a.changeRate);
     const valB = sort === "volume" ? b.volume : Math.abs(b.changeRate);
@@ -234,9 +340,9 @@ function TrendingSectionWrapper() {
             <Flame className="size-5 text-orange-500" />
             인기 급상승 키워드
           </h3>
-          {data?.lastUpdated && (
+          {(lastUpdated ?? monthlyData?.lastUpdated) && (
             <span className="text-xs text-muted-foreground">
-              마지막 업데이트: {new Date(data.lastUpdated + "T00:00:00+09:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
+              마지막 업데이트: {new Date(((period === "daily" ? lastUpdated : monthlyData?.lastUpdated) ?? "") + "T00:00:00+09:00").toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}
             </span>
           )}
         </div>
@@ -320,8 +426,13 @@ function TrendingSectionWrapper() {
               <button
                 key={kw.keyword}
                 type="button"
-                onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
-                className="flex items-center gap-3 py-2.5 px-2 hover:bg-white/60 dark:hover:bg-white/10 rounded-lg transition-colors cursor-pointer text-left w-full"
+                onClick={() => onSelectKeyword(kw.keyword)}
+                className={cn(
+                  "flex items-center gap-3 py-2.5 px-2 rounded-lg transition-colors cursor-pointer text-left w-full",
+                  selectedKeyword === kw.keyword 
+                    ? "bg-orange-500/10 dark:bg-orange-500/20 ring-1 ring-orange-500/30" 
+                    : "hover:bg-white/60 dark:hover:bg-white/10"
+                )}
               >
                 <span className={cn(
                   "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
@@ -331,11 +442,6 @@ function TrendingSectionWrapper() {
                 </span>
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-semibold truncate block">{kw.keyword}</span>
-                  {kw.newsTitle && (
-                    <span className="text-[10px] text-muted-foreground truncate block mt-0.5">
-                      {kw.newsTitle}
-                    </span>
-                  )}
                 </div>
                 <div className="flex flex-col items-end shrink-0">
                   <span className={cn(
@@ -380,8 +486,11 @@ function TrendingSectionWrapper() {
               {keywords.map((kw, idx) => (
                 <tr
                   key={kw.keyword}
-                  className="border-b border-muted/15 hover:bg-white/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                  onClick={() => window.open(`/analyze?keyword=${encodeURIComponent(kw.keyword)}`, '_blank')}
+                  className={cn(
+                    "border-b border-muted/15 transition-colors cursor-pointer",
+                    selectedKeyword === kw.keyword ? "bg-orange-500/5 dark:bg-orange-500/10" : "hover:bg-white/60 dark:hover:bg-white/10"
+                  )}
+                  onClick={() => onSelectKeyword(kw.keyword)}
                 >
                   <td className="py-3 px-4 font-bold text-muted-foreground">{idx + 1}</td>
                   <td className="py-3 pr-4 font-semibold">{kw.keyword}</td>
