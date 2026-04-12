@@ -151,9 +151,11 @@ export async function scoreContent(
 평가 항목 (각 0-100):
 - keywordUsage: 키워드 포함 빈도와 자연스러운 배치
 - readability: 문장 가독성, 길이, 흐름
-- structure: H2 소제목, 단락 구분, 리스트 활용
+- structure: 소제목으로 단락 구분, 리스트 활용
 - depth: 내용의 깊이와 정보량
 - titleAttractiveness: 제목의 클릭 유인력 (제목이 없으면 본문 첫 줄 기준)
+
+improvements와 strengths는 블로그를 처음 쓰는 일반인도 바로 이해할 수 있는 언어로 작성하세요. H1/H2/H3/마크다운 같은 기술 용어 대신 "소제목", "중간 제목", "목록" 등 일상적인 표현을 사용하세요.
 
 JSON으로 응답하세요:
 {
