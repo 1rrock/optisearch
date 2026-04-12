@@ -382,17 +382,17 @@ function KeywordTrendChart({
   // Build tooltip y position (use primary series)
   const tooltipY = tooltip
     ? (() => {
-        const idx = periods.indexOf(tooltip.period);
-        if (idx < 0) return PAD.top;
-        const pt = seriesRenderData[0]?.pts[idx];
-        return pt ? pt.y : PAD.top;
-      })()
+      const idx = periods.indexOf(tooltip.period);
+      if (idx < 0) return PAD.top;
+      const pt = seriesRenderData[0]?.pts[idx];
+      return pt ? pt.y : PAD.top;
+    })()
     : 0;
   const tooltipX = tooltip
     ? (() => {
-        const idx = periods.indexOf(tooltip.period);
-        return idx >= 0 ? xOf(idx) : 0;
-      })()
+      const idx = periods.indexOf(tooltip.period);
+      return idx >= 0 ? xOf(idx) : 0;
+    })()
     : 0;
 
   return (
@@ -687,28 +687,35 @@ function SkeletonCard({ className }: { className?: string }) {
 function LoadingSkeleton() {
   return (
     <div className="space-y-12">
-      {/* Metrics Row */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
+      {/* Dashboard Header Skeleton */}
+      <div className="flex items-center gap-3 mb-8 px-1">
+        <div className="size-10 bg-muted/60 rounded-xl animate-pulse" />
+        <div className="space-y-2">
+          <div className="h-6 w-32 bg-muted/60 rounded animate-pulse" />
+          <div className="h-3 w-56 bg-muted/40 rounded animate-pulse" />
+        </div>
+      </div>
+
+      {/* Metrics Row Skeleton - Matching Bento Grid */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
+          <SkeletonCard key={i} className="h-[280px] md:h-full rounded-[2rem]" />
+        ))}
       </section>
 
       {/* Charts & Tables Row */}
       <section className="flex flex-col gap-8">
-        <div className="w-full bg-card p-8 rounded-xl shadow-sm border border-muted/50 animate-pulse">
+        <div className="w-full bg-card p-8 rounded-[2rem] shadow-sm border border-muted/50 animate-pulse">
           <div className="h-4 w-32 bg-muted rounded mb-8"></div>
-          <div className="h-64 bg-muted/50 rounded"></div>
+          <div className="h-64 bg-muted/50 rounded-2xl"></div>
         </div>
-        <div className="w-full bg-card rounded-xl shadow-sm border border-muted/50 animate-pulse flex flex-col">
-          <div className="p-6">
+        <div className="w-full bg-card rounded-[2rem] shadow-sm border border-muted/50 animate-pulse flex flex-col overflow-hidden">
+          <div className="p-8 border-b border-muted/20">
             <div className="h-4 w-24 bg-muted rounded"></div>
           </div>
-          <div className="p-6 space-y-4 flex-1">
+          <div className="p-8 space-y-4 flex-1">
             {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="h-10 bg-muted/50 rounded"></div>
+              <div key={i} className="h-12 bg-muted/30 rounded-xl"></div>
             ))}
           </div>
         </div>
@@ -717,31 +724,31 @@ function LoadingSkeleton() {
       {/* Section Analysis Skeleton */}
       <section>
         <div className="flex items-center gap-2 mb-4">
-            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
-            <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
+          <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+          <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
         </div>
       </section>
-      
+
       {/* Gender Distribution Skeleton */}
       <section>
         <div className="flex items-center gap-2 mb-4">
-            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
-            <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
+          <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+          <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
         </div>
         <div className="bg-card p-6 rounded-xl shadow-sm border border-muted/50 animate-pulse">
-           <div className="h-5 w-32 bg-muted rounded mb-4"></div>
-           <div className="h-4 w-full bg-muted rounded-full"></div>
+          <div className="h-5 w-32 bg-muted rounded mb-4"></div>
+          <div className="h-4 w-full bg-muted rounded-full"></div>
         </div>
       </section>
 
       {/* Demographics Skeleton */}
       <section>
         <div className="flex items-center gap-2 mb-4">
-            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
-            <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
+          <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+          <div className="h-6 w-32 bg-muted rounded animate-pulse"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
@@ -751,8 +758,8 @@ function LoadingSkeleton() {
       {/* AI Insights Skeleton */}
       <section>
         <div className="flex items-center gap-2 mb-4">
-            <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
-            <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
+          <div className="h-5 w-5 bg-muted rounded animate-pulse"></div>
+          <div className="h-6 w-24 bg-muted rounded animate-pulse"></div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
@@ -1453,7 +1460,7 @@ function AnalyzePageInner() {
                       {isEstimated ? "~" : ""}{displayVolume.totalSearchVolume.toLocaleString("ko-KR")}
                     </h2>
                     <div className="flex flex-wrap items-center gap-1.5 pb-2">
-                       {gradeConfig && (
+                      {gradeConfig && (
                         <span className="px-2 py-1 text-[11px] font-black rounded-lg text-white shadow-sm" style={{ backgroundColor: gradeConfig.color }}>{analysis?.keywordGrade}</span>
                       )}
                     </div>
@@ -2182,75 +2189,73 @@ function AnalyzePageInner() {
               )}
               {aiInsightsLoaded && extraData && (!extraPending || extraData.intent || extraData.strategy) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Intent */}
-                {extraData.intent && (
-                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
-                    <p className="text-sm font-bold text-muted-foreground mb-2">검색 의도</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${
-                        extraData.intent.intent === "구매성"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                          : extraData.intent.intent === "탐색성"
-                          ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-                      }`}>
-                        {extraData.intent.intent}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {Math.round(extraData.intent.confidence * 100)}% 확신
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{extraData.intent.reason}</p>
-                  </div>
-                )}
-
-                {/* Strategy */}
-                {extraData.strategy && (
-                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
-                    <p className="text-sm font-bold text-muted-foreground mb-2">콘텐츠 전략</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${
-                        extraData.strategy.verdict === "추천"
-                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                          : extraData.strategy.verdict === "비추천"
-                          ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
-                      }`}>
-                        {extraData.strategy.verdict}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mb-2">{extraData.strategy.reason}</p>
-                    {extraData.strategy.tips.length > 0 && (
-                      <ul className="space-y-1">
-                        {extraData.strategy.tips.map((tip, i) => (
-                          <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
-                            <span className="text-primary shrink-0">•</span>
-                            {tip}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-
-                {/* Content Spec */}
-                {extraData.contentSpec && (
-                  <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
-                    <p className="text-sm font-bold text-muted-foreground mb-2">상위 노출 콘텐츠 스펙</p>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">평균 제목 길이</p>
-                        <p className="text-lg font-bold">{extraData.contentSpec.avgTitleLength}자</p>
+                  {/* Intent */}
+                  {extraData.intent && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-2">검색 의도</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${extraData.intent.intent === "구매성"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            : extraData.intent.intent === "탐색성"
+                              ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                          }`}>
+                          {extraData.intent.intent}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {Math.round(extraData.intent.confidence * 100)}% 확신
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">평균 설명 길이</p>
-                        <p className="text-lg font-bold">{extraData.contentSpec.avgDescLength}자</p>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">상위 {extraData.contentSpec.count}개 결과 기준</p>
+                      <p className="text-xs text-muted-foreground">{extraData.intent.reason}</p>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+
+                  {/* Strategy */}
+                  {extraData.strategy && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-2">콘텐츠 전략</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2.5 py-1 text-sm font-bold rounded-lg ${extraData.strategy.verdict === "추천"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                            : extraData.strategy.verdict === "비추천"
+                              ? "bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-400"
+                              : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"
+                          }`}>
+                          {extraData.strategy.verdict}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{extraData.strategy.reason}</p>
+                      {extraData.strategy.tips.length > 0 && (
+                        <ul className="space-y-1">
+                          {extraData.strategy.tips.map((tip, i) => (
+                            <li key={i} className="text-xs text-muted-foreground flex gap-1.5">
+                              <span className="text-primary shrink-0">•</span>
+                              {tip}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Content Spec */}
+                  {extraData.contentSpec && (
+                    <div className="bg-card p-5 rounded-xl shadow-sm border border-muted/50">
+                      <p className="text-sm font-bold text-muted-foreground mb-2">상위 노출 콘텐츠 스펙</p>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">평균 제목 길이</p>
+                          <p className="text-lg font-bold">{extraData.contentSpec.avgTitleLength}자</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-1">평균 설명 길이</p>
+                          <p className="text-lg font-bold">{extraData.contentSpec.avgDescLength}자</p>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">상위 {extraData.contentSpec.count}개 결과 기준</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Keyword Clusters */}
@@ -2282,90 +2287,90 @@ function AnalyzePageInner() {
 
           {/* Row 3: Quick Actions */}
           {(analysis || quickData) && (
-          <section className="mb-12">
-            <h3 className="text-lg font-bold mb-6">빠른 실행</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Compare */}
-              <a
-                href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="size-12 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 rounded-full flex items-center justify-center">
-                    <ArrowRightLeft className="size-6" />
+            <section className="mb-12">
+              <h3 className="text-lg font-bold mb-6">빠른 실행</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Compare */}
+                <a
+                  href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
+                  className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 rounded-full flex items-center justify-center">
+                      <ArrowRightLeft className="size-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">키워드 비교</h4>
+                      <p className="text-xs text-muted-foreground mt-1">다른 키워드와 비교 분석</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold">키워드 비교</h4>
-                    <p className="text-xs text-muted-foreground mt-1">다른 키워드와 비교 분석</p>
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
-              </a>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+                </a>
 
-              {/* AI Title */}
-              <a
-                href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=title`}
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="size-12 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
-                    <Sparkles className="size-6" />
+                {/* AI Title */}
+                <a
+                  href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=title`}
+                  className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
+                      <Sparkles className="size-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">AI 제목 추천</h4>
+                      <p className="text-xs text-muted-foreground mt-1">클릭률 높은 제목 생성</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold">AI 제목 추천</h4>
-                    <p className="text-xs text-muted-foreground mt-1">클릭률 높은 제목 생성</p>
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
-              </a>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+                </a>
 
-              {/* AI Draft */}
-              <a
-                href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=draft`}
-                className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="size-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
-                    <FileText className="size-6" />
+                {/* AI Draft */}
+                <a
+                  href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=draft`}
+                  className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="size-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
+                      <FileText className="size-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold">AI 글 초안 생성</h4>
+                      <p className="text-xs text-muted-foreground mt-1">블로그 포스팅 초안 작성</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold">AI 글 초안 생성</h4>
-                    <p className="text-xs text-muted-foreground mt-1">블로그 포스팅 초안 작성</p>
-                  </div>
-                </div>
-                <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
-              </a>
-            </div>
-          </section>
+                  <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
+                </a>
+              </div>
+            </section>
           )}
 
           {/* Bottom Actions */}
           {(analysis || quickData) && (
-          <footer className="flex flex-col sm:flex-row justify-center gap-4 border-t border-muted/50 pt-10">
-            <button
-              onClick={() => {
-                const kw = analysis?.keyword ?? quickData?.keyword;
-                if (kw) bookmarkMutation.mutate({ keyword: kw, saved: isSaved });
-              }}
-              disabled={bookmarkMutation.isPending}
-              className={`w-full sm:w-auto px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
-                ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
-                : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
-                }`}
-            >
-              <span className="flex items-center justify-center gap-2">
-                <Star className={`size-5 ${isSaved ? "fill-white" : ""}`} />
-                {bookmarkMutation.isPending ? "처리 중…" : isSaved ? "저장됨" : "키워드 저장"}
-              </span>
-            </button>
-            <a
-              href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
-              className="w-full sm:w-auto px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center justify-center gap-2"
-            >
-              <ArrowRightLeft className="size-5" />
-              비교에 추가
-            </a>
-          </footer>
+            <footer className="flex flex-col sm:flex-row justify-center gap-4 border-t border-muted/50 pt-10">
+              <button
+                onClick={() => {
+                  const kw = analysis?.keyword ?? quickData?.keyword;
+                  if (kw) bookmarkMutation.mutate({ keyword: kw, saved: isSaved });
+                }}
+                disabled={bookmarkMutation.isPending}
+                className={`w-full sm:w-auto px-10 py-4 rounded-xl font-bold shadow-lg transition-all disabled:opacity-60 ${isSaved
+                  ? "bg-amber-500 text-white shadow-amber-500/20 hover:bg-amber-600"
+                  : "bg-primary text-primary-foreground shadow-primary/20 hover:bg-primary/90"
+                  }`}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <Star className={`size-5 ${isSaved ? "fill-white" : ""}`} />
+                  {bookmarkMutation.isPending ? "처리 중…" : isSaved ? "저장됨" : "키워드 저장"}
+                </span>
+              </button>
+              <a
+                href={`/compare?keywords=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}`}
+                className="w-full sm:w-auto px-10 py-4 bg-muted/50 text-foreground rounded-xl font-bold hover:bg-muted transition-colors flex items-center justify-center gap-2"
+              >
+                <ArrowRightLeft className="size-5" />
+                비교에 추가
+              </a>
+            </footer>
           )}
         </>
       )}
