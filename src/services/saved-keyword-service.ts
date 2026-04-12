@@ -5,6 +5,8 @@ export interface SavedKeyword {
   keyword: string;
   memo: string | null;
   createdAt: string;
+  analysisData?: Record<string, unknown> | null;
+  analysisUpdatedAt?: string | null;
 }
 
 /**
@@ -17,7 +19,7 @@ export async function getSavedKeywords(
   const supabase = await createServerClient();
   const { data, error } = await supabase
     .from("saved_keywords")
-    .select("id, keyword, memo, created_at")
+    .select("id, keyword, memo, created_at, analysis_data, analysis_updated_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -31,7 +33,52 @@ export async function getSavedKeywords(
     keyword: row.keyword,
     memo: row.memo ?? null,
     createdAt: row.created_at,
+    analysisData: row.analysis_data ?? null,
+    analysisUpdatedAt: row.analysis_updated_at ?? null,
   }));
+}
+
+/**
+ * Get cached analysis data for a saved keyword.
+ */
+export async function getAnalysisData(
+  userId: string,
+  keyword: string
+): Promise<{ analysisData: Record<string, unknown>; analysisUpdatedAt: string } | null> {
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("saved_keywords")
+    .select("analysis_data, analysis_updated_at")
+    .eq("user_id", userId)
+    .eq("keyword", keyword)
+    .single();
+
+  if (error || !data || !data.analysis_data) return null;
+
+  return {
+    analysisData: data.analysis_data as Record<string, unknown>,
+    analysisUpdatedAt: data.analysis_updated_at as string,
+  };
+}
+
+/**
+ * Persist analysis data for a saved keyword. Fire-and-forget.
+ */
+export async function updateAnalysisData(
+  userId: string,
+  keyword: string,
+  analysisData: Record<string, unknown>
+): Promise<void> {
+  const supabase = await createServerClient();
+  await supabase
+    .from("saved_keywords")
+    .update({
+      analysis_data: analysisData,
+      analysis_updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", userId)
+    .eq("keyword", keyword);
+  // fire-and-forget: errors are intentionally ignored
 }
 
 /**

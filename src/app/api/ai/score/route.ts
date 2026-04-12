@@ -3,6 +3,7 @@ import { scoreContent } from "@/services/ai-service";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { recordAndEnforce } from "@/services/usage-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
+import { resolveEnrichment } from "@/services/enrichment-service";
 
 const bodySchema = z.object({
   keyword: z.string().min(1),
@@ -41,7 +42,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const score = await scoreContent(parsed.data.keyword, parsed.data.content);
+    const enrichment = await resolveEnrichment(user.userId, parsed.data.keyword, "score");
+    const score = await scoreContent(parsed.data.keyword, parsed.data.content, enrichment);
     return Response.json({ score });
   } catch (err) {
     console.error("[api/ai/score] Error:", err);

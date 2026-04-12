@@ -1,31 +1,23 @@
 import { getOpenAIClient } from "@/shared/lib/openai";
 import type { AITitleSuggestion, AIDraftResult, AIContentScore, AIContentSubMetrics } from "@/entities/analysis/model/types";
 import { cached, CacheTTL } from "@/services/cache-service";
+import { sanitizeForPrompt } from "@/shared/lib/sanitize";
 
 const MODEL = "gpt-4o-mini";
-
-/**
- * Sanitize user input before inserting into AI prompts.
- * Strips control characters, limits length, and wraps in delimiters.
- */
-function sanitizeForPrompt(input: string, maxLen = 100): string {
-  // Strip control characters and excessive whitespace
-  const cleaned = input
-    .replace(/[\x00-\x1f\x7f]/g, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, maxLen);
-  return cleaned;
-}
 
 /**
  * Generate AI blog title suggestions for a keyword.
  */
 export async function generateTitleSuggestions(
   keyword: string,
-  context?: string
+  context?: string,
+  enrichment?: string
 ): Promise<AITitleSuggestion[]> {
   const openai = getOpenAIClient();
+
+  const enrichmentInstruction = enrichment
+    ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 검색 트렌드와 사용자 의도에 맞는 제목을 생성하세요. 상위 인기글과 차별화되면서도 검색 의도에 부합하는 제목을 추천하세요.\n\n${enrichment}`
+    : "";
 
   const systemPrompt = `당신은 네이버 블로그 SEO 전문가입니다. 사용자가 제공한 키워드를 기반으로 클릭률이 높은 블로그 제목 5개를 추천합니다.
 
@@ -36,11 +28,13 @@ export async function generateTitleSuggestions(
 - 클릭을 유도하되 과장/낚시성 제목 지양
 
 JSON 배열로 응답하세요:
-[{"title": "제목", "rank": 1, "reason": "추천 이유"}]`;
+[{"title": "제목", "rank": 1, "reason": "추천 이유"}]${enrichmentInstruction}`;
 
-  const userPrompt = context
-    ? `키워드: ${keyword}\n추가 설명: ${context}`
-    : `키워드: ${keyword}`;
+  const safeKeyword = sanitizeForPrompt(keyword);
+  const safeContext = context ? sanitizeForPrompt(context, 200) : undefined;
+  const userPrompt = safeContext
+    ? `키워드: ${safeKeyword}\n추가 설명: ${safeContext}`
+    : `키워드: ${safeKeyword}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
@@ -80,9 +74,14 @@ JSON 배열로 응답하세요:
 export async function generateDraft(
   keyword: string,
   postType: "정보성" | "리뷰" | "리스트형" | "비교분석" = "정보성",
-  targetLength: number = 1500
+  targetLength: number = 1500,
+  enrichment?: string
 ): Promise<AIDraftResult> {
   const openai = getOpenAIClient();
+
+  const enrichmentInstruction = enrichment
+    ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 경쟁 상황과 검색 의도에 맞는 콘텐츠를 작성하세요. 지식iN 질문에서 파악된 사용자의 실제 궁금증을 반영하고, 상위 인기글 대비 차별화된 내용을 포함하세요.\n\n${enrichment}`
+    : "";
 
   const systemPrompt = `당신은 네이버 블로그 콘텐츠 전문 작성자입니다. 사용자가 제공한 키워드와 포스팅 유형에 맞는 블로그 초안을 작성합니다.
 
@@ -100,13 +99,13 @@ JSON으로 응답하세요:
   "content": "마크다운 본문",
   "outline": ["소제목1", "소제목2", ...],
   "tags": ["태그1", "태그2", ...]
-}`;
+}${enrichmentInstruction}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `키워드: ${keyword}` },
+      { role: "user", content: `키워드: ${sanitizeForPrompt(keyword)}` },
     ],
     temperature: 0.7,
     max_tokens: 4000,
@@ -138,9 +137,14 @@ JSON으로 응답하세요:
  */
 export async function scoreContent(
   keyword: string,
-  content: string
+  content: string,
+  enrichment?: string
 ): Promise<AIContentScore> {
   const openai = getOpenAIClient();
+
+  const enrichmentInstruction = enrichment
+    ? `\n\n아래 키워드 분석 데이터와 비교하여 실제 경쟁 환경에서의 SEO 최적화 수준을 평가하세요. 상위 인기글의 패턴과 비교하여 개선점을 제시하세요.\n\n${enrichment}`
+    : "";
 
   const systemPrompt = `당신은 네이버 블로그 SEO 분석 전문가입니다. 사용자가 제공한 키워드와 블로그 본문을 분석하여 SEO 최적화 점수를 산출합니다.
 
@@ -163,13 +167,13 @@ JSON으로 응답하세요:
   },
   "improvements": ["개선사항1", "개선사항2", ...],
   "strengths": ["강점1", "강점2", ...]
-}`;
+}${enrichmentInstruction}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `키워드: ${keyword}\n\n본문:\n${content}` },
+      { role: "user", content: `키워드: ${sanitizeForPrompt(keyword)}\n\n본문:\n${content.replace(/[\x00-\x1f\x7f]/g, "")}` },
     ],
     temperature: 0.3,
     response_format: { type: "json_object" },
