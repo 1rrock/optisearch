@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, Bookmark, Verified, Minus, Plus, Download, Type, PenTool, BarChart2, TrendingUp } from "lucide-react";
+import { Search, Bookmark, Verified, Minus, Plus, Download, Type, PenTool, BarChart2, TrendingUp, Sparkles, Edit3, ArrowRight } from "lucide-react";
+import { AiLinkButton } from "@/shared/components/AiLinkButton";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { useDashboardData } from "@/shared/hooks/use-user";
 import { exportToExcel } from "@/shared/lib/excel";
@@ -61,9 +62,8 @@ export default function DashboardPage() {
   const effectivePlan = plan;
   const limits = PLAN_LIMITS[effectivePlan];
   const searchLimit = limits.dailySearch;
-  const titleLimit = limits.dailyTitle;
+  const analyzeLimit = limits.dailyAnalyze;
   const draftLimit = limits.dailyDraft;
-  const scoreLimit = limits.dailyScore;
   const { data: rankData, isPending: rankLoading } = useRankTrackTargets();
   const trackLimit = limits.maxTrackTargets;
   const trackUsed = rankData?.targets?.length ?? 0;
@@ -157,13 +157,36 @@ export default function DashboardPage() {
         <div className="relative z-10 bg-background/80 backdrop-blur-md rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-muted/50 p-2 lg:p-4 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-0.5">
             <StatItem label="오늘 검색" used={usage.search} limit={searchLimit} color="hsl(var(--primary))" initialized={initialized} icon={<Search className="size-5" />} />
-            <StatItem label="AI 제목 추천" used={usage.title} limit={titleLimit} color="#f59e0b" initialized={initialized} icon={<Type className="size-5" />} />
+            <StatItem label="AI 경쟁 분석" used={usage.analyze} limit={analyzeLimit} color="#f59e0b" initialized={initialized} icon={<Type className="size-5" />} />
             <StatItem label="AI 초안 생성" used={usage.draft} limit={draftLimit} color="#10b981" initialized={initialized} icon={<PenTool className="size-5" />} />
-            <StatItem label="AI 점수 분석" used={usage.score} limit={scoreLimit} color="#8b5cf6" initialized={initialized} icon={<BarChart2 className="size-5" />} />
             <StatItem label="순위 추적 슬롯" used={trackUsed} limit={trackLimit} color="#06b6d4" initialized={initialized && !rankLoading} icon={<TrendingUp className="size-5" />} />
           </div>
         </div>
       </div>
+
+      {/* AI 미사용 넛지 배너 */}
+      {initialized && usage.analyze === 0 && usage.draft === 0 && (
+        <div className="relative overflow-hidden rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-950/20 p-5 sm:p-6 shadow-sm">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="size-12 rounded-2xl bg-blue-500/10 flex items-center justify-center shrink-0">
+              <Sparkles className="size-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-foreground mb-0.5">아직 AI 도구를 한 번도 안 써보셨네요 ✨</p>
+              <p className="text-sm text-muted-foreground">상위 1% 블로거들이 쓰는 AI 경쟁 분석으로 공백 키워드를 발견하고, 5분 만에 포스팅 초안을 완성하세요.</p>
+            </div>
+            <a
+              href="/ai"
+              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/20 shrink-0 text-sm"
+            >
+              <Sparkles className="size-4" />
+              무료 체험하기
+              <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* 2. Middle Section: Search */}
       <section className="bg-card p-5 sm:p-10 rounded-xl shadow-sm border border-muted/50">
@@ -312,6 +335,7 @@ export default function DashboardPage() {
                     <th className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right">검색량</th>
                     <th className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-center">등급</th>
                     <th className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right">날짜</th>
+                    <th className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-widest text-right">AI 도구</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-muted/30">
@@ -332,6 +356,28 @@ export default function DashboardPage() {
                       </td>
                       <td className="px-6 py-4 text-right text-xs text-muted-foreground font-medium">
                         {new Date(s.createdAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <AiLinkButton
+                            href={`/ai?keyword=${encodeURIComponent(s.keyword)}&tab=analyze`}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors text-[10px] font-bold border border-blue-500/15"
+                            title="AI 경쟁 분석"
+                            feature="AI 경쟁 분석"
+                          >
+                            <Sparkles className="size-2.5" />
+                            분석
+                          </AiLinkButton>
+                          <AiLinkButton
+                            href={`/ai?keyword=${encodeURIComponent(s.keyword)}&tab=draft`}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors text-[10px] font-bold border border-emerald-500/15"
+                            title="AI 초안 작성"
+                            feature="AI 글 초안"
+                          >
+                            <Edit3 className="size-2.5" />
+                            초안
+                          </AiLinkButton>
+                        </div>
                       </td>
                     </tr>
                   ))}

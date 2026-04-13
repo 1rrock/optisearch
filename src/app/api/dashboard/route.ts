@@ -6,7 +6,7 @@ import { getKSTDateString } from "@/shared/lib/date-utils";
 
 const EMPTY_DASHBOARD = {
   plan: "free" as const,
-  usage: { search: 0, title: 0, draft: 0, score: 0 },
+  usage: { search: 0, analyze: 0, draft: 0 },
   recentSearches: [],
   savedKeywordsCount: 0,
   totalSearches: 0,
@@ -39,7 +39,7 @@ export async function GET() {
       getDatalabQuotaUsage(),
     ]);
 
-    const usage = { search: 0, title: 0, draft: 0, score: 0 };
+    const usage = { search: 0, analyze: 0, draft: 0 };
     for (const row of usageData ?? []) {
       if (row.feature in usage) {
         usage[row.feature as keyof typeof usage]++;
@@ -53,9 +53,8 @@ export async function GET() {
       usage,
       limits: {
         dailySearch: limits.dailySearch,
-        dailyTitle: limits.dailyTitle,
+        dailyAnalyze: limits.dailyAnalyze,
         dailyDraft: limits.dailyDraft,
-        dailyScore: limits.dailyScore,
       },
       recentSearches: (recentSearches ?? []).map((s) => ({
         keyword: s.keyword,

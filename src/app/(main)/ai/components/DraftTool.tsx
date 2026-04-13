@@ -46,15 +46,20 @@ export function DraftTool({
   limit,
   onMutationSuccess,
   initialKeyword,
+  initialHint,
 }: {
   onUsageLimitExceeded: (state: UpgradeModalState) => void;
   used: number;
   limit: number;
   onMutationSuccess: () => void;
   initialKeyword?: string;
+  /** URL ?hint= 파라미터로 전달된 키워드 맥락 힌트 */
+  initialHint?: string;
 }) {
   const router = useRouter();
   const [keyword, setKeyword] = useState(initialKeyword || "");
+  const [hint, setHint] = useState(initialHint || "");
+  const [showHint, setShowHint] = useState(!!initialHint);
   const [postType, setPostType] = useState<PostType>("정보성");
   const [length, setLength] = useState<DraftLength>("1500");
   const [copied, setCopied] = useState(false);
@@ -67,7 +72,15 @@ export function DraftTool({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialKeyword]);
 
-  const mutation = useMutation<DraftResponse, Error, { keyword: string; postType: PostType; length: DraftLength }>({
+  useEffect(() => {
+    if (initialHint !== undefined) {
+      setHint(initialHint);
+      if (initialHint) setShowHint(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialHint]);
+
+  const mutation = useMutation<DraftResponse, Error, { keyword: string; postType: PostType; length: DraftLength; hint?: string }>({
     mutationFn: async (payload) => {
       const res = await fetch("/api/ai/draft", {
         method: "POST",
@@ -95,7 +108,7 @@ export function DraftTool({
 
   const handleGenerate = () => {
     if (!keyword.trim()) return;
-    mutation.mutate({ keyword: keyword.trim(), postType, length });
+    mutation.mutate({ keyword: keyword.trim(), postType, length, hint: hint.trim() || undefined });
   };
 
   const draft = mutation.data?.draft;
@@ -156,6 +169,33 @@ export function DraftTool({
                 onKeyDown={handleKeyDown}
                 placeholder="예: 다이어트 식단"
               />
+            </div>
+
+            {/* 맥락 힌트 — 다의어 문제 해결 */}
+            <div className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => setShowHint((v) => !v)}
+                className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+              >
+                <span className={`transition-transform duration-200 inline-block ${showHint ? "rotate-90" : ""}`}>▶</span>
+                맥락 힌트 {hint && <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400 rounded text-[10px] font-black">설정됨</span>}
+              </button>
+              {showHint && (
+                <div className="space-y-1">
+                  <input
+                    className="w-full bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 rounded-xl py-2.5 px-4 text-sm focus:ring-2 focus:ring-blue-500/20 transition-all"
+                    type="text"
+                    value={hint}
+                    onChange={(e) => setHint(e.target.value)}
+                    placeholder="예: 마스터스 골프 대회, 2024년 우승자"
+                    maxLength={200}
+                  />
+                  <p className="text-[11px] text-muted-foreground px-1">
+                    키워드의 구체적 의미를 입력하면 AI가 올바른 맥락으로 초안을 작성합니다
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

@@ -12,10 +12,13 @@ const bodySchema = z.object({
   // Accept both field names and coerce string→number for compatibility
   targetLength: z.coerce.number().min(500).max(5000).optional(),
   length: z.coerce.number().min(500).max(5000).optional(),
+  /** 키워드 맥락 힌트 — 다의어 문제 해결용 (예: "마스터스 골프 대회") */
+  hint: z.string().max(300).optional(),
 }).transform((data) => ({
   keyword: data.keyword,
   postType: data.postType,
   targetLength: data.targetLength ?? data.length ?? 1500,
+  hint: data.hint,
 }));
 
 export async function POST(request: Request) {
@@ -51,7 +54,7 @@ export async function POST(request: Request) {
 
   try {
     const enrichment = await resolveEnrichment(user.userId, parsed.data.keyword, "draft");
-    const draft = await generateDraft(parsed.data.keyword, parsed.data.postType, parsed.data.targetLength, enrichment);
+    const draft = await generateDraft(parsed.data.keyword, parsed.data.postType, parsed.data.targetLength, enrichment, parsed.data.hint);
     return Response.json({ draft });
   } catch (err) {
     console.error("[api/ai/draft] Error:", err);

@@ -98,7 +98,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
 export async function enforceUsageLimit(
   userId: string,
   plan: PlanId,
-  feature: "search" | "title" | "draft" | "score"
+  feature: "search" | "analyze" | "draft"
 ): Promise<Response | null> {
   const { allowed, used, limit } = await checkUsageLimit(userId, plan, feature);
   if (!allowed) {

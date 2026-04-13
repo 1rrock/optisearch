@@ -52,7 +52,7 @@ interface ApiHandlerOptions<T> {
   /** Require authentication. Default: true */
   auth?: boolean;
   /** Feature name for usage tracking/limits */
-  feature?: "search" | "title" | "draft" | "score";
+  feature?: "search" | "analyze" | "draft";
   /** The actual handler function */
   handler: (ctx: HandlerContext<T>) => Promise<Response>;
 }

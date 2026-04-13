@@ -42,6 +42,7 @@ import type { KeywordSearchResult, RelatedKeyword } from "@/entities/keyword/mod
 import type { TrendPoint, SeasonalityInfo } from "@/services/trend-service";
 import { copyToClipboard, formatKeywordsAsHashtags, formatKeywordsAsTags } from "@/shared/lib/clipboard";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
+import { AiLinkButton } from "@/shared/components/AiLinkButton";
 import { SearchInputWithHistory } from "@/shared/components/SearchInputWithHistory";
 import { cn } from "@/shared/lib/utils";
 import { competitionBadgeClass } from "@/shared/lib/keyword-utils";
@@ -638,22 +639,40 @@ const DEMO_FILTERS = [
   { key: "f50", label: "50대+ 여성", color: "#6366f1", gender: "f" as const, ages: ["9", "10", "11"] },
 ];
 
-function RelatedRow({ word, vol, comp, onClick, onCompare }: { word: string; vol: string; comp: string; onClick: () => void; onCompare: () => void }) {
+function RelatedRow({ word, vol, comp, onClick, onCompare, volRaw }: { word: string; vol: string; comp: string; onClick: () => void; onCompare: () => void; volRaw?: number }) {
   const badgeCls = competitionBadgeClass(comp);
+  // 황금 키워드: 저경쟁(LOW) + 검색량 1000 이상
+  const isGolden = comp === "LOW" && (volRaw ?? 0) >= 1000;
 
   return (
     <tr
-      className="hover:bg-muted/30 transition-colors cursor-pointer"
+      className={`hover:bg-muted/30 transition-colors cursor-pointer ${isGolden ? "bg-amber-50/30 dark:bg-amber-950/10" : ""}`}
       onClick={onClick}
       title={`'${word}' 분석하기`}
     >
-      <td className="px-6 py-4 text-sm font-semibold text-foreground/80 hover:text-primary transition-colors">{word}</td>
+      <td className="px-6 py-4 text-sm font-semibold text-foreground/80 hover:text-primary transition-colors">
+        <span className="flex items-center gap-2">
+          {word}
+          {isGolden && (
+            <span className="px-1.5 py-0.5 text-[9px] font-black rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 shrink-0 tracking-wide">✨ 황금</span>
+          )}
+        </span>
+      </td>
       <td className="px-4 py-4 text-sm text-right font-medium text-muted-foreground">{vol}</td>
       <td className="px-4 py-4 text-center whitespace-nowrap">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${badgeCls}`}>{comp}</span>
       </td>
       <td className="px-6 py-4 text-right">
         <div className="flex items-center justify-end gap-2">
+          <AiLinkButton
+            href={`/ai?keyword=${encodeURIComponent(word)}&tab=analyze`}
+            className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950/20 shadow-sm border border-muted transition-colors"
+            title="AI 경쟁 분석"
+            feature="AI 경쟁 분석"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Sparkles className="size-3.5" />
+          </AiLinkButton>
           <button
             className="size-8 rounded-full inline-flex items-center justify-center text-muted-foreground hover:text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-950/20 shadow-sm border border-muted transition-colors"
             onClick={(e) => { e.stopPropagation(); onCompare(); }}
@@ -1855,6 +1874,7 @@ function AnalyzePageInner() {
                           key={rk.keyword}
                           word={rk.keyword}
                           vol={(rk.pcSearchVolume + rk.mobileSearchVolume).toLocaleString("ko-KR")}
+                          volRaw={rk.pcSearchVolume + rk.mobileSearchVolume}
                           comp={rk.competition}
                           onClick={() => handleRelatedKeywordClick(rk.keyword)}
                           onCompare={() => {
@@ -2307,27 +2327,30 @@ function AnalyzePageInner() {
                   <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
                 </a>
 
-                {/* AI Title */}
-                <a
-                  href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=title`}
-                  className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+                {/* AI Compete Analyze */}
+                <AiLinkButton
+                  href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=analyze`}
+                  className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-blue-300/50 hover:shadow-md transition-all relative overflow-hidden"
+                  feature="AI 경쟁 분석"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="size-12 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex items-center gap-4 relative z-10">
+                    <div className="size-12 bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
                       <Sparkles className="size-6" />
                     </div>
                     <div>
-                      <h4 className="font-bold">AI 제목 추천</h4>
-                      <p className="text-xs text-muted-foreground mt-1">클릭률 높은 제목 생성</p>
+                      <h4 className="font-bold">AI 경쟁 분석</h4>
+                      <p className="text-xs text-muted-foreground mt-1">상위글 공백 발견 · 콘텐츠 전략</p>
                     </div>
                   </div>
-                  <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
-                </a>
+                  <ArrowRight className="text-muted-foreground group-hover:text-blue-500 size-5 transition-colors relative z-10" />
+                </AiLinkButton>
 
                 {/* AI Draft */}
-                <a
+                <AiLinkButton
                   href={`/ai?keyword=${encodeURIComponent(analysis?.keyword ?? quickData?.keyword ?? "")}&tab=draft`}
                   className="group flex items-center justify-between p-6 bg-card rounded-xl shadow-sm border border-muted/50 text-left hover:border-primary/30 hover:shadow-md transition-all"
+                  feature="AI 글 초안"
                 >
                   <div className="flex items-center gap-4">
                     <div className="size-12 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center">
@@ -2339,7 +2362,7 @@ function AnalyzePageInner() {
                     </div>
                   </div>
                   <ArrowRight className="text-muted-foreground group-hover:text-primary size-5 transition-colors" />
-                </a>
+                </AiLinkButton>
               </div>
             </section>
           )}

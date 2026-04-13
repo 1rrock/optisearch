@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight, ArrowRightLeft, Database } from "lucide-react";
+import { Bookmark, Trash2, Search, Pencil, Check, X, ArrowRight, ArrowRightLeft, Database, Sparkles, Edit3 } from "lucide-react";
+import { AiLinkButton } from "@/shared/components/AiLinkButton";
 
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/ui/page-header";
@@ -185,7 +186,7 @@ function KeywordCard({
       </div>
 
       {/* Actions row */}
-      <div className="flex items-center gap-2 pt-1 border-t border-muted/30">
+      <div className="flex items-center gap-2 pt-1 border-t border-muted/30 flex-wrap">
         <button
           onClick={handleAnalyze}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary/10 text-primary rounded-lg hover:bg-primary/20 transition-colors"
@@ -194,6 +195,22 @@ function KeywordCard({
           분석
           <ArrowRight className="size-3" />
         </button>
+        <AiLinkButton
+          href={`/ai?keyword=${encodeURIComponent(item.keyword)}&tab=analyze`}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-500/20 transition-colors border border-blue-500/20"
+          feature="AI 경쟁 분석"
+        >
+          <Sparkles className="size-3" />
+          AI 분석
+        </AiLinkButton>
+        <AiLinkButton
+          href={`/ai?keyword=${encodeURIComponent(item.keyword)}&tab=draft`}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors border border-emerald-500/20"
+          feature="AI 글 초안"
+        >
+          <Edit3 className="size-3" />
+          초안
+        </AiLinkButton>
         <button
           onClick={() => onDelete(item.keyword)}
           className="ml-auto size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
@@ -332,6 +349,15 @@ export default function KeywordsPage() {
                   <Database className="size-3.5" />
                   대량 분석
                 </a>
+                <AiLinkButton
+                  href={`/ai?keyword=${encodeURIComponent(Array.from(selected)[0] ?? "")}&tab=analyze`}
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-xl hover:bg-blue-500/20 transition-colors border border-blue-500/20"
+                  title="첫 번째 선택 키워드로 AI 분석"
+                  feature="AI 경쟁 분석"
+                >
+                  <Sparkles className="size-3.5" />
+                  AI 분석
+                </AiLinkButton>
               </>
             )}
           </div>

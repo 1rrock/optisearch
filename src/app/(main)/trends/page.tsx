@@ -15,11 +15,13 @@ import {
   ChevronDown,
   ExternalLink,
   Newspaper,
+  Edit3,
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PageHeader } from "@/shared/ui/page-header";
 import { Skeleton } from "@/shared/ui/skeleton";
 import type { TrendingWordCloudItem } from "@/features/trends/ui/TrendingWordCloud";
+import { AiLinkButton } from "@/shared/components/AiLinkButton";
 
 const TrendingWordCloud = dynamic(
   () => import("@/features/trends/ui/TrendingWordCloud").then((mod) => mod.TrendingWordCloud),
@@ -81,7 +83,7 @@ export default function TrendsPage() {
         />
       </div>
 
-      <NewKeywordsSection />
+      {/* <NewKeywordsSection /> */}
       <SeasonalKeywordsSection />
     </div>
   );
@@ -126,7 +128,7 @@ function TrendsNewsListSection({ top10, isLoading: isTrendingLoading, selectedKe
     staleTime: 5 * 60 * 1000, // 5 minutes cache
   });
 
-  if (isTrendingLoading) {
+  if (isTrendingLoading && top10.length === 0) {
     return (
       <div className="bg-card border border-muted/50 rounded-2xl p-6 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2 mb-5">
@@ -201,10 +203,20 @@ function TrendsNewsListSection({ top10, isLoading: isTrendingLoading, selectedKe
       </div>
 
       {/* 2. News Title Section */}
-      <div className="px-6 pt-6 pb-2">
+      <div className="px-6 pt-5 pb-2 flex items-center justify-between gap-4">
         <h4 className="text-lg font-bold text-foreground">
           <span className="text-primary">'{activeKeyword}'</span>에 대한 뉴스
         </h4>
+        {activeKeyword && (
+          <AiLinkButton
+            href={`/ai?keyword=${encodeURIComponent(activeKeyword)}&tab=draft${newsData?.items?.[0]?.title ? `&hint=${encodeURIComponent(newsData.items[0].title.replace(/<[^>]+>/g, '').slice(0, 100))}` : ""}`}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-bold shrink-0 border border-emerald-500/20"
+            feature="AI 글 초안"
+          >
+            <Edit3 className="size-3.5" />
+            AI 초안 쓰기
+          </AiLinkButton>
+        )}
       </div>
 
       {/* 3. News List Section */}
@@ -481,27 +493,39 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                 <div className="flex-1 min-w-0">
                   <span className="text-sm font-semibold truncate block">{kw.keyword}</span>
                 </div>
-                <div className="flex flex-col items-end shrink-0">
-                  <span className={cn(
-                    "text-xs font-bold",
-                    kw.direction === "up" ? "text-rose-500" : kw.direction === "down" ? "text-blue-500" : "text-muted-foreground"
-                  )}>
-                    {kw.direction === "up" ? <ArrowUpRight className="size-3 inline" /> : kw.direction === "down" ? <ArrowDownRight className="size-3 inline" /> : null}
-                    {Math.abs(kw.changeRate)}%
-                  </span>
-                  {kw.commercialScore && kw.commercialScore >= 40 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  {/* AI Draft button */}
+                  <AiLinkButton
+                    href={`/ai?keyword=${encodeURIComponent(kw.keyword)}&tab=draft`}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                    title="AI 초안 작성"
+                    feature="AI 글 초안"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Edit3 className="size-3.5" />
+                  </AiLinkButton>
+                  <div className="flex flex-col items-end">
                     <span className={cn(
-                      "text-[9px] font-bold px-1 py-0.5 rounded mt-0.5",
-                      kw.commercialScore >= 70 
-                        ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" 
-                        : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                      "text-xs font-bold",
+                      kw.direction === "up" ? "text-rose-500" : kw.direction === "down" ? "text-blue-500" : "text-muted-foreground"
                     )}>
-                      {kw.commercialScore >= 70 ? "🔥 광고가치 높음" : "광고가치 보통"}
+                      {kw.direction === "up" ? <ArrowUpRight className="size-3 inline" /> : kw.direction === "down" ? <ArrowDownRight className="size-3 inline" /> : null}
+                      {Math.abs(kw.changeRate)}%
                     </span>
-                  )}
-                  <span className="text-[10px] text-muted-foreground tabular-nums">
-                    {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
-                  </span>
+                    {kw.commercialScore && kw.commercialScore >= 40 && (
+                      <span className={cn(
+                        "text-[9px] font-bold px-1 py-0.5 rounded mt-0.5",
+                        kw.commercialScore >= 70 
+                          ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" 
+                          : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
+                      )}>
+                        {kw.commercialScore >= 70 ? "광고가치 높음" : "광고가치 보통"}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground tabular-nums">
+                      {kw.volume > 0 ? `${(kw.volume / 10000).toFixed(1)}만` : ""}
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -528,6 +552,7 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                 >
                   변동률{sortIcon("changeRate")}
                 </th>
+                <th className="text-right py-2.5 pr-4 font-semibold w-20">AI 초안</th>
               </tr>
             </thead>
             <tbody>
@@ -592,9 +617,20 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                           ? "bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400" 
                           : "bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400"
                       )} title={`상업적 가치 점수: ${kw.commercialScore}`}>
-                        {kw.commercialScore >= 70 ? "🔥 광고가치 높음" : "광고가치 보통"}
+                        {kw.commercialScore >= 70 ? "광고가치 높음" : "광고가치 보통"}
                       </div>
                     )}
+                  </td>
+                  <td className="py-3 pr-4 text-right">
+                    <AiLinkButton
+                      href={`/ai?keyword=${encodeURIComponent(kw.keyword)}&tab=draft`}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors text-[11px] font-bold border border-emerald-500/20"
+                      title="AI 초안 작성"
+                      feature="AI 글 초안"
+                    >
+                      <Edit3 className="size-3" />
+                      초안
+                    </AiLinkButton>
                   </td>
                 </tr>
               ))}
@@ -651,7 +687,7 @@ function NewKeywordsContent() {
   const visibleKws = expanded ? keywords : keywords.slice(0, MAX_VISIBLE);
   const hasMore = keywords.length > MAX_VISIBLE;
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -825,7 +861,7 @@ function SeasonalKeywordsContent() {
   // Compute max multiplier for heat bar normalization
   const maxMultiplier = Math.max(...keywords.map((k) => k.multiplier), 1);
 
-  if (isLoading) {
+  if (isLoading && !data) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (

@@ -10,7 +10,7 @@ import { config } from "dotenv";
 config({ path: ".env.local" });
 
 import { buildEnrichmentBlock } from "@/services/enrichment-service";
-import { generateTitleSuggestions, generateDraft } from "@/services/ai-service";
+import { analyzeCompetition, generateDraft } from "@/services/ai-service";
 import type { EnrichmentAnalysisData } from "@/services/enrichment-service";
 
 const KEYWORD = process.argv[2] ?? "강남 맛집";
@@ -71,18 +71,22 @@ async function main() {
 
   console.log(`\n📊 토큰 추정: 약 ${Math.round(enrichmentBlock.length / 3.5)}토큰`);
 
-  // 2. Title: without vs with enrichment
-  hr("② 제목 추천 비교");
+  // 2. Competitive analysis: without vs with enrichment
+  hr("② 경쟁 분석 비교");
   console.log("\n[A] enrichment 없음 (기존 — 키워드만)");
   sep();
-  const titlesWithout = await generateTitleSuggestions(KEYWORD);
-  titlesWithout.forEach((t, i) => console.log(`  ${i + 1}. ${t.title}`));
+  const analysisWithout = await analyzeCompetition(KEYWORD);
+  console.log(`  난이도: ${analysisWithout.difficulty}`);
+  console.log(`  전략: ${analysisWithout.strategySummary}`);
+  analysisWithout.recommendedTitles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
 
   console.log("\n[B] enrichment 있음 (데이터 기반)");
   sep();
-  const titleEnrichment = buildEnrichmentBlock(MOCK_DATA, "title");
-  const titlesWith = await generateTitleSuggestions(KEYWORD, undefined, titleEnrichment);
-  titlesWith.forEach((t, i) => console.log(`  ${i + 1}. ${t.title}`));
+  const analyzeEnrichment = buildEnrichmentBlock(MOCK_DATA, "analyze");
+  const analysisWith = await analyzeCompetition(KEYWORD, analyzeEnrichment);
+  console.log(`  난이도: ${analysisWith.difficulty}`);
+  console.log(`  전략: ${analysisWith.strategySummary}`);
+  analysisWith.recommendedTitles.forEach((t, i) => console.log(`  ${i + 1}. ${t}`));
 
   // 3. Draft: without vs with enrichment
   hr("③ 블로그 초안 도입부 비교 (400자 미리보기)");

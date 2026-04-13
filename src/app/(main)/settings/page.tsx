@@ -143,9 +143,9 @@ export default function SettingsPage() {
                       icon={<Search className="size-4" />}
                     />
                     <UsageBar
-                      label="AI 제목 추천"
-                      used={data?.usage.title ?? 0}
-                      limit={limits.dailyTitle}
+                      label="AI 경쟁 분석"
+                      used={data?.usage.analyze ?? 0}
+                      limit={limits.dailyAnalyze}
                       icon={<Flame className="size-4" />}
                     />
                     <UsageBar
@@ -153,12 +153,6 @@ export default function SettingsPage() {
                       used={data?.usage.draft ?? 0}
                       limit={limits.dailyDraft}
                       icon={<Zap className="size-4" />}
-                    />
-                    <UsageBar
-                      label="SEO 점수 분석"
-                      used={data?.usage.score ?? 0}
-                      limit={limits.dailyScore}
-                      icon={<Star className="size-4" />}
                     />
                   </div>
 

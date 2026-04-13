@@ -1,7 +1,7 @@
 import { createServerClient } from "@/shared/lib/supabase";
 import { PLAN_LIMITS, type PlanId } from "@/shared/config/constants";
 
-type FeatureKey = "search" | "title" | "draft" | "score";
+type FeatureKey = "search" | "analyze" | "draft";
 
 /**
  * Get today's date string in KST (UTC+9) for daily reset.
@@ -22,9 +22,8 @@ export async function checkUsageLimit(
   const limits = PLAN_LIMITS[plan];
   const dailyLimitMap: Record<FeatureKey, number> = {
     search: limits.dailySearch,
-    title: limits.dailyTitle,
+    analyze: limits.dailyAnalyze,
     draft: limits.dailyDraft,
-    score: limits.dailyScore,
   };
 
   const limit = dailyLimitMap[feature];
@@ -87,9 +86,8 @@ export async function recordAndEnforce(
   const limits = PLAN_LIMITS[plan];
   const dailyLimitMap: Record<FeatureKey, number> = {
     search: limits.dailySearch,
-    title: limits.dailyTitle,
+    analyze: limits.dailyAnalyze,
     draft: limits.dailyDraft,
-    score: limits.dailyScore,
   };
 
   const limit = dailyLimitMap[feature];

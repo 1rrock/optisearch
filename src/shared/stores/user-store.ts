@@ -11,8 +11,8 @@ interface UserState {
 
   // Plan & usage
   plan: PlanId;
-  usage: { search: number; title: number; draft: number; score: number };
-  limits: { dailySearch: number; dailyTitle: number; dailyDraft: number; dailyScore: number };
+  usage: { search: number; analyze: number; draft: number };
+  limits: { dailySearch: number; dailyAnalyze: number; dailyDraft: number };
 
   // Dashboard data
   recentSearches: Array<{
@@ -33,8 +33,8 @@ interface UserState {
   setSessionLoading: (loading: boolean) => void;
   setDashboard: (data: Record<string, unknown>) => void;
   setDashboardLoading: (loading: boolean) => void;
-  incrementUsage: (feature: "search" | "title" | "draft" | "score") => void;
-  isOverLimit: (feature: "search" | "title" | "draft" | "score") => boolean;
+  incrementUsage: (feature: "search" | "analyze" | "draft") => void;
+  isOverLimit: (feature: "search" | "analyze" | "draft") => boolean;
   refresh: () => Promise<void>;
 }
 
@@ -50,12 +50,11 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   // Plan defaults
   plan: "free",
-  usage: { search: 0, title: 0, draft: 0, score: 0 },
+  usage: { search: 0, analyze: 0, draft: 0 },
   limits: {
     dailySearch: FREE_LIMITS.dailySearch,
-    dailyTitle: FREE_LIMITS.dailyTitle,
+    dailyAnalyze: FREE_LIMITS.dailyAnalyze,
     dailyDraft: FREE_LIMITS.dailyDraft,
-    dailyScore: FREE_LIMITS.dailyScore,
   },
 
   // Dashboard defaults
@@ -81,7 +80,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   setDashboard: (data) => {
     const plan = (data.plan as PlanId) ?? "free";
     const planLimits = PLAN_LIMITS[plan];
-    const usage = (data.usage as UserState["usage"]) ?? { search: 0, title: 0, draft: 0, score: 0 };
+    const usage = (data.usage as UserState["usage"]) ?? { search: 0, analyze: 0, draft: 0 };
     const recentSearches = (data.recentSearches as UserState["recentSearches"]) ?? [];
     const savedKeywordsCount = (data.savedKeywordsCount as number) ?? 0;
     const totalSearches = (data.totalSearches as number) ?? 0;
@@ -91,9 +90,8 @@ export const useUserStore = create<UserState>((set, get) => ({
       usage,
       limits: {
         dailySearch: planLimits.dailySearch,
-        dailyTitle: planLimits.dailyTitle,
+        dailyAnalyze: planLimits.dailyAnalyze,
         dailyDraft: planLimits.dailyDraft,
-        dailyScore: planLimits.dailyScore,
       },
       recentSearches,
       savedKeywordsCount,
@@ -112,7 +110,7 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   isOverLimit: (feature) => {
     const { usage, limits } = get();
-    const limitMap = { search: "dailySearch", title: "dailyTitle", draft: "dailyDraft", score: "dailyScore" } as const;
+    const limitMap = { search: "dailySearch", analyze: "dailyAnalyze", draft: "dailyDraft" } as const;
     const limit = limits[limitMap[feature]];
     return limit !== -1 && usage[feature] >= limit;
   },

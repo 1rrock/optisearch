@@ -185,3 +185,21 @@ export interface BulkAnalysisResult {
   /** ISO timestamp when the analysis completed */
   completedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// AI feature: competitive analysis (경쟁 분석)
+// ---------------------------------------------------------------------------
+
+/** AI-powered competitive analysis result for a keyword */
+export interface AICompetitiveAnalysis {
+  /** Topics already covered by top-ranking posts (3-5 items) */
+  coveredTopics: string[];
+  /** Content angles not yet covered by top posts (2-3 items) */
+  uncoveredTopics: string[];
+  /** Recommended titles targeting content gaps (3 items) */
+  recommendedTitles: string[];
+  /** One-line strategy summary based on saturation + competition */
+  strategySummary: string;
+  /** Overall difficulty to rank for this keyword */
+  difficulty: "쉬움" | "보통" | "어려움";
+}

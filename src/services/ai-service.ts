@@ -1,72 +1,9 @@
 import { getOpenAIClient } from "@/shared/lib/openai";
-import type { AITitleSuggestion, AIDraftResult, AIContentScore, AIContentSubMetrics } from "@/entities/analysis/model/types";
+import type { AIDraftResult, AICompetitiveAnalysis } from "@/entities/analysis/model/types";
 import { cached, CacheTTL } from "@/services/cache-service";
 import { sanitizeForPrompt } from "@/shared/lib/sanitize";
 
 const MODEL = "gpt-4o-mini";
-
-/**
- * Generate AI blog title suggestions for a keyword.
- */
-export async function generateTitleSuggestions(
-  keyword: string,
-  context?: string,
-  enrichment?: string
-): Promise<AITitleSuggestion[]> {
-  const openai = getOpenAIClient();
-
-  const enrichmentInstruction = enrichment
-    ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 검색 트렌드와 사용자 의도에 맞는 제목을 생성하세요. 상위 인기글과 차별화되면서도 검색 의도에 부합하는 제목을 추천하세요.\n\n${enrichment}`
-    : "";
-
-  const systemPrompt = `당신은 네이버 블로그 SEO 전문가입니다. 사용자가 제공한 키워드를 기반으로 클릭률이 높은 블로그 제목 5개를 추천합니다.
-
-규칙:
-- 각 제목은 40자 이내
-- 네이버 블로그 특성에 맞는 한국어 자연어 제목
-- 숫자, 질문형, 감성형 등 다양한 패턴 활용
-- 클릭을 유도하되 과장/낚시성 제목 지양
-
-JSON 배열로 응답하세요:
-[{"title": "제목", "rank": 1, "reason": "추천 이유"}]${enrichmentInstruction}`;
-
-  const safeKeyword = sanitizeForPrompt(keyword);
-  const safeContext = context ? sanitizeForPrompt(context, 200) : undefined;
-  const userPrompt = safeContext
-    ? `키워드: ${safeKeyword}\n추가 설명: ${safeContext}`
-    : `키워드: ${safeKeyword}`;
-
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    temperature: 0.8,
-    response_format: { type: "json_object" },
-  });
-
-  const content = completion.choices[0]?.message?.content ?? "{}";
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let parsed: any;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    console.error("[ai-service] Failed to parse title response:", content.slice(0, 200));
-    throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
-  }
-  // OpenAI json_object mode may wrap in various keys — try all common patterns
-  const suggestions: AITitleSuggestion[] =
-    Array.isArray(parsed) ? parsed :
-    parsed.titles ?? parsed.suggestions ?? parsed.results ?? parsed.data ??
-    (Array.isArray(Object.values(parsed)[0]) ? Object.values(parsed)[0] as AITitleSuggestion[] : []);
-
-  return suggestions.slice(0, 5).map((s, i) => ({
-    title: s.title,
-    rank: s.rank ?? i + 1,
-    reason: s.reason ?? "",
-  }));
-}
 
 /**
  * Generate AI blog draft for a keyword.
@@ -75,12 +12,18 @@ export async function generateDraft(
   keyword: string,
   postType: "정보성" | "리뷰" | "리스트형" | "비교분석" = "정보성",
   targetLength: number = 1500,
-  enrichment?: string
+  enrichment?: string,
+  hint?: string
 ): Promise<AIDraftResult> {
   const openai = getOpenAIClient();
 
   const enrichmentInstruction = enrichment
     ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 경쟁 상황과 검색 의도에 맞는 콘텐츠를 작성하세요. 지식iN 질문에서 파악된 사용자의 실제 궁금증을 반영하고, 상위 인기글 대비 차별화된 내용을 포함하세요.\n\n${enrichment}`
+    : "";
+
+  // hint가 있으면 다의어·중의어 문제를 해결하기 위해 명시적으로 맥락을 지정
+  const hintInstruction = hint
+    ? `\n\n[중요] 이 키워드의 맥락: "${sanitizeForPrompt(hint, 200)}"\n위 맥락을 기준으로 콘텐츠 주제를 좁혀서 작성하세요. 다른 의미로 해석하지 마세요.`
     : "";
 
   const systemPrompt = `당신은 네이버 블로그 콘텐츠 전문 작성자입니다. 사용자가 제공한 키워드와 포스팅 유형에 맞는 블로그 초안을 작성합니다.
@@ -99,13 +42,18 @@ JSON으로 응답하세요:
   "content": "마크다운 본문",
   "outline": ["소제목1", "소제목2", ...],
   "tags": ["태그1", "태그2", ...]
-}${enrichmentInstruction}`;
+}${hintInstruction}${enrichmentInstruction}`;
+
+  const safeKeyword = sanitizeForPrompt(keyword);
+  const userMessage = hint
+    ? `키워드: ${safeKeyword}\n맥락: ${sanitizeForPrompt(hint, 200)}`
+    : `키워드: ${safeKeyword}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `키워드: ${sanitizeForPrompt(keyword)}` },
+      { role: "user", content: userMessage },
     ],
     temperature: 0.7,
     max_tokens: 4000,
@@ -133,85 +81,67 @@ JSON으로 응답하세요:
 }
 
 /**
- * Score existing blog content for SEO optimization.
+ * Analyze competition for a keyword based on real top posts data.
  */
-export async function scoreContent(
+export async function analyzeCompetition(
   keyword: string,
-  content: string,
   enrichment?: string
-): Promise<AIContentScore> {
+): Promise<AICompetitiveAnalysis> {
   const openai = getOpenAIClient();
 
-  const enrichmentInstruction = enrichment
-    ? `\n\n아래 키워드 분석 데이터와 비교하여 실제 경쟁 환경에서의 SEO 최적화 수준을 평가하세요. 상위 인기글의 패턴과 비교하여 개선점을 제시하세요.\n\n${enrichment}`
+  const enrichmentSection = enrichment
+    ? `\n\n아래는 이 키워드의 실제 검색 데이터입니다:\n\n${enrichment}`
     : "";
 
-  const systemPrompt = `당신은 네이버 블로그 SEO 분석 전문가입니다. 사용자가 제공한 키워드와 블로그 본문을 분석하여 SEO 최적화 점수를 산출합니다.
+  const systemPrompt = `당신은 네이버 블로그 콘텐츠 전략가입니다.
+아래 키워드의 상위 인기글 데이터를 분석하여:
+1. 이미 다루는 주제 패턴을 3-5개 추출하세요
+2. 아직 다루지 않는 각도/주제를 2-3개 찾으세요
+3. 그 공백을 공략하는 제목 3개를 추천하세요
+4. 포화도와 경쟁도를 고려한 한 줄 전략을 작성하세요
+5. 이 키워드로 상위 노출이 얼마나 어려운지 난이도를 판단하세요
 
-평가 항목 (각 0-100):
-- keywordUsage: 키워드 포함 빈도와 자연스러운 배치
-- readability: 문장 가독성, 길이, 흐름
-- structure: 소제목으로 단락 구분, 리스트 활용
-- depth: 내용의 깊이와 정보량
-- titleAttractiveness: 제목의 클릭 유인력 (제목이 없으면 본문 첫 줄 기준)
-
-improvements와 strengths는 블로그를 처음 쓰는 일반인도 바로 이해할 수 있는 언어로 작성하세요. H1/H2/H3/마크다운 같은 기술 용어 대신 "소제목", "중간 제목", "목록" 등 일상적인 표현을 사용하세요.
+중요: 실제 상위글 데이터만 근거로 사용하세요. 추측하지 마세요.
+네이버 순위나 노출 확률을 예측하지 마세요.
 
 JSON으로 응답하세요:
 {
-  "totalScore": 82,
-  "subMetrics": {
-    "keywordUsage": 70,
-    "readability": 90,
-    "structure": 50,
-    "depth": 85,
-    "titleAttractiveness": 75
-  },
-  "improvements": ["개선사항1", "개선사항2", ...],
-  "strengths": ["강점1", "강점2", ...]
-}${enrichmentInstruction}`;
+  "coveredTopics": ["주제1", "주제2", "주제3"],
+  "uncoveredTopics": ["공백1", "공백2"],
+  "recommendedTitles": ["제목1", "제목2", "제목3"],
+  "strategySummary": "한 줄 전략 요약",
+  "difficulty": "쉬움 또는 보통 또는 어려움"
+}`;
+
+  const safeKeyword = sanitizeForPrompt(keyword);
+  const userPrompt = `키워드: ${safeKeyword}${enrichmentSection}`;
 
   const completion = await openai.chat.completions.create({
     model: MODEL,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `키워드: ${sanitizeForPrompt(keyword)}\n\n본문:\n${content.replace(/[\x00-\x1f\x7f]/g, "")}` },
+      { role: "user", content: userPrompt },
     ],
-    temperature: 0.3,
+    temperature: 0.5,
     response_format: { type: "json_object" },
   });
 
-  const result = completion.choices[0]?.message?.content ?? "{}";
+  const content = completion.choices[0]?.message?.content ?? "{}";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let parsed: any;
   try {
-    parsed = JSON.parse(result);
+    parsed = JSON.parse(content);
   } catch {
-    console.error("[ai-service] Failed to parse score response:", result.slice(0, 200));
+    console.error("[ai-service] Failed to parse analyze response:", content.slice(0, 200));
     throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
   }
 
-  const subMetrics: AIContentSubMetrics = {
-    keywordUsage: parsed.subMetrics?.keywordUsage ?? 0,
-    readability: parsed.subMetrics?.readability ?? 0,
-    structure: parsed.subMetrics?.structure ?? 0,
-    depth: parsed.subMetrics?.depth ?? 0,
-    titleAttractiveness: parsed.subMetrics?.titleAttractiveness ?? 0,
-  };
-
-  const totalScore = parsed.totalScore ?? Math.round(
-    (subMetrics.keywordUsage + subMetrics.readability + subMetrics.structure + subMetrics.depth + subMetrics.titleAttractiveness) / 5
-  );
-
-  // Import gradeFromScore to determine the grade
-  const { gradeFromScore } = await import("@/shared/config/constants");
-
   return {
-    totalScore,
-    grade: gradeFromScore(totalScore),
-    subMetrics,
-    improvements: parsed.improvements ?? [],
-    strengths: parsed.strengths ?? [],
+    coveredTopics: Array.isArray(parsed.coveredTopics) ? parsed.coveredTopics.slice(0, 5) : [],
+    uncoveredTopics: Array.isArray(parsed.uncoveredTopics) ? parsed.uncoveredTopics.slice(0, 3) : [],
+    recommendedTitles: Array.isArray(parsed.recommendedTitles) ? parsed.recommendedTitles.slice(0, 3) : [],
+    strategySummary: parsed.strategySummary ?? "",
+    difficulty: ["쉬움", "보통", "어려움"].includes(parsed.difficulty) ? parsed.difficulty : "보통",
   };
 }
 

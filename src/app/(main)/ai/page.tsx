@@ -2,18 +2,17 @@
 
 import { useState, useCallback, Suspense } from "react";
 import { useUserStore } from "@/shared/stores/user-store";
-import { useUsage, useUserPlan, useIncrementUsage } from "@/shared/hooks/use-user";
+import { useUsage, useUserPlan } from "@/shared/hooks/use-user";
 import { useSearchParams } from "next/navigation";
-import { Sparkles, Zap, Edit3, Target } from "lucide-react";
+import { Sparkles, BarChart2, Edit3 } from "lucide-react";
 import { PageHeader } from "@/shared/ui/page-header";
 import { UpgradeModal } from "@/shared/components/UpgradeModal";
-import { PLAN_LIMITS, type PlanId } from "@/shared/config/constants";
+import { PLAN_LIMITS } from "@/shared/config/constants";
 import { TabButton, type UpgradeModalState } from "./components/shared";
-import { TitleTool } from "./components/TitleTool";
+import { AnalyzeTool } from "./components/AnalyzeTool";
 import { DraftTool } from "./components/DraftTool";
-import { ScoreTool } from "./components/ScoreTool";
 
-type TabId = "title" | "draft" | "score";
+type TabId = "analyze" | "draft";
 
 export default function AIToolsPage() {
   return (
@@ -27,16 +26,16 @@ function AIToolsPageInner() {
   const searchParams = useSearchParams();
   const urlKeyword = searchParams.get("keyword") ?? "";
   const urlTab = searchParams.get("tab") as TabId | null;
+  const urlHint = searchParams.get("hint") ?? "";
 
   const [activeTab, setActiveTab] = useState<TabId>(
-    urlTab && ["title", "draft", "score"].includes(urlTab) ? urlTab : "title"
+    urlTab && (["analyze", "draft"] as TabId[]).includes(urlTab) ? urlTab : "analyze"
   );
   const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>(null);
   const [draftKeyword, setDraftKeyword] = useState(urlKeyword);
 
   const plan = useUserPlan();
-  const { usage, limits: storeLimits } = useUsage();
-  const incrementUsage = useIncrementUsage();
+  const { usage } = useUsage();
   const limits = PLAN_LIMITS[plan];
 
   const handleGoToDraft = useCallback((title?: string) => {
@@ -59,18 +58,18 @@ function AIToolsPageInner() {
       <PageHeader
         icon={<Sparkles className="size-8 text-primary" />}
         title="AI 도구 모음"
-        description="강력한 생성형 AI를 활용하여 클릭을 부르는 제목, 고품질 초안, 완벽한 SEO 포스팅을 완성하세요."
+        description="상위글 경쟁 분석으로 공백을 발견하고, AI 초안으로 5분 만에 포스팅을 완성하세요."
       />
 
       {/* Segmented Tab Navigation */}
       <div className="sticky top-16 z-30 bg-background/80 backdrop-blur-xl border-b border-muted/30 mb-8 pt-2 pb-2 overflow-x-auto">
         <div className="inline-flex bg-muted/30 rounded-xl p-1 gap-1 min-w-max">
           <TabButton
-            active={activeTab === "title"}
-            onClick={() => setActiveTab("title")}
-            label="AI 제목 추천"
-            icon={<Zap className="size-4" />}
-            usage={{ used: usage.title, limit: limits.dailyTitle }}
+            active={activeTab === "analyze"}
+            onClick={() => setActiveTab("analyze")}
+            label="경쟁 분석"
+            icon={<BarChart2 className="size-4" />}
+            usage={{ used: usage.analyze, limit: limits.dailyAnalyze }}
           />
           <TabButton
             active={activeTab === "draft"}
@@ -79,24 +78,17 @@ function AIToolsPageInner() {
             icon={<Edit3 className="size-4" />}
             usage={{ used: usage.draft, limit: limits.dailyDraft }}
           />
-          <TabButton
-            active={activeTab === "score"}
-            onClick={() => setActiveTab("score")}
-            label="콘텐츠 점수"
-            icon={<Target className="size-4" />}
-            usage={{ used: usage.score, limit: limits.dailyScore }}
-          />
         </div>
       </div>
 
       {/* All tabs rendered, inactive hidden — preserves state */}
       <div className="w-full">
-        <div className={activeTab === "title" ? "animate-in fade-in duration-300" : "hidden"}>
-          <TitleTool
+        <div className={activeTab === "analyze" ? "animate-in fade-in duration-300" : "hidden"}>
+          <AnalyzeTool
             onGoToDraft={handleGoToDraft}
             onUsageLimitExceeded={setUpgradeModal}
-            used={usage.title}
-            limit={limits.dailyTitle}
+            used={usage.analyze}
+            limit={limits.dailyAnalyze}
             onMutationSuccess={invalidate}
             initialKeyword={urlKeyword}
           />
@@ -108,16 +100,7 @@ function AIToolsPageInner() {
             limit={limits.dailyDraft}
             onMutationSuccess={invalidate}
             initialKeyword={draftKeyword}
-          />
-        </div>
-        <div className={activeTab === "score" ? "animate-in fade-in duration-300" : "hidden"}>
-          <ScoreTool
-            onGoToDraft={handleGoToDraft}
-            onUsageLimitExceeded={setUpgradeModal}
-            used={usage.score}
-            limit={limits.dailyScore}
-            onMutationSuccess={invalidate}
-            initialKeyword={urlKeyword}
+            initialHint={urlHint}
           />
         </div>
       </div>

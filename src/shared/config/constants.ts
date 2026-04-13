@@ -65,7 +65,7 @@ export const APP_CONFIG = {
 // ---------------------------------------------------------------------------
 // Plan limits
 // Feature keys mirror ai_usage.feature column values:
-//   search | title | draft | score | bulk | trend
+//   search | analyze | draft | bulk | trend
 // ---------------------------------------------------------------------------
 
 export type PlanId = "free" | "basic" | "pro";
@@ -73,12 +73,10 @@ export type PlanId = "free" | "basic" | "pro";
 export interface PlanLimit {
   /** Daily keyword search limit (-1 = unlimited) */
   dailySearch: number;
-  /** Daily AI title suggestion limit */
-  dailyTitle: number;
+  /** Daily AI competitive analysis limit */
+  dailyAnalyze: number;
   /** Daily AI draft generation limit */
   dailyDraft: number;
-  /** Daily AI content score limit */
-  dailyScore: number;
   /** Bulk analysis keywords per run (-1 = feature disabled) */
   bulkKeywordsPerRun: number;
   /** Trend period in months (-1 = all available history) */
@@ -104,9 +102,8 @@ export interface PlanLimit {
 export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
   free: {
     dailySearch: 10,
-    dailyTitle: 3,
+    dailyAnalyze: 3,
     dailyDraft: 1,
-    dailyScore: 1,
     maxTrackTargets: 3,
     bulkKeywordsPerRun: -1,
     trendPeriodMonths: 3,
@@ -120,9 +117,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
   },
   basic: {
     dailySearch: 300,
-    dailyTitle: 20,
+    dailyAnalyze: 20,
     dailyDraft: 5,
-    dailyScore: 10,
     maxTrackTargets: 20,
     bulkKeywordsPerRun: 50,
     trendPeriodMonths: 12,
@@ -136,9 +132,8 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
   },
   pro: {
     dailySearch: -1,
-    dailyTitle: 100,
+    dailyAnalyze: 100,
     dailyDraft: 30,
-    dailyScore: 50,
     maxTrackTargets: -1,
     bulkKeywordsPerRun: 500,
     trendPeriodMonths: -1,

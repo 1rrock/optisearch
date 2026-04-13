@@ -22,7 +22,7 @@ const ENRICHMENT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 export async function resolveEnrichment(
   userId: string,
   keyword: string,
-  purpose: "title" | "draft" | "score" = "draft"
+  purpose: "analyze" | "draft" = "draft"
 ): Promise<string | undefined> {
   try {
     // Wrap entire enrichment resolution in a 2-second timeout
@@ -39,7 +39,7 @@ export async function resolveEnrichment(
 async function _resolveEnrichmentInner(
   userId: string,
   keyword: string,
-  purpose: "title" | "draft" | "score"
+  purpose: "analyze" | "draft"
 ): Promise<string | undefined> {
   // 1. Try DB cache first
   const cached = await getAnalysisData(userId, keyword);
@@ -64,6 +64,7 @@ async function _resolveEnrichmentInner(
   // Need at minimum the keyword analysis data
   if (!keywordData) return undefined;
 
+  const topPostCount = purpose === "analyze" ? 7 : 5;
   const analysisData: EnrichmentAnalysisData = {
     totalSearchVolume: keywordData.totalSearchVolume,
     pcSearchVolume: keywordData.pcSearchVolume,
@@ -74,7 +75,7 @@ async function _resolveEnrichmentInner(
       label: keywordData.saturationIndex.label,
       score: keywordData.saturationIndex.score,
     },
-    topPosts: (keywordData.topPosts ?? []).slice(0, 5).map((p) => ({
+    topPosts: (keywordData.topPosts ?? []).slice(0, topPostCount).map((p) => ({
       title: p.title,
       description: p.description,
     })),
@@ -105,7 +106,7 @@ async function _resolveEnrichmentInner(
 
 export function buildEnrichmentBlock(
   data: EnrichmentAnalysisData,
-  purpose: "title" | "draft" | "score" = "draft"
+  purpose: "analyze" | "draft" = "draft"
 ): string {
   const lines: string[] = [];
 
@@ -154,7 +155,8 @@ export function buildEnrichmentBlock(
 
   // Dynamic strategy instruction based on saturation score + competition
   lines.push("");
-  lines.push("[전략 지시]");
+  const strategyHeader = purpose === "analyze" ? "[경쟁 분석 지시]" : "[전략 지시]";
+  lines.push(strategyHeader);
   lines.push(_buildStrategyInstruction(data.saturation.score, data.competition));
 
   return lines.join("\n");
