@@ -1114,6 +1114,7 @@ function AnalyzePageInner() {
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
+    setDemographics(null);
     fireAllPhases(keyword, turnstileToken ?? undefined);
   }
 
@@ -1149,6 +1150,7 @@ function AnalyzePageInner() {
     setSubmittedKeyword(keyword);
     setTrendData(null);
     setTrendError(false);
+    setDemographics(null);
     fireAllPhases(keyword);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }

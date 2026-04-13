@@ -9,6 +9,9 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/api/", "/dashboard/", "/analyze/", "/compare/", "/trends/"],
       },
     ],
-    sitemap: "https://www.optisearch.kr/sitemap.xml",
+    sitemap: [
+      "https://www.optisearch.kr/sitemap.xml",
+      "https://www.optisearch.kr/rss.xml",
+    ],
   };
 }

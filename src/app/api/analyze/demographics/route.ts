@@ -96,15 +96,17 @@ async function fetchSearchDemographics(keyword: string) {
     timeUnit: "month" as const,
   };
 
-  // Fire all demographic queries in parallel (9 total)
+  // Fire all demographic queries in parallel (7 total)
+  // NOTE: Gender is intentionally omitted. Naver DataLab /search with gender:"m" / gender:"f"
+  // returns independently-normalized relative indices (0–100 within each gender's own universe),
+  // NOT comparable cross-gender shares. Dividing them always produces ~50:50 regardless of the
+  // actual demographic split (e.g. "브래지어" shows 50:50 instead of ~90% female).
+  // Accurate gender share requires the Shopping Insight /keyword/gender endpoint which needs a
+  // category code — not available for general search keywords.
   const [
-    maleRes, femaleRes,
     pcRes, moRes,
     ...ageResults
   ] = await Promise.allSettled([
-    // Gender (2 calls)
-    getSearchTrend({ ...baseParams, gender: "m" }),
-    getSearchTrend({ ...baseParams, gender: "f" }),
     // Device (2 calls)
     getSearchTrend({ ...baseParams, device: "pc" }),
     getSearchTrend({ ...baseParams, device: "mo" }),
@@ -121,16 +123,8 @@ async function fetchSearchDemographics(keyword: string) {
     return data[data.length - 1].ratio;
   };
 
-  // Gender
-  const maleRatio = extractRatio(maleRes);
-  const femaleRatio = extractRatio(femaleRes);
-  const genderTotal = maleRatio + femaleRatio;
-  const gender: DemoRatio[] = genderTotal > 0
-    ? [
-        { group: "남성", ratio: Math.round((maleRatio / genderTotal) * 100) },
-        { group: "여성", ratio: Math.round((femaleRatio / genderTotal) * 100) },
-      ]
-    : [];
+  // Gender — not available for search keywords (see comment above)
+  const gender: DemoRatio[] = [];
 
   // Device
   const pcRatio = extractRatio(pcRes);
