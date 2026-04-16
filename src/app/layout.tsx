@@ -16,14 +16,14 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
   title: {
-    default: "옵티써치 - 네이버 키워드 분석 + AI 콘텐츠 최적화",
+    default: "옵티써치 - 키워드 분석 + AI 콘텐츠 최적화",
     template: "%s | 옵티써치",
   },
-  description: "네이버 키워드 분석부터 AI 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지. 무료로 시작하세요.",
-  keywords: ["네이버 키워드 분석", "블로그 SEO", "키워드 검색량", "AI 블로그", "콘텐츠 최적화", "키워드 분석 도구"],
+  description: "키워드 분석부터 AI 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지. 무료로 시작하세요.",
+  keywords: ["키워드 분석", "블로그 SEO", "키워드 검색량", "AI 블로그", "콘텐츠 최적화", "키워드 분석 도구"],
   openGraph: {
-    title: "옵티써치 - 네이버 키워드 분석 + AI 콘텐츠 최적화",
-    description: "네이버 키워드 분석부터 AI 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지. 무료로 시작하세요.",
+    title: "옵티써치 - 키워드 분석 + AI 콘텐츠 최적화",
+    description: "키워드 분석부터 AI 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지. 무료로 시작하세요.",
     url: "https://www.optisearch.kr",
     siteName: "옵티써치",
     locale: "ko_KR",
@@ -74,9 +74,35 @@ export default function RootLayout({
           </>
         )}
         <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9970402588626346"
-          crossOrigin="anonymous"
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "옵티써치 (OptiSearch)",
+              description: "키워드 분석부터 AI 블로그 제목 추천, 글 초안 생성, SEO 점수 분석까지 제공하는 콘텐츠 마케팅 도구",
+              url: "https://www.optisearch.kr",
+              applicationCategory: "BusinessApplication",
+              operatingSystem: "Web",
+              inLanguage: "ko",
+              offers: [
+                { "@type": "Offer", name: "무료 플랜", price: "0", priceCurrency: "KRW" },
+                { "@type": "Offer", name: "베이직 플랜", price: "9900", priceCurrency: "KRW", billingIncrement: "P1M" },
+              ],
+              publisher: {
+                "@type": "Organization",
+                name: "알에이케이랩스",
+                url: "https://www.optisearch.kr",
+                logo: "https://www.optisearch.kr/logo.png",
+                contactPoint: {
+                  "@type": "ContactPoint",
+                  telephone: "070-8065-7571",
+                  contactType: "customer service",
+                  availableLanguage: "Korean",
+                },
+              },
+            }),
+          }}
         />
       </head>
       <body>

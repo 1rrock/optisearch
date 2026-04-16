@@ -19,7 +19,7 @@ export function Hero() {
         <div className="lg:col-span-7 space-y-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 border border-primary/20 text-primary text-xs font-mono tracking-widest shadow-[0_0_15px_hsl(var(--primary)/0.2)] animate-in fade-in slide-in-from-bottom-4 duration-500">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            네이버 검색 데이터 분석 플랫폼
+            검색 데이터 분석 플랫폼
           </div>
 
           <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 text-foreground">
@@ -30,7 +30,7 @@ export function Hero() {
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl font-medium animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-            네이버 검색광고 API 기반의 키워드 분석 소프트웨어. 검색량, 경쟁 강도, 순위 변동을 하나의 대시보드에서 조회하고 의사결정에 활용하세요.
+            검색 데이터 기반의 키워드 분석 소프트웨어. 검색량, 경쟁 강도, 순위 변동을 하나의 대시보드에서 조회하고 의사결정에 활용하세요.
           </p>
         </div>
 

@@ -494,16 +494,6 @@ function TrendingSectionWrapper({ sharedKeywords, isSharedLoading, lastUpdated, 
                   <span className="text-sm font-semibold truncate block">{kw.keyword}</span>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  {/* AI Draft button */}
-                  <AiLinkButton
-                    href={`/ai?keyword=${encodeURIComponent(kw.keyword)}&tab=draft`}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
-                    title="AI 초안 작성"
-                    feature="AI 글 초안"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Edit3 className="size-3.5" />
-                  </AiLinkButton>
                   <div className="flex flex-col items-end">
                     <span className={cn(
                       "text-xs font-bold",

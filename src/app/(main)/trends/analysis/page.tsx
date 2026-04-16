@@ -722,7 +722,7 @@ export default function TrendAnalysisPage() {
       <PageHeader
         icon={<TrendingUp className="size-8 text-primary" />}
         title="트렌드 분석"
-        description="네이버 DataLab 기반 키워드 검색 트렌드 분석 · 인구통계 · 기기별 비교"
+        description="키워드 검색 트렌드 분석 · 인구통계 · 기기별 비교"
       />
 
       {/* Search Section — subtle primary border on focus-within */}
@@ -945,7 +945,7 @@ export default function TrendAnalysisPage() {
             키워드를 검색하세요
           </h3>
           <p className="text-sm text-muted-foreground max-w-md">
-            키워드를 입력하면 네이버 DataLab 데이터를 기반으로
+            키워드를 입력하면 검색 데이터를 기반으로
             <br />
             검색 트렌드, 성별·연령대·기기별 분포를 분석합니다.
           </p>

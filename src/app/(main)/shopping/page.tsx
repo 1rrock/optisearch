@@ -280,7 +280,7 @@ export default function ShoppingInsightPage() {
       <PageHeader
         icon={<ShoppingBag className="size-8 text-primary" />}
         title="쇼핑 키워드 인사이트"
-        description="네이버 쇼핑 카테고리별 검색 트렌드를 파악하세요."
+        description="쇼핑 카테고리별 검색 트렌드를 파악하세요."
       />
 
       {/* Search Form */}
@@ -448,7 +448,7 @@ export default function ShoppingInsightPage() {
           <div>
             <p className="font-semibold text-foreground/70">카테고리를 선택하세요</p>
             <p className="text-sm text-muted-foreground mt-1">
-              네이버 쇼핑 카테고리를 선택한 뒤 기간과 필터를 설정하고 조회하세요.
+              쇼핑 카테고리를 선택한 뒤 기간과 필터를 설정하고 조회하세요.
             </p>
           </div>
         </div>

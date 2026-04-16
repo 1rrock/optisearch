@@ -192,7 +192,7 @@ export default function DashboardPage() {
       <section className="bg-card p-5 sm:p-10 rounded-xl shadow-sm border border-muted/50">
         <div className="max-w-3xl mx-auto text-center mb-8">
           <h2 className="text-2xl font-bold tracking-tight mb-2">어떤 키워드를 분석해드릴까요?</h2>
-          <p className="text-muted-foreground text-sm">실시간 네이버 검색량과 AI 기반 경쟁 강도를 즉시 확인하세요.</p>
+          <p className="text-muted-foreground text-sm">실시간 검색량과 AI 기반 경쟁 강도를 즉시 확인하세요.</p>
         </div>
         <div className="max-w-2xl mx-auto">
           <div className="flex flex-col sm:flex-row gap-3 p-2 sm:bg-muted/30 sm:rounded-2xl sm:border-2 sm:border-transparent focus-within:border-primary/20 focus-within:bg-card transition-all">
@@ -236,7 +236,7 @@ export default function DashboardPage() {
               <span className="text-primary text-3xl">📈</span> 내 상품 순위 추적
             </h2>
             <p className="text-muted-foreground text-sm mt-2">
-              스마트스토어 URL과 키워드를 등록하면 매일 네이버 쇼핑 순위 변동을 자동으로 추적하여 보여드립니다.
+              스마트스토어 URL과 키워드를 등록하면 매일 쇼핑 순위 변동을 자동으로 추적하여 보여드립니다.
             </p>
           </div>
           <div className="shrink-0 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10 flex items-center gap-2 self-start md:self-auto">

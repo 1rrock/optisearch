@@ -18,7 +18,7 @@ export default function PrivacyPage() {
 
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">1. 수집하는 개인정보 항목</h2>
-        <p className="text-muted-foreground mb-3">서비스는 네이버 소셜 로그인을 통해 다음 정보를 수집합니다.</p>
+        <p className="text-muted-foreground mb-3">서비스는 소셜 로그인(구글, 카카오)을 통해 다음 정보를 수집합니다.</p>
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
           <li>이메일 주소</li>
           <li>이름(닉네임)</li>

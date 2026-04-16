@@ -14,7 +14,7 @@ export default function TermsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제1조 (목적)</h2>
         <p className="text-muted-foreground leading-relaxed">
-          본 약관은 옵티써치(이하 &ldquo;서비스&rdquo;)가 제공하는 네이버 키워드 분석 및 AI 콘텐츠 최적화 서비스의 이용 조건과
+          본 약관은 옵티써치(이하 &ldquo;서비스&rdquo;)가 제공하는 키워드 분석 및 AI 콘텐츠 최적화 서비스의 이용 조건과
           절차, 서비스 제공자와 이용자 간의 권리·의무 및 책임 사항을 규정함을 목적으로 합니다.
         </p>
       </section>
@@ -22,8 +22,8 @@ export default function TermsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제2조 (서비스 소개)</h2>
         <p className="text-muted-foreground leading-relaxed mb-3">
-          옵티써치는 네이버 검색 데이터를 기반으로 키워드 검색량·경쟁도를 분석하고, AI를 활용하여 블로그 제목 및 초안을 생성하며,
-          SEO 점수 피드백을 제공하는 한국형 콘텐츠 마케팅 SaaS입니다.
+          옵티써치는 검색 데이터를 기반으로 키워드 검색량·경쟁도를 분석하고, AI를 활용하여 블로그 제목 및 초안을 생성하며,
+          SEO 점수 피드백을 제공하는 콘텐츠 마케팅 SaaS입니다.
         </p>
         <p className="text-muted-foreground leading-relaxed">
           서비스는 인터넷을 통해 제공되며, 별도 설치 없이 웹 브라우저에서 이용할 수 있습니다.
@@ -33,7 +33,7 @@ export default function TermsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제3조 (회원가입 및 계정)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-          <li>회원가입은 네이버 소셜 로그인을 통해 이루어집니다.</li>
+          <li>회원가입은 소셜 로그인(구글, 카카오)을 통해 이루어집니다.</li>
           <li>이용자는 타인의 계정 정보를 도용하거나 허위 정보로 가입할 수 없습니다.</li>
           <li>계정의 관리 책임은 이용자에게 있으며, 계정 양도·공유는 허용되지 않습니다.</li>
           <li>이용자는 계정 도용 또는 보안 위협을 인지한 즉시 서비스에 신고해야 합니다.</li>
@@ -140,7 +140,7 @@ export default function TermsPage() {
             활용 책임은 이용자에게 있습니다.
           </li>
           <li>서비스는 이용자가 서비스를 통해 달성하는 검색 순위, 트래픽, 수익 등 비즈니스 결과를 보장하지 않습니다.</li>
-          <li>네이버 등 외부 플랫폼의 정책 변경으로 인한 데이터 제공 중단에 대해 서비스는 책임을 지지 않습니다.</li>
+          <li>외부 플랫폼의 정책 변경으로 인한 데이터 제공 중단에 대해 서비스는 책임을 지지 않습니다.</li>
           <li>이용자 귀책 사유로 발생한 손해에 대해서는 서비스가 책임을 지지 않습니다.</li>
           <li>서비스의 고의 또는 중과실로 발생한 손해에 대한 배상 한도는 해당 월 결제 금액을 초과하지 않습니다.</li>
         </ul>
