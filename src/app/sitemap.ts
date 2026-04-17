@@ -1,16 +1,34 @@
 import type { MetadataRoute } from "next";
+import { guides } from "./(guides)/guides/_content";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://www.optisearch.kr";
+  const now = new Date();
+
+  const toolPages: MetadataRoute.Sitemap = [
+    "keyword-analyzer",
+    "title-generator",
+    "seo-checker",
+    "trend-checker",
+  ].map((slug) => ({
+    url: `${baseUrl}/tools/${slug}`,
+    lastModified: now,
+    changeFrequency: "weekly" as const,
+    priority: 0.9,
+  }));
+
+  const guideDetailPages: MetadataRoute.Sitemap = guides.map((g) => ({
+    url: `${baseUrl}/guides/${g.slug}`,
+    lastModified: new Date(g.date),
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
+  }));
 
   return [
-    { url: baseUrl, lastModified: new Date(), changeFrequency: "weekly", priority: 1.0 },
-    { url: `${baseUrl}/pricing`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.8 },
-    { url: `${baseUrl}/about`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.7 },
-    { url: `${baseUrl}/contact`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.6 },
-    { url: `${baseUrl}/support`, lastModified: new Date(), changeFrequency: "monthly", priority: 0.5 },
-    { url: `${baseUrl}/terms`, lastModified: new Date(), changeFrequency: "yearly", priority: 0.3 },
-    { url: `${baseUrl}/privacy`, lastModified: new Date(), changeFrequency: "yearly", priority: 0.3 },
-    { url: `${baseUrl}/disclaimer`, lastModified: new Date(), changeFrequency: "yearly", priority: 0.3 },
+    { url: baseUrl, lastModified: now, changeFrequency: "weekly", priority: 1.0 },
+    { url: `${baseUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    ...toolPages,
+    { url: `${baseUrl}/guides`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    ...guideDetailPages,
   ];
 }

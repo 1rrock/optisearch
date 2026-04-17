@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { ReactNode } from "react";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: true },
+};
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (

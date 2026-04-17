@@ -4,6 +4,7 @@ import Image from "next/image";
 export const metadata: Metadata = {
   title: "소개 | 옵티써치",
   description: "옵티써치는 키워드 분석과 AI 콘텐츠 최적화를 하나로 제공하는 콘텐츠 마케팅 도구입니다.",
+  robots: { index: true, follow: true },
 };
 
 export default function AboutPage() {
@@ -60,6 +61,79 @@ export default function AboutPage() {
           <li><strong className="text-foreground">AI 활용</strong> — 최신 AI 기술로 콘텐츠 작성 시간을 절반 이하로 줄여줍니다.</li>
           <li><strong className="text-foreground">무료로 시작</strong> — 핵심 기능을 무료 플랜에서 바로 체험할 수 있습니다.</li>
         </ul>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-4">우리가 이 도구를 만든 이유</h2>
+        <p className="text-muted-foreground leading-relaxed mb-4">
+          옵티써치 팀은 블로그 운영자와 콘텐츠 마케터로 일하면서 키워드 분석 도구의 높은 구독 비용과
+          복잡한 UX에 오랫동안 불편함을 느꼈습니다. 해외에서 만들어진 도구들은 한국어 검색 환경을
+          제대로 반영하지 못했고, 국내 도구들은 기능이 단편적이거나 가격 부담이 컸습니다.
+        </p>
+        <p className="text-muted-foreground leading-relaxed mb-4">
+          그래서 한국어 검색 환경에 최적화된, 직관적이고 합리적인 도구가 필요하다고 판단했습니다.
+          네이버 검색광고 API, DataLab API 등 공개 데이터를 활용해 누구나 쉽게 키워드를 분석할 수
+          있도록 설계했고, AI 기능을 결합해 분석에서 콘텐츠 작성까지 하나의 흐름으로 완성할 수 있게
+          했습니다.
+        </p>
+        <p className="text-muted-foreground leading-relaxed">
+          옵티써치의 목표는 블로거·콘텐츠 크리에이터·소규모 쇼핑몰 운영자가 데이터 기반으로
+          콘텐츠 전략을 세우고, 검색 상위 노출을 통해 실질적인 성장을 이룰 수 있도록 돕는 것입니다.
+        </p>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-4">옵티써치 팀의 전문 분야</h2>
+        <ul className="list-disc pl-6 space-y-3 text-muted-foreground">
+          <li>
+            <strong className="text-foreground">데이터 분석</strong> —
+            수십만 건의 한국어 키워드 패턴 분석 경험을 바탕으로 신뢰도 높은 검색량·경쟁도 지표를 제공합니다.
+          </li>
+          <li>
+            <strong className="text-foreground">검색엔진 최적화(SEO)</strong> —
+            네이버 및 구글 검색 알고리즘의 변화를 지속적으로 추적하고 서비스에 반영합니다.
+          </li>
+          <li>
+            <strong className="text-foreground">AI/ML 통합</strong> —
+            GPT 기반 콘텐츠 생성과 SEO 데이터를 효율적으로 결합하여 실용적인 AI 도구를 구현합니다.
+          </li>
+          <li>
+            <strong className="text-foreground">프론트엔드 개발</strong> —
+            Next.js, TypeScript 기반의 빠르고 직관적인 웹 애플리케이션을 설계합니다.
+          </li>
+          <li>
+            <strong className="text-foreground">콘텐츠 마케팅 실전 경험</strong> —
+            실제 블로그 운영과 수익화 경험을 통해 현장에서 필요한 기능을 직접 제품에 반영합니다.
+          </li>
+        </ul>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-4">서비스 신뢰성</h2>
+        <div className="bg-muted/20 rounded-2xl p-6 border border-muted/40">
+          <ul className="list-disc pl-6 space-y-3 text-muted-foreground not-prose">
+            <li>
+              <strong className="text-foreground">공식 데이터 기반</strong> —
+              모든 검색량 데이터는 네이버 검색광고 공식 API에서 직접 수집합니다.
+            </li>
+            <li>
+              <strong className="text-foreground">트렌드 데이터</strong> —
+              시간별·기간별 트렌드는 네이버 DataLab 공식 API를 통해 제공합니다.
+            </li>
+            <li>
+              <strong className="text-foreground">데이터 보완 알고리즘</strong> —
+              검열 처리되거나 데이터가 부족한 키워드는 독자 개발한 블로그 비율 역산 알고리즘으로 보완합니다.
+            </li>
+            <li>
+              <strong className="text-foreground">개인정보 보호</strong> —
+              회원 정보는 암호화하여 저장하며, 제3자에게 공유하지 않습니다.
+            </li>
+            <li>
+              <strong className="text-foreground">신속한 고객 응대</strong> —
+              서비스 관련 문의는 카카오톡 채널 또는 이메일로 즉시 응대합니다.
+            </li>
+          </ul>
+        </div>
       </section>
 
       <section className="mb-10">

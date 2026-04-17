@@ -7,9 +7,15 @@ const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/terms", "/support", "
 // API route prefixes that handle their own auth (webhooks, cron, etc.)
 const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/", "/api/webhooks/"]
 
+// Path prefixes that do not require authentication (e.g., /tools/*, /guides/*, /api/public/*)
+const PUBLIC_PATH_PREFIXES = ["/tools", "/guides", "/api/public/"]
+
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true
   for (const prefix of PUBLIC_API_PREFIXES) {
+    if (pathname.startsWith(prefix)) return true
+  }
+  for (const prefix of PUBLIC_PATH_PREFIXES) {
     if (pathname.startsWith(prefix)) return true
   }
   return false

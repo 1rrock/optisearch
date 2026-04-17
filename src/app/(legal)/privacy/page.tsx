@@ -110,7 +110,24 @@ export default function PrivacyPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">7. 개인정보보호 책임자 및 연락처</h2>
+        <h2 className="text-xl font-bold mb-4">7. 제3자 광고 및 쿠키</h2>
+        <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
+          <li>본 서비스는 Google AdSense를 포함한 제3자 광고 네트워크를 통해 광고를 게재합니다.</li>
+          <li>Google 및 제3자 광고 파트너는 쿠키(DoubleClick DART 쿠키 등)를 사용하여 이전 방문 기록을 기반으로 사용자에게 맞춤화된 광고를 제공합니다.</li>
+          <li>
+            사용자는{" "}
+            <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+              Google 광고 설정
+            </a>
+            에서 맞춤 광고를 비활성화할 수 있습니다.
+          </li>
+          <li>사용자는 aboutads.info를 방문하여 다른 광고 네트워크의 쿠키 수집도 관리할 수 있습니다.</li>
+          <li>브라우저 설정에서 쿠키를 차단할 수 있으나, 이 경우 일부 서비스 이용에 제한이 있을 수 있습니다.</li>
+        </ul>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-xl font-bold mb-4">8. 개인정보보호 책임자 및 연락처</h2>
         <div className="bg-muted/20 rounded-2xl p-6 text-muted-foreground space-y-1">
           <p><span className="font-semibold text-foreground">서비스명:</span> 옵티써치 (OptiSearch)</p>
           <p><span className="font-semibold text-foreground">사업자명:</span> 알에이케이랩스</p>
@@ -126,7 +143,7 @@ export default function PrivacyPage() {
       </section>
 
       <section className="mb-10">
-        <h2 className="text-xl font-bold mb-4">8. 방침 변경 안내</h2>
+        <h2 className="text-xl font-bold mb-4">9. 방침 변경 안내</h2>
         <p className="text-muted-foreground">
           본 방침은 법령 또는 서비스 변경에 따라 수정될 수 있으며, 변경 시 서비스 내 공지사항을 통해 사전 안내합니다.
         </p>

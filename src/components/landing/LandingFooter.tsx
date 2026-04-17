@@ -22,6 +22,45 @@ export function LandingFooter() {
           </div>
         </div>
 
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-8 border-t border-border/50 py-8">
+          <div>
+            <h3 className="text-sm font-bold text-foreground mb-4">서비스</h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li>
+                <a href="/tools/keyword-analyzer" className="hover:text-foreground transition-colors">
+                  키워드 분석기
+                </a>
+              </li>
+              <li>
+                <a href="/tools/title-generator" className="hover:text-foreground transition-colors">
+                  AI 제목 생성기
+                </a>
+              </li>
+              <li>
+                <a href="/tools/seo-checker" className="hover:text-foreground transition-colors">
+                  SEO 점수 분석기
+                </a>
+              </li>
+              <li>
+                <a href="/tools/trend-checker" className="hover:text-foreground transition-colors">
+                  트렌드 분석기
+                </a>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-bold text-foreground mb-4">학습</h3>
+            <ul className="space-y-2 text-xs text-muted-foreground">
+              <li>
+                <a href="/guides" className="hover:text-foreground transition-colors">
+                  SEO 가이드
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         <div className="border-t border-border/50 pt-8 text-xs text-muted-foreground font-mono flex flex-col md:flex-row justify-between items-center gap-4">
           <p>키워드 데이터 분석 소프트웨어 © 2026</p>
           <div className="text-right">

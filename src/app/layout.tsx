@@ -15,6 +15,7 @@ import { cn } from "@/shared/lib/utils";
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.optisearch.kr"),
   title: {
     default: "옵티써치 - 키워드 분석 + AI 콘텐츠 최적화",
     template: "%s | 옵티써치",
