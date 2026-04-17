@@ -182,3 +182,249 @@
     animation: none !important;
   }
 }
+
+/* ================================================================
+   Complete prose / blog-article typography  (Velog-style)
+   Self-contained — no @tailwindcss/typography plugin required.
+   Applied to any element with class="prose …"
+================================================================ */
+
+/* ── Base ─────────────────────────────────────────────────────── */
+.prose {
+  color: var(--foreground);
+  font-size: 1.0625rem;       /* ~17 px — Velog body size */
+  line-height: 1.85;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  max-width: 100%;
+}
+
+.prose > * + * {
+  margin-top: 1.35em;
+}
+
+/* ── Paragraphs ───────────────────────────────────────────────── */
+.prose p {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+  line-height: 1.85;
+}
+
+/* ── Headings ─────────────────────────────────────────────────── */
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: var(--foreground);
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.prose h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+/* H2: Velog signature — left green bar */
+.prose h2 {
+  font-size: 1.5rem;
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  padding-left: 0.9rem;
+  border-left: 4px solid oklch(0.65 0.16 155);
+}
+
+/* H3: green tint */
+.prose h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+  color: oklch(0.45 0.14 155);
+}
+
+.dark .prose h3 {
+  color: oklch(0.72 0.14 155);
+}
+
+.prose h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+/* ── Lists ────────────────────────────────────────────────────── */
+.prose ul,
+.prose ol {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+  padding-left: 1.625em;
+}
+
+.prose ul {
+  list-style-type: disc;
+}
+
+.prose ol {
+  list-style-type: decimal;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.75;
+}
+
+.prose ul > li::marker {
+  color: oklch(0.65 0.16 155);
+}
+
+.prose ol > li::marker {
+  color: oklch(0.65 0.16 155);
+  font-weight: 700;
+}
+
+/* nested lists */
+.prose li > ul,
+.prose li > ol {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+/* ── Inline emphasis ──────────────────────────────────────────── */
+.prose strong {
+  font-weight: 700;
+  color: var(--foreground);
+}
+
+.prose em {
+  font-style: italic;
+}
+
+/* ── Inline code ──────────────────────────────────────────────── */
+.prose :not(pre) > code {
+  background-color: oklch(0.93 0.01 155);
+  color: oklch(0.40 0.16 155);
+  padding: 0.15em 0.45em;
+  border-radius: 0.3rem;
+  font-size: 0.875em;
+  font-weight: 500;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.dark .prose :not(pre) > code {
+  background-color: oklch(0.22 0.03 155);
+  color: oklch(0.78 0.12 155);
+}
+
+/* ── Pre / code blocks ───────────────────────────────────────── */
+.prose pre {
+  background-color: oklch(0.13 0 0);
+  color: oklch(0.92 0 0);
+  border-radius: 0.625rem;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  line-height: 1.7;
+  font-size: 0.9em;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.prose pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+/* ── Blockquote ──────────────────────────────────────────────── */
+.prose blockquote {
+  background-color: oklch(0.96 0.006 155);
+  border-left: 4px solid oklch(0.65 0.16 155);
+  border-radius: 0 0.5rem 0.5rem 0;
+  padding: 0.9rem 1.25rem;
+  margin-left: 0;
+  margin-right: 0;
+  font-style: normal;
+  color: var(--foreground);
+}
+
+.dark .prose blockquote {
+  background-color: oklch(0.19 0.02 155);
+}
+
+/* ── Horizontal rule ─────────────────────────────────────────── */
+.prose hr {
+  border: none;
+  border-top: 1px solid oklch(0.88 0 0);
+  margin-top: 2.5rem;
+  margin-bottom: 2.5rem;
+}
+
+.dark .prose hr {
+  border-top-color: oklch(0.28 0 0);
+}
+
+/* ── Links ───────────────────────────────────────────────────── */
+.prose a {
+  color: oklch(0.52 0.18 155);
+  text-decoration: underline;
+  text-decoration-color: oklch(0.65 0.16 155 / 40%);
+  text-underline-offset: 3px;
+  font-weight: 500;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.prose a:hover {
+  color: oklch(0.42 0.20 155);
+  text-decoration-color: oklch(0.52 0.18 155);
+}
+
+/* ── Tables ──────────────────────────────────────────────────── */
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375em;
+  margin-top: 1.5em;
+  margin-bottom: 1.5em;
+}
+
+.prose th {
+  background-color: oklch(0.94 0 0);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.6em 0.85em;
+  border: 1px solid oklch(0.85 0 0);
+}
+
+.dark .prose th {
+  background-color: oklch(0.20 0 0);
+  border-color: oklch(0.28 0 0);
+}
+
+.prose td {
+  padding: 0.6em 0.85em;
+  border: 1px solid oklch(0.88 0 0);
+  vertical-align: top;
+}
+
+.dark .prose td {
+  border-color: oklch(0.28 0 0);
+}
+
+/* ── prose-lg modifier (matches page.tsx className) ─────────── */
+.prose.prose-lg,
+.prose-lg.prose {
+  font-size: 1.125rem;     /* 18 px */
+  line-height: 1.875;
+}
+
+.prose-lg h2 { font-size: 1.625rem; }
+.prose-lg h3 { font-size: 1.275rem; }
+.prose-lg p  { line-height: 1.875; }

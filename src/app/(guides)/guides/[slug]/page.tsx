@@ -56,7 +56,7 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
         </div>
       </header>
 
-      <div className="prose prose-neutral dark:prose-invert max-w-none">
+      <div className="prose prose-lg prose-neutral dark:prose-invert max-w-none">
         <GuideContent />
       </div>
 
