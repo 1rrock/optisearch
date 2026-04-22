@@ -15,6 +15,7 @@ export function LandingFooter() {
           <div className="flex items-center gap-6 flex-wrap text-sm font-bold text-muted-foreground">
             <a href="/about" className="hover:text-foreground transition-colors">소개</a>
             <a href="/terms" className="hover:text-foreground transition-colors">이용약관</a>
+            <a href="/terms#refund" className="hover:text-foreground transition-colors">환불정책</a>
             <a href="/privacy" className="hover:text-foreground transition-colors">개인정보처리방침</a>
             <a href="/disclaimer" className="hover:text-foreground transition-colors">면책조항</a>
             <a href="/contact" className="hover:text-foreground transition-colors">문의</a>

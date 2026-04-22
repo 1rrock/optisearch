@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <article className="prose prose-neutral dark:prose-invert max-w-none">
       <h1 className="text-3xl font-black tracking-tight mb-2">이용약관</h1>
-      <p className="text-sm text-muted-foreground mb-10">최종 수정일: 2026년 4월 2일</p>
+      <p className="text-sm text-muted-foreground mb-10">최종 수정일: 2026년 4월 20일</p>
 
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제1조 (목적)</h2>
@@ -61,7 +61,6 @@ export default function TermsPage() {
               <li>SEO 점수 분석 10회/일</li>
               <li>대량 키워드 분석 50개/회</li>
               <li>검색량 데이터 엑셀 추출</li>
-              <li>첫 1개월 무료 체험</li>
             </ul>
           </div>
           <div className="bg-muted/20 rounded-2xl p-5">
@@ -83,8 +82,11 @@ export default function TermsPage() {
       <section className="mb-10">
         <h2 className="text-xl font-bold mb-4">제5조 (결제)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-          <li>유료 플랜 이용 요금은 결제일 기준 월 단위로 청구됩니다.</li>
-          <li>구독 취소 후에는 해당 결제 기간 종료 시까지 서비스를 이용할 수 있으며, 이후 무료 플랜으로 전환됩니다.</li>
+          <li>유료 플랜 이용 요금은 결제일 기준 월 단위로 자동 갱신·청구되는 정기결제(구독) 방식으로 운영됩니다. 이용자가 명시적으로 해지하지 않는 한 매월 동일 금액이 자동으로 청구됩니다.</li>
+          <li>표시 요금은 부가가치세(VAT 10%)가 포함된 금액입니다.</li>
+          <li>신규 유료 구독은 카드 등록 후 첫 결제가 승인되면 시작되며, 서비스 이용 권한은 결제 승인 확인 후 활성화됩니다.</li>
+          <li>베이직 플랜에서 프로 플랜으로 업그레이드하는 경우, 추가 결제가 필요한 시점에는 결제 확인 후 업그레이드가 반영됩니다.</li>
+          <li>구독 해지 후에는 해당 결제 기간 종료 시까지 유료 플랜의 기능을 그대로 이용할 수 있으며, 기간 종료 후 무료 플랜으로 전환됩니다. 해지는 다음 결제부터 적용되며, 해지 시 남은 기간에 대한 자동 비례환불이 함께 처리됩니다.</li>
           <li>결제 오류 또는 이중 청구 발생 시 즉시 전액 환불 처리합니다.</li>
         </ul>
       </section>
@@ -106,18 +108,25 @@ export default function TermsPage() {
         </p>
       </section>
 
-      <section className="mb-10">
+      <section id="refund" className="mb-10">
         <h2 className="text-xl font-bold mb-4">제7조 (청약철회 및 환불)</h2>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>
-            유료 플랜 결제 후 AI 쿼리 사용 이력이 없는 경우, 결제일로부터 7일 이내에 청약철회 및 100% 환불을 요청할 수 있습니다.
+            <strong className="text-foreground">청약철회 (전액환불):</strong> 결제일로부터 7일 이내이고, 당월 키워드 검색 횟수가 5회 이하이며, AI 기능(제목 생성·초안 생성·SEO 점수 분석)을 단 1회도 사용하지 않은 경우 청약철회 및 100% 전액환불을 요청할 수 있습니다.
           </li>
           <li>
-            AI 쿼리를 1회라도 사용한 경우에는 디지털 콘텐츠 특성상 전자상거래 등에서의 소비자보호에 관한 법률에 따라 청약철회 및 환불이 제한됩니다.
+            <strong className="text-foreground">셀프 환불 범위:</strong> 서비스 내 셀프 환불은 첫 정기구독 결제 건에 한해 제공됩니다. 업그레이드 차액 및 후속 정기결제는 셀프 전액환불 대상은 아니지만, 구독 해지 시 남은 기간에 대한 자동 비례환불 계산에는 포함될 수 있습니다.
           </li>
           <li>
-            환불 요청은 <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 접수하며,
-            접수일로부터 영업일 기준 3일 이내 처리 결과를 안내합니다.
+            <strong className="text-foreground">환불 불가:</strong> 이미 환불된 결제, 업그레이드 차액 결제, 후속 정기결제, 그리고 결제 오류·중복청구 외 결제일로부터 30일이 경과한 결제는 환불이 제공되지 않습니다.
+          </li>
+          <li>
+            <strong className="text-foreground">결제 오류·중복결제:</strong> 시스템 오류 또는 중복 청구로 인한 잘못된 결제는 확인 즉시 전액 환불 처리합니다.
+          </li>
+          <li>
+            구독 해지는 서비스 내 <strong className="text-foreground">/settings</strong> 페이지에서 직접 진행할 수 있으며, 환불 요청은{" "}
+            <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>로 접수하시기 바랍니다.
+            환불 처리는 영업일 기준 3~5일 소요될 수 있습니다.
           </li>
         </ul>
       </section>

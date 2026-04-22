@@ -1,9 +1,9 @@
 "use client";
 
 import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
+import { useEffect, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
@@ -60,19 +60,23 @@ interface PlanCardProps {
   currentPlan: PlanId | null;
   isPopular?: boolean;
   checkoutHref: string;
-  onPaidPlanClick: () => void;
-  isLoading?: boolean;
+  currentStatus?: string;
 }
 
-function PlanCard({ planId, currentPlan, isPopular, checkoutHref, onPaidPlanClick, isLoading }: PlanCardProps) {
+function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
-  const isCurrent = currentPlan === planId;
+  const isCurrent = currentStatus !== "stopped" && currentPlan === planId;
 
   const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
   const currentRank = currentPlan ? planRank[currentPlan] : -1;
+  const effectiveRank = currentStatus === "stopped" ? -1 : currentRank;
   const thisRank = planRank[planId];
-  const isSubscribed = currentRank >= thisRank && currentRank > 0;
-  const canUpgrade = !isCurrent && thisRank > currentRank;
+  const isSubscribed = effectiveRank >= thisRank && effectiveRank > 0;
+  const canUpgrade = !isCurrent && thisRank > effectiveRank;
+
+  // Determine button href and label
+  const isUpgradingFromBasic = currentPlan === "basic" && planId === "pro" && canUpgrade && currentStatus !== "stopped";
+  const buttonHref = isUpgradingFromBasic ? "/settings" : checkoutHref;
 
   const ctaLabel = isCurrent
     ? "현재 플랜"
@@ -80,8 +84,8 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, onPaidPlanClic
     ? "현재 플랜"
     : planId === "free"
     ? "시작하기"
-    : planId === "basic"
-    ? "결제하기"
+    : currentStatus === "stopped" && currentPlan === planId
+    ? "재구독"
     : "결제하기";
 
   return (
@@ -145,32 +149,20 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, onPaidPlanClic
         </ul>
 
         {/* CTA */}
-        {planId === "free" ? (
-          <Button
-            asChild
-            size="lg"
-            variant="outline"
-            disabled={isCurrent || isSubscribed || isLoading}
-            className="w-full rounded-xl font-bold h-12"
-          >
-            <Link href={checkoutHref}>{ctaLabel}</Link>
-          </Button>
-        ) : (
-          <Button
-            size="lg"
-            variant={!canUpgrade ? "outline" : "default"}
-            disabled={isCurrent || isSubscribed || isLoading}
-            onClick={onPaidPlanClick}
-            className={[
-              "w-full rounded-xl font-bold h-12",
-              isPopular && canUpgrade
-                ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
-                : "",
-            ].join(" ")}
-          >
-            {ctaLabel}
-          </Button>
-        )}
+        <Button
+          asChild
+          size="lg"
+          variant={!canUpgrade && planId !== "free" ? "outline" : planId === "free" ? "outline" : "default"}
+          disabled={isCurrent || isSubscribed}
+          className={[
+            "w-full rounded-xl font-bold h-12",
+            isPopular && canUpgrade
+              ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+              : "",
+          ].join(" ")}
+        >
+          <Link href={buttonHref}>{ctaLabel}</Link>
+        </Button>
       </CardContent>
     </Card>
   );
@@ -183,12 +175,19 @@ export default function PricingPage() {
 function PricingContent() {
   const { isAuthenticated } = useIsAuthenticated();
   const userPlan = useUserPlan();
+  const [subStatus, setSubStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/subscription")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.status) setSubStatus(data.status);
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
-
-  const showComingSoon = () => {
-    toast.info("결제 시스템 준비 중입니다. 곧 서비스가 오픈됩니다!");
-  };
 
   const checkoutPathByPlan: Record<PlanId, string> = {
     free: "/dashboard",
@@ -220,23 +219,20 @@ function PricingContent() {
           planId="free"
           currentPlan={currentPlan}
           checkoutHref={getCheckoutHref("free")}
-          onPaidPlanClick={showComingSoon}
-          isLoading={false}
+          currentStatus={subStatus ?? undefined}
         />
         <PlanCard
           planId="basic"
           currentPlan={currentPlan}
           isPopular
           checkoutHref={getCheckoutHref("basic")}
-          onPaidPlanClick={showComingSoon}
-          isLoading={false}
+          currentStatus={subStatus ?? undefined}
         />
         <PlanCard
           planId="pro"
           currentPlan={currentPlan}
           checkoutHref={getCheckoutHref("pro")}
-          onPaidPlanClick={showComingSoon}
-          isLoading={false}
+          currentStatus={subStatus ?? undefined}
         />
       </div>
 
@@ -264,6 +260,21 @@ function PricingContent() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Footer with policy links */}
+      <div className="text-xs text-muted-foreground text-center mt-4 max-w-5xl mx-auto w-full">
+        <Link href="/terms#refund" className="hover:underline">
+          환불정책
+        </Link>
+        {" · "}
+        <Link href="/terms" className="hover:underline">
+          이용약관
+        </Link>
+        {" · "}
+        <Link href="/privacy" className="hover:underline">
+          개인정보처리방침
+        </Link>
       </div>
     </div>
   );

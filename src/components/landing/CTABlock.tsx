@@ -22,7 +22,7 @@ export function CTABlock() {
         <div className="flex flex-col items-center gap-6">
           <a href="/login">
             <Button size="lg" className="h-16 px-10 rounded-2xl text-xl font-black bg-foreground text-background hover:bg-muted-foreground shadow-[0_0_40px_rgba(255,255,255,0.3)] hover:shadow-[0_0_60px_rgba(255,255,255,0.5)] hover:scale-[1.03] transition-all group flex items-center gap-3">
-              14일 무료 체험 시작하기
+              무료로 시작하기
               <ArrowRight className="size-6 group-hover:translate-x-1 transition-transform" />
             </Button>
           </a>

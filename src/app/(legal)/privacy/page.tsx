@@ -22,6 +22,8 @@ export default function PrivacyPage() {
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground">
           <li>이메일 주소</li>
           <li>이름(닉네임)</li>
+          <li>휴대폰번호 (SMS 결제알림 발송용, 유료 플랜 결제 시 필수)</li>
+          <li>결제정보: 카드번호 뒤 4자리, 결제승인번호, 결제일시 (유료 플랜 결제 시 수집)</li>
         </ul>
         <p className="text-muted-foreground mt-3">서비스 이용 과정에서 다음 정보가 자동으로 생성·수집될 수 있습니다.</p>
         <ul className="list-disc pl-6 space-y-1 text-muted-foreground mt-1">
@@ -49,6 +51,7 @@ export default function PrivacyPage() {
         </p>
         <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
           <li>전자상거래 관련 기록: 5년 (전자상거래 등에서의 소비자보호에 관한 법률)</li>
+          <li>결제 관련 정보(카드번호 뒤 4자리, 결제승인번호, 결제일시 등): 5년 (전자상거래 등에서의 소비자보호에 관한 법률)</li>
           <li>접속 로그 기록: 3개월 (통신비밀보호법)</li>
           <li>소비자 불만·분쟁 처리 기록: 3년 (전자상거래 등에서의 소비자보호에 관한 법률)</li>
         </ul>
@@ -78,6 +81,11 @@ export default function PrivacyPage() {
                 <td className="py-3 px-4">OpenAI, L.L.C.</td>
                 <td className="py-3 px-4">AI 콘텐츠 생성 API 처리 (검색어 등 입력값 전달)</td>
                 <td className="py-3 px-4">API 처리 완료 즉시 파기 (OpenAI 정책에 따름)</td>
+              </tr>
+              <tr>
+                <td className="py-3 px-4">주식회사 페이앱</td>
+                <td className="py-3 px-4">결제 처리 (정기결제 승인·취소·환불)</td>
+                <td className="py-3 px-4">결제 완료 후 5년</td>
               </tr>
             </tbody>
           </table>
