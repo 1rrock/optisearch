@@ -18,15 +18,27 @@ declare module "@auth/core/jwt" {
 // Auth.js v5 configuration — pure JWT, no DB adapter
 // User profiles are managed separately in user_profiles table.
 // ---------------------------------------------------------------------------
+
+function getRequiredEnv(primaryKey: string, fallbackKey?: string): string {
+  const value = process.env[primaryKey] ?? (fallbackKey ? process.env[fallbackKey] : undefined)
+  if (!value) {
+    throw new Error(`[auth] Missing required environment variable: ${primaryKey}${fallbackKey ? ` (or ${fallbackKey})` : ""}`)
+  }
+  return value
+}
+
 const config: NextAuthConfig = {
+  secret: getRequiredEnv("AUTH_SECRET"),
+  trustHost: true,
+  redirectProxyUrl: process.env.AUTH_REDIRECT_PROXY_URL || undefined,
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      clientId: getRequiredEnv("AUTH_GOOGLE_ID"),
+      clientSecret: getRequiredEnv("AUTH_GOOGLE_SECRET"),
     }),
     Kakao({
-      clientId: process.env.KAKAO_CLIENT_ID!,
-      clientSecret: process.env.KAKAO_CLIENT_SECRET!,
+      clientId: getRequiredEnv("AUTH_KAKAO_ID", "KAKAO_CLIENT_ID"),
+      clientSecret: getRequiredEnv("AUTH_KAKAO_SECRET", "KAKAO_CLIENT_SECRET"),
     }),
   ],
 

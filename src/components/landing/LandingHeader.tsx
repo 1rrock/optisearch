@@ -1,6 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useIsAuthenticated } from "@/shared/hooks/use-user";
 import Link from "next/link";
 import Image from "next/image";
@@ -26,9 +25,11 @@ function AuthNav() {
     </a>
   ) : (
     <>
-      <Button variant="ghost" className="hidden sm:flex rounded-xl font-bold text-muted-foreground hover:text-foreground hover:bg-muted/50 h-12 px-6" onClick={() => signIn()}>
-        로그인
-      </Button>
+      <Link href="/login">
+        <Button variant="ghost" className="hidden sm:flex rounded-xl font-bold text-muted-foreground hover:text-foreground hover:bg-muted/50 h-12 px-6">
+          로그인
+        </Button>
+      </Link>
       <a href="/login">
         <Button className="rounded-xl font-bold bg-foreground text-background shadow-[0_0_20px_rgba(255,255,255,0.2)] hover:bg-zinc-200 hover:scale-[1.02] transition-all px-6 h-12">
           무료 체험 시작
