@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { checkUsageLimit, recordUsage } from "@/services/usage-service";
 import type { PlanId } from "@/shared/config/constants";
+import { getKstDateString } from "@/shared/lib/payapp-time";
 
 export { recordUsage };
 
@@ -34,7 +35,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
       // Ensure user_profiles row exists
       const { data: existingProfile } = await supabase
         .from("user_profiles")
-        .select("id, plan")
+        .select("id")
         .eq("id", DEV_USER.profileId)
         .single();
 
@@ -44,7 +45,6 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
           auth_user_id: DEV_USER.authId,
           name: DEV_USER.name,
           email: DEV_USER.email,
-          plan: "pro",
         });
       }
     } catch {
@@ -64,7 +64,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
     // Try to find existing profile
     let { data: profile } = await supabase
       .from("user_profiles")
-      .select("id, plan")
+      .select("id")
       .eq("auth_user_id", authUserId)
       .single();
 
@@ -75,7 +75,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
       if (profileId) {
         const { data: newProfile } = await supabase
           .from("user_profiles")
-          .select("id, plan")
+          .select("id")
           .eq("id", profileId)
           .single();
         profile = newProfile;
@@ -84,7 +84,21 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
 
     if (!profile) return null;
 
-    return { userId: profile.id, plan: (profile.plan as PlanId) ?? "free" };
+    // Fetch active subscription for the plan
+    // Also includes stopped subscriptions still within their paid period
+    const today = getKstDateString();
+    const { data: activeSub } = await supabase
+      .from("subscriptions")
+      .select("plan, status, current_period_end")
+      .eq("user_id", profile.id)
+      .or(`status.eq.active,status.eq.pending_billing,and(status.eq.pending_cancel,current_period_end.gte.${today}),and(status.eq.stopped,current_period_end.gte.${today})`)
+      .order("status", { ascending: true }) // 'active' sorts before 'stopped'
+      .limit(1)
+      .maybeSingle();
+
+    const plan = (activeSub?.plan as PlanId) ?? "free";
+
+    return { userId: profile.id, plan };
   } catch (err) {
     console.error("[getAuthenticatedUser] Error:", err instanceof Error ? err.message : err);
     return null;
