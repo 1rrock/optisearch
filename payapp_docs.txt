@@ -1,0 +1,2820 @@
+# PayApp payments
+
+PayApp 결제 서비스의 API 연동 가이드입니다.
+
+## Documentation Map
+
+- [시작하기](https://docs.payapp.kr/docs/01-getting-started.md): API 기본 정보 및 인증
+- [결제 요청](https://docs.payapp.kr/docs/02-payment-request.md): 결제 요청
+- [JavaScript API](https://docs.payapp.kr/docs/03-javascript-api.md): 프론트엔드 연동
+- [웹훅 알림](https://docs.payapp.kr/docs/04-webhook.md): 결제 결과 알림
+- [정기결제](https://docs.payapp.kr/docs/05-subscription.md): 정기결제(Rebill)
+- [빌키 결제](https://docs.payapp.kr/docs/06-billing.md): 카드 등록 및 빌키 결제
+- [취소 및 환불](https://docs.payapp.kr/docs/07-cancellation.md): 결제 취소/환불 처리
+- [현금영수증](https://docs.payapp.kr/docs/08-cash-receipt.md): 현금영수증 발행
+- [모바일 앱 연동](https://docs.payapp.kr/docs/09-mobile-app.md): 모바일 앱 결제
+
+---
+# Full Documentation Content
+
+# 시작하기
+
+PayApp API 연동을 위한 기본 정보입니다.
+
+## API 정보
+
+| 항목               | 값                                         |
+|------------------|-------------------------------------------|
+| **Domain**       | `api.payapp.kr`                           |
+| **Endpoint**     | `https://api.payapp.kr/oapi/apiLoad.html` |
+| **Port**         | 443 (HTTPS)                               |
+| **Method**       | POST                                      |
+| **Content-Type** | `application/x-www-form-urlencoded`       |
+| **Encoding**     | UTF-8                                     |
+| **Timeout**      | 30초 권장                                    |
+| **Response**     | URL-encoded KEY=VALUE                     |
+
+> **방화벽 설정**: PayApp 연동을 위해서는 서버에서 `api.payapp.kr:443` 접속이 가능해야 합니다. 방화벽 룰을 조정하시기 바랍니다.
+
+## 인증 정보
+
+모든 API 요청에는 아래 인증 정보가 필요합니다.
+
+| 파라미터      | 필수 | 설명       |
+|-----------|----|----------|
+| `userid`  | O  | 가맹점 ID   |
+| `linkkey` | O  | 연동 KEY   |
+| `linkval` | O  | 연동 VALUE |
+
+> 연동 KEY/VALUE는 PayApp 가맹점 설정에서 확인할 수 있습니다.
+
+## 기본 요청 형식
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=COMMAND" \
+  -d "userid=YOUR_USERID" \
+  -d "param1=value1" \
+  -d "param2=value2"
+```
+
+> **참고**: `linkkey`, `linkval`은 웹훅(feedbackurl)에서 결과 검증 시 사용됩니다. 결제 요청 시에는 `userid`만 필요합니다.
+
+## 응답 형식
+
+### 성공 응답
+
+```
+state=1&errorMessage=&result_param1=value1&result_param2=value2
+```
+
+### 실패 응답
+
+```
+state=0&errorMessage=에러메시지&errorCode=70010
+```
+
+## 에러 코드
+
+| 코드      | 설명                                      | 해결 방법                                                               |
+|---------|-----------------------------------------|---------------------------------------------------------------------|
+| `00000` |                                         | API 요청이 성공했습니다                                                      |
+| `20020` | API 요청 파라메터에 오류가 있습니다                   | 요청 파라메터의 값을 확인하세요                                                   |
+| `20021` | 현금영수증 발행이 완료된 결제승인건 입니다.                | 기 발행된 현금영수증을 확인하세요                                                  |
+| `20023` | 요청하신 파라메터로 정기결제건을 찾을 수 없습니다.            | 요청 파라메터를 확인 하세요                                                     |
+| `30000` | 결제 취소 실패                                | errorMessage 내용을 확인하세요                                              |
+| `30051` | 현금영수증 발행이 불가능한 상태입니다                    | userid의 로그인 및 결제이용 가능 여부 확인                                         |
+| `30052` | 거래금액을 확인 하세요                            | API 요청 파라메터 금액을 확인 하세요                                              |
+| `30053` | API 요청 실패                               | errorMessage 내용을 확인하세요                                              |
+| `30054` | 취소 권한 오류                                | 부계정의 취소 권한을 확인하세요                                                   |
+| `40018` | 휴대전화번호 오류                               | 요청 API의 휴대전화번호를 확인하세요                                               |
+| `50051` | 정기결제 삭제는 상태가 요청 또는 해지된 정기결제건만 삭제가 가능합니다 |                                                                     |
+| `50052` | 휴대전화는 월 정기결제만 이용이 가능합니다.                |                                                                     |
+| `50054` | 결제요청 최소금액 미만 입니다                        | 결제요청 최소금액은 1,000원 입니다                                               |
+| `70001` | HTTPS 필수                                | 보안접속(https)으로 호출하지 않았습니다. https로 호출하도록 수정하세요.                       |
+| `70010` | 인증 오류                                   | userid, linkkey 값이 올바르지 않습니다.                                       |
+| `70020` | 파라미터 오류                                 | 필수 파라미터(goodname, price, recvphone 등)가 누락되었거나 형식이 올바르지 않습니다.        |
+| `70030` | 금액 오류                                   | 결제 금액이 최소 금액(1,000원) 미만입니다.                                         |
+| `70040` | 명령어 오류                                  | 지원하지 않는 cmd 값입니다.                                                   |
+| `70050` | 결제 상태 오류                                | 해당 결제의 현재 상태에서는 요청한 작업을 수행할 수 없습니다.                                 |
+| `70060` | 권한 오류                                   | 해당 작업에 대한 권한이 없습니다.                                                 |
+| `70080` | 고객사 응답 실패                               | feedbackurl로 접속하여 SUCCESS 응답을 받지 못했습니다. feedbackurl 접근 및 응답을 확인하세요. |
+| `80010` | 취소 불가                                   | 취소가 가능한 상태가 아닙니다. 결제 상태를 확인하세요.                                     |
+| `80020` | 취소 불가                                   | 취소가 가능한 상태가 아닙니다. 결제 상태를 확인하세요.                                     |
+| `80030` | 취소 금액 오류                                | 취소 금액을 확인하세요. 남은 결제 금액 내에서만 취소 가능합니다.                               |
+| `99999` | 연결 오류                                   | 네트워크 연결 오류 또는 시스템 오류입니다. 방화벽 설정을 확인하세요.                             |
+
+## 명령어 목록 (cmd)
+
+| 명령어            | 설명           |
+|----------------|--------------|
+| `payrequest`   | 결제 요청        |
+| `paycancel`    | 결제 취소        |
+| `paycancelreq` | 환불 요청 (정산 후) |
+| `rebillRegist` | 정기결제 등록      |
+| `rebillCancel` | 정기결제 취소      |
+| `rebillStop`   | 정기결제 일시정지    |
+| `rebillStart`  | 정기결제 재개      |
+| `billRegist`   | 빌키 등록        |
+| `billPay`      | 빌키 결제        |
+| `billDelete`   | 빌키 삭제        |
+| `cashStRegist` | 현금영수증 발행     |
+| `cashStCancel` | 현금영수증 취소     |
+
+## PHP 연동 예제
+
+```php
+<?php
+// payapp 연동 도메인
+define('PAYAPP_API_DOMAIN', 'api.payapp.kr');
+// payapp 연동 URL
+define('PAYAPP_API_URL', '/oapi/apiLoad.html');
+
+/**
+ * PayApp API 호출 함수
+ * @param array $postdata 요청 데이터
+ * @return array API 응답 데이터
+ */
+function payappOapiPost(array $postdata = [])
+{
+    // 필수 값 검증
+    if (!$postdata['cmd']) {
+        return ['state' => '0', 'errorMessage' => 'cmd 값을 확인하세요.', 'errno' => '99999'];
+    }
+    if (!$postdata['userid']) {
+        return ['state' => '0', 'errorMessage' => 'userid 값을 확인하세요.', 'errno' => '70010'];
+    }
+
+    $postdataStr = http_build_query($postdata);
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, 'https://' . PAYAPP_API_DOMAIN . PAYAPP_API_URL);
+    curl_setopt($ch, CURLOPT_HEADER, 0);
+    curl_setopt($ch, CURLOPT_POST, 1);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $postdataStr);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    $responseData = curl_exec($ch);
+    $errno = curl_errno($ch);
+    $errstr = curl_error($ch);
+
+    if ($errno) {
+        return ['state' => '0', 'errorMessage' => '(' . $errno . ') ' . $errstr, 'errno' => '99999'];
+    }
+
+    parse_str($responseData, $parseData);
+    curl_close($ch);
+
+    return $parseData;
+}
+
+// 사용 예시
+$postdata = [
+    'cmd'         => 'payrequest',
+    'userid'      => 'YOUR_USERID',
+    'goodname'    => '테스트상품',
+    'price'       => '1000',
+    'recvphone'   => '01012345678',
+    'feedbackurl' => 'https://your-domain.com/webhook',
+    'var1'        => 'ORDER_ID',
+    'smsuse'      => 'n'
+];
+
+$result = payappOapiPost($postdata);
+
+if ($result['state'] == '1') {
+    echo "결제요청번호: " . $result['mul_no'];
+    echo "결제 URL: " . $result['payurl'];
+} else {
+    echo "에러: " . $result['errorMessage'];
+}
+?>
+```
+
+## Node.js 연동 예제
+
+```javascript
+const http = require('http');
+const querystring = require('querystring');
+
+// payapp 연동 도메인
+const PAYAPP_API_DOMAIN = 'api.payapp.kr';
+// payapp 연동 URL
+const PAYAPP_API_URL = '/oapi/apiLoad.html';
+
+/**
+ * PayApp API POST 요청
+ * @param {Object} postdata - 요청 데이터
+ * @returns {Promise<Object>} - API 응답 데이터
+ */
+async function payappOapiPost(postdata = {}) {
+    // 필수 값 검증
+    if (!postdata.cmd) {
+        return {state: '0', errorMessage: 'cmd 값을 확인하세요.', errno: '99999'};
+    }
+    if (!postdata.userid) {
+        return {state: '0', errorMessage: 'userid 값을 확인하세요.', errno: '70010'};
+    }
+
+    const postdataStr = querystring.stringify(postdata);
+
+    return new Promise((resolve) => {
+        const options = {
+            hostname: PAYAPP_API_DOMAIN,
+            port: 80,
+            path: PAYAPP_API_URL,
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Content-Length': Buffer.byteLength(postdataStr)
+            },
+            timeout: 30000
+        };
+
+        const req = http.request(options, (res) => {
+            let responseData = '';
+            res.on('data', (chunk) => {
+                responseData += chunk;
+            });
+            res.on('end', () => {
+                const parseData = querystring.parse(responseData);
+                resolve(parseData);
+            });
+        });
+
+        req.on('error', (e) => {
+            resolve({state: '0', errorMessage: e.message, errno: '99999'});
+        });
+
+        req.on('timeout', () => {
+            req.destroy();
+            resolve({state: '0', errorMessage: 'connection time out', errno: '99999'});
+        });
+
+        req.write(postdataStr);
+        req.end();
+    });
+}
+
+// 사용 예시
+async function requestPayment() {
+    const postdata = {
+        cmd: 'payrequest',
+        userid: 'YOUR_USERID',
+        goodname: '테스트상품',
+        price: '1000',
+        recvphone: '01012345678',
+        feedbackurl: 'https://your-domain.com/webhook',
+        var1: 'ORDER_ID',
+        smsuse: 'n'
+    };
+
+    const result = await payappOapiPost(postdata);
+
+    if (result.state === '1') {
+        console.log('결제요청번호:', result.mul_no);
+        console.log('결제 URL:', result.payurl);
+    } else {
+        console.error('에러:', result.errorMessage);
+    }
+}
+```
+
+## Python 연동 예제
+
+```python
+import requests
+from urllib.parse import parse_qs
+
+# payapp 연동 도메인
+PAYAPP_API_DOMAIN = 'api.payapp.kr'
+# payapp 연동 URL
+PAYAPP_API_URL = '/oapi/apiLoad.html'
+
+def payapp_oapi_post(postdata):
+    """
+    PayApp API 호출 함수
+    :param postdata: 요청 데이터 (dict)
+    :return: API 응답 데이터 (dict)
+    """
+    # 필수 값 검증
+    if not postdata.get('cmd'):
+        return {'state': '0', 'errorMessage': 'cmd 값을 확인하세요.', 'errno': '99999'}
+    if not postdata.get('userid'):
+        return {'state': '0', 'errorMessage': 'userid 값을 확인하세요.', 'errno': '70010'}
+
+    url = f"https://{PAYAPP_API_DOMAIN}{PAYAPP_API_URL}"
+
+    try:
+        response = requests.post(url, data=postdata, timeout=30)
+        result = parse_qs(response.text)
+        # parse_qs는 리스트로 반환하므로 첫 번째 값 추출
+        return {k: v[0] for k, v in result.items()}
+    except requests.exceptions.RequestException as e:
+        return {'state': '0', 'errorMessage': str(e), 'errno': '99999'}
+
+# 사용 예시
+postdata = {
+    'cmd': 'payrequest',
+    'userid': 'YOUR_USERID',
+    'goodname': '테스트상품',
+    'price': '1000',
+    'recvphone': '01012345678',
+    'feedbackurl': 'https://your-domain.com/webhook',
+    'var1': 'ORDER_ID',
+    'smsuse': 'n'
+}
+
+result = payapp_oapi_post(postdata)
+
+if result.get('state') == '1':
+    print(f"결제요청번호: {result['mul_no']}")
+    print(f"결제 URL: {result['payurl']}")
+else:
+    print(f"에러: {result.get('errorMessage')}")
+```
+
+---
+
+# 결제 요청 API
+
+결제를 요청하고 결제 URL을 생성하는 API입니다.
+
+## 기본 정보
+
+| 항목           | 값            |
+|--------------|--------------|
+| **Command**  | `payrequest` |
+| **Method**   | POST         |
+| **최소 결제 금액** | 1,000원       |
+
+## 요청 파라미터
+
+### 필수 파라미터
+
+| 파라미터        | 타입     | 설명                   |
+|-------------|--------|----------------------|
+| `cmd`       | string | `payrequest` (고정값)   |
+| `userid`    | string | 가맹점 ID               |
+| `goodname`  | string | 상품명                  |
+| `price`     | int    | 결제 금액 (최소 1,000원 이상) |
+| `recvphone` | string | 수신자 휴대폰번호 (구매자)      |
+
+### 선택 파라미터
+
+| 파라미터             | 타입     | 설명                                                            |
+|------------------|--------|---------------------------------------------------------------|
+| `memo`           | string | 결제요청시 메모                                                      |
+| `reqaddr`        | string | 주소요청 여부 (`0`: 요청안함, `1`: 요청)                                  |
+| `feedbackurl`    | string | 웹노티 URL (외부에서 접근 가능해야 함, PayApp 서버에서 POST 호출)                 |
+| `var1`           | string | 임의변수1 (주문번호 등 자유롭게 사용, feedbackurl로 전달됨)                      |
+| `var2`           | string | 임의변수2 (상품코드 등 자유롭게 사용, feedbackurl로 전달됨)                      |
+| `smsuse`         | string | 결제요청 SMS 발송여부 (`y`: 발송, `n`: 발송안함)                            |
+| `vccode`         | string | 국제전화 국가번호                                                     |
+| `returnurl`      | string | 결제완료 이동 URL (결제완료 후 매출전표 페이지에서 "확인" 버튼 클릭시 이동, 가상계좌의 경우 입금대기) |
+| `openpaytype`    | string | 결제수단 선택 (판매자 사이트 "설정" 메뉴의 "결제 설정"이 우선함)                       |
+| `checkretry`     | string | feedbackurl 재시도 여부 (`y`: 응답이 'SUCCESS'가 아니면 재시도, 총 10회)       |
+| `skip_cstpage`   | string | 매출전표 스킵 (`y`: 결제승인 후 매출전표 페이지 없이 returnurl로 POST 이동)          |
+| `recvemail`      | string | 수신 이메일 주소                                                     |
+| `appurl`         | string | 앱스키마 (카드사앱 스키마가 아닌 앱제작사의 스키마 사용)                              |
+| `subuserid`      | string | 부계정 아이디                                                       |
+| `buyerid`        | string | 구매자 아이디                                                       |
+| `amount_taxable` | int    | 과세 공급가액                                                       |
+| `amount_taxfree` | int    | 면세 공급가액                                                       |
+| `amount_vat`     | int    | 부가세                                                           |
+
+### openpaytype 값
+
+| 값           | 설명    |
+|-------------|-------|
+| `card`      | 신용카드  |
+| `phone`     | 휴대전화  |
+| `kakaopay`  | 카카오페이 |
+| `naverpay`  | 네이버페이 |
+| `smilepay`  | 스마일페이 |
+| `applepay`  | 애플페이  |
+| `rbank`     | 계좌이체  |
+| `vbank`     | 가상계좌  |
+| `payco`     | 페이코   |
+| `wechat`    | 위챗페이  |
+| `myaccount` | 내통장결제 |
+| `tosspay`   | 토스페이  |
+
+> **참고**: 콤마(,) 구분으로 여러 결제수단 선택이 가능합니다. 값이 없는 경우 이용 가능한 결제수단이 모두 선택됩니다. 판매자 결제 설정의 값이 우선합니다. 해외결제는 현재 신용카드 결제만 가능하며, 입력된 openpaytype 값은 무시됩니다.
+
+## 응답
+
+### 성공 응답
+
+```
+state=1&errorMessage=&mul_no=123456&payurl=https://payapp.kr/pay/...
+```
+
+| 필드             | 설명                |
+|----------------|-------------------|
+| `state`        | 상태 (1: 성공)        |
+| `errorMessage` | 에러 메시지 (성공 시 빈 값) |
+| `mul_no`       | 결제 요청 번호          |
+| `payurl`       | 결제 페이지 URL        |
+| `qrurl`        | 결제창 QR URL        |
+
+### 실패 응답
+
+```
+state=0&errorMessage=에러메시지&errorCode=70020
+```
+
+## 요청 예제
+
+### cURL
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=payrequest" \
+  -d "userid=YOUR_USERID" \
+  -d "goodname=테스트상품" \
+  -d "price=1000" \
+  -d "recvphone=01012341234" \
+  -d "memo=결제요청 테스트" \
+  -d "feedbackurl=https://your-domain.com/payapp_feedbackurl.php" \
+  -d "var1=1234567890" \
+  -d "var2=abcdefg" \
+  -d "smsuse=n" \
+  -d "returnurl=https://your-domain.com/payment_complete" \
+  -d "checkretry=y" \
+  -d "skip_cstpage=y"
+```
+
+### PHP
+
+```php
+<?php
+include("payapp_lib.php");
+
+/*
+TODO : 이곳에서 결제요청전 정보를 저장합니다.
+ex) INSERT INTO payrequest (orderno,memberid,goodcode,goodname,goodprice)
+    VALUES ('1234567890','kim','abcdefg','테스트상품',1000)
+*/
+
+// 결제요청 정보
+$postdata = [
+    'cmd'           => 'payrequest',               // 결제요청, 필수
+    'userid'        => 'YOUR_USERID',              // 판매자 아이디, 필수
+    'goodname'      => '테스트상품',                // 상품명, 필수
+    'price'         => '1000',                     // 결제요청 금액 (1,000원 이상), 필수
+    'recvphone'     => '01012341234',              // 수신자 휴대폰번호 (구매자), 필수
+    'memo'          => '결제요청 테스트',           // 결제요청시 메모
+    'reqaddr'       => '0',                        // 주소요청 여부
+    'feedbackurl'   => 'https://your-domain.com/payapp_feedbackurl.php',
+    'var1'          => '1234567890',               // 임의변수1 (주문번호)
+    'var2'          => 'abcdefg',                  // 임의변수2 (상품코드)
+    'smsuse'        => 'n',                        // 결제요청 SMS 발송여부
+    'returnurl'     => 'https://your-domain.com/payment_complete',
+    'openpaytype'   => '',                         // 결제수단 선택
+    'checkretry'    => 'y',                        // feedbackurl 재시도
+    'skip_cstpage'  => 'y',                        // 매출전표 스킵
+];
+
+$oResData = payappOapiPost($postdata);
+
+if ($oResData['state'] == '1') {
+    // 결제요청 성공
+    // 결제요청번호($oResData['mul_no'])를 고객사 DB에 저장해야 합니다.
+    // 요청 성공은 결제완료 상태가 아닙니다. 상품배송/서비스 제공은 feedbackurl에서!
+
+    /*
+    TODO : 결제요청 성공 정보 저장
+    ex) UPDATE payrequest SET mul_no='{$oResData['mul_no']}' WHERE orderno='1234567890'
+    */
+
+    echo json_encode(['state' => true, 'msg' => '', 'payurl' => $oResData['payurl']]);
+
+    // 또는 결제 URL로 리다이렉트
+    // header("Location: " . $oResData['payurl']);
+    // exit;
+} else {
+    // 결제요청 실패
+    echo json_encode(['state' => false, 'msg' => $oResData['errorMessage'] ?? '알 수 없는 오류', 'payurl' => '']);
+}
+?>
+```
+
+### Node.js
+
+```javascript
+const {payappOapiPost} = require('./payappLib');
+
+/**
+ * 결제요청 함수
+ * @param {Object} options - 결제요청 옵션
+ * @returns {Promise<Object>} - 결제요청 결과
+ */
+async function payRequest(options = {}) {
+    /*
+    TODO : 결제요청전 정보를 저장합니다.
+    ex) INSERT INTO payrequest (orderno,memberid,goodcode,goodname,goodprice)
+        VALUES ('1234567890','kim','abcdefg','테스트상품',1000)
+    */
+
+    // 결제요청 정보
+    const postdata = {
+        cmd: 'payrequest',
+        userid: 'YOUR_USERID',
+        goodname: '테스트상품',
+        price: '1000',
+        recvphone: '01012341234',
+        memo: '결제요청 테스트',
+        reqaddr: '0',
+        feedbackurl: 'https://your-domain.com/payapp_feedbackurl',
+        var1: '1234567890',
+        var2: 'abcdefg',
+        smsuse: 'n',
+        returnurl: 'https://your-domain.com/payment_complete',
+        openpaytype: '',
+        checkretry: 'y',
+        skip_cstpage: 'y',
+        ...options
+    };
+
+    const oResData = await payappOapiPost(postdata);
+
+    if (oResData.state === '1') {
+        // 결제요청 성공
+        // 결제요청번호(oResData.mul_no)를 고객사 DB에 저장해야 합니다.
+
+        /*
+        TODO : 결제요청 성공 정보 저장
+        ex) UPDATE payrequest SET mul_no='${oResData.mul_no}' WHERE orderno='1234567890'
+        */
+
+        return {state: true, msg: '', payurl: oResData.payurl, mul_no: oResData.mul_no};
+    } else {
+        // 결제요청 실패
+        return {
+            state: false,
+            msg: oResData.errorMessage || '',
+            payurl: '',
+            errno: oResData.errno
+        };
+    }
+}
+
+module.exports = {payRequest};
+```
+
+### Python
+
+```python
+import requests
+from urllib.parse import parse_qs
+import os
+
+def request_payment(order_info):
+    """
+    결제 요청 API (payrequest)
+    - payrequest는 userid만 필요하며 linkkey, linkval은 사용하지 않습니다
+    """
+    params = {
+        'cmd': 'payrequest',
+        'userid': os.environ['PAYAPP_USERID'],
+        'goodname': order_info['product_name'],
+        'price': order_info['amount'],
+        'recvphone': order_info['phone'],
+        'feedbackurl': 'https://yoursite.com/api/webhook/payapp',
+        'var1': order_info['order_id'],
+        'openpaytype': 'card'
+    }
+
+    response = requests.post(
+        'https://api.payapp.kr/oapi/apiLoad.html',
+        data=params
+    )
+
+    result = {k: v[0] for k, v in parse_qs(response.text).items()}
+
+    if result.get('state') == '1':
+        return {
+            'success': True,
+            'payment_id': result['mul_no'],
+            'payment_url': result['payurl']
+        }
+    else:
+        raise Exception(result.get('errorMessage'))
+```
+
+## 결제 흐름
+
+```
+1. 서버에서 payrequest API 호출
+          ↓
+2. PayApp에서 mul_no, payurl 응답
+          ↓
+3. 사용자를 payurl로 리다이렉트
+          ↓
+4. 사용자가 결제 진행
+          ↓
+5. PayApp에서 feedbackurl로 결과 전송
+          ↓
+6. returnurl로 사용자 리다이렉트 (설정된 경우)
+```
+
+## 주의사항
+
+1. **최소 금액**: 결제 금액은 최소 1,000원 이상이어야 합니다
+2. **인증 정보 보안**: `linkkey`, `linkval`은 서버에서만 사용하세요
+3. **웹훅 설정**: 결제 결과를 받으려면 `feedbackurl`을 설정하세요
+4. **중복 방지**: `var1`, `var2`에 주문 번호를 저장하여 중복 처리를 방지하세요
+5. **returnurl METHOD**: `skip_cstpage`가 'y' 이면 POST로 리다이렉트, 'y'가 아닌경우 GET으로 리다이렉트 됩니다
+6. **skip_cstpage**: `skip_cstpage`가 'y' 이면 `returnurl` POST 리다이렉트 되면서 결제정보가 전달이 됩니다
+7. **feedbackurl**: 결제 완료에 대한 처리는 반드시 `feedbackurl`에서 처리 하시기 바랍니다
+
+---
+
+# JavaScript API
+
+프론트엔드에서 PayApp 결제를 연동하기 위한 JavaScript API입니다.
+
+## 스크립트 로드
+
+```html
+
+<script src="https://lite.payapp.kr/public/api/v2/payapp-lite.js"></script>
+```
+
+## 주요 메서드
+
+| 메서드                               | 설명         |
+|-----------------------------------|------------|
+| `PayApp.setForm(formName)`        | HTML 폼 연결  |
+| `PayApp.setDefault(param, value)` | 기본 파라미터 설정 |
+| `PayApp.setParam(param, value)`   | 개별 파라미터 설정 |
+| `PayApp.payrequest()`             | 결제 창 호출    |
+| `PayApp.rebill()`                 | 정기결제 창 호출  |
+
+## 기본 사용법
+
+### HTML 폼 연동
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://lite.payapp.kr/public/api/v2/payapp-lite.js"></script>
+</head>
+<body>
+<form name="payForm">
+    <input type="hidden" name="userid" value="YOUR_USERID">
+    <input type="hidden" name="goodname" value="테스트상품">
+    <input type="hidden" name="price" value="10000">
+    <input type="hidden" name="recvphone" value="01012345678">
+    <input type="hidden" name="shopname" value="테스트상점">
+    <button type="button" onclick="requestPayment()">결제하기</button>
+</form>
+
+<script>
+    function requestPayment() {
+        PayApp.setForm('payForm');
+        PayApp.payrequest();
+    }
+</script>
+</body>
+</html>
+```
+
+### 파라미터 직접 설정
+
+```html
+
+<script src="https://lite.payapp.kr/public/api/v2/payapp-lite.js"></script>
+<script>
+    function requestPayment() {
+        // 기본 설정
+        PayApp.setDefault('userid', 'YOUR_USERID');
+        PayApp.setDefault('shopname', '테스트상점');
+
+        // 결제 정보 설정
+        PayApp.setParam('goodname', '테스트상품');
+        PayApp.setParam('price', '10000');
+        PayApp.setParam('recvphone', '01012345678');
+        PayApp.setParam('feedbackurl', 'https://yoursite.com/webhook');
+        PayApp.setParam('var1', 'order_123');
+
+        // 결제 창 호출
+        PayApp.payrequest();
+    }
+</script>
+
+<button onclick="requestPayment()">결제하기</button>
+```
+
+## 파라미터
+
+### 필수 파라미터
+
+| 파라미터        | 설명       |
+|-------------|----------|
+| `userid`    | 가맹점 ID   |
+| `goodname`  | 상품명      |
+| `price`     | 결제 금액    |
+| `recvphone` | 수신자 전화번호 |
+| `shopname`  | 상점명      |
+
+### 선택 파라미터
+
+| 파라미터             | 설명                                                    |
+|------------------|-------------------------------------------------------|
+| `memo`           | 결제 메모                                                 |
+| `reqaddr`        | 주소요청 (`0`: 요청안함, `1`: 요청함)                            |
+| `vccode`         | 국제전화 국가번호                                             |
+| `redirecturl`    | 결제요청 성공 URL                                           |
+| `redirect`       | 결제요청 성공 URL 방향 (`opener`: 부모창, `self`: 현재창)           |
+| `feedbackurl`    | 웹훅 URL                                                |
+| `returnurl`      | 결제 완료 후 이동 URL                                        |
+| `var1`, `var2`   | 사용자 정의 변수                                             |
+| `smsuse`         | SMS 발송여부 (`y`: 발송, `n`: 발송안함)                         |
+| `charset`        | 캐릭터셋 (`auto`: UTF-8/EUC-KR 자동감지, `euc-kr`: EUC-KR 고정) |
+| `openpaytype`    | 결제 수단 지정                                              |
+| `checkretry`     | feedbackurl 재시도 (`y`: 재시도, `n`: 안함)                   |
+| `redirectpay`    | 결제창으로 리다이렉션 (`1`: 결제창 바로 이동)                          |
+| `amount_taxable` | 과세대상 금액                                               |
+| `amount_taxfree` | 면세 금액                                                 |
+| `amount_vat`     | 부가세                                                   |
+| `subuserid`      | 판매자 부계정 아이디                                           |
+| `buyerid`        | 구매자 아이디                                               |
+| `skip_cstpage`   | 매출전표 페이지 이동 여부 (`y`: 매출전표 페이지 이동 안함)                  |
+
+## 결제 수단 지정
+
+특정 결제 수단만 사용하도록 제한할 수 있습니다.
+
+```javascript
+// 카드 결제만 허용
+PayApp.setParam('openpaytype', 'card');
+
+// 카카오페이만 허용
+PayApp.setParam('openpaytype', 'kakaopay');
+
+// 여러 결제 수단 허용 (콤마로 구분)
+PayApp.setParam('openpaytype', 'card,kakaopay,naverpay');
+```
+
+### 결제 수단 코드
+
+| 코드          | 설명    |
+|-------------|-------|
+| `card`      | 신용카드  |
+| `phone`     | 휴대전화  |
+| `rbank`     | 계좌이체  |
+| `vbank`     | 가상계좌  |
+| `kakaopay`  | 카카오페이 |
+| `naverpay`  | 네이버페이 |
+| `smilepay`  | 스마일페이 |
+| `applepay`  | 애플페이  |
+| `payco`     | 페이코   |
+| `wechat`    | 위챗페이  |
+| `myaccount` | 내통장결제 |
+| `tosspay`   | 토스페이  |
+
+## 정기결제 연동
+
+```javascript
+function requestSubscription() {
+    PayApp.setDefault('userid', 'YOUR_USERID');
+    PayApp.setDefault('shopname', '테스트상점');
+
+    PayApp.setParam('goodname', '월간 구독');
+    PayApp.setParam('goodprice', '9900');
+    PayApp.setParam('recvphone', '01012345678');
+    PayApp.setParam('rebillCycleType', 'Month');
+    PayApp.setParam('rebillCycleMonth', '1');  // 매월 1일
+    PayApp.setParam('rebillExpire', '2025-12-31');
+
+    PayApp.rebill();
+}
+```
+
+## 실제 사용 예제
+
+### React
+
+```jsx
+import {useEffect} from 'react';
+
+function PaymentButton({orderInfo}) {
+    useEffect(() => {
+        // 스크립트 동적 로드
+        const script = document.createElement('script');
+        script.src = 'https://lite.payapp.kr/public/api/v2/payapp-lite.js';
+        script.async = true;
+        document.body.appendChild(script);
+
+        return () => {
+            document.body.removeChild(script);
+        };
+    }, []);
+
+    const handlePayment = () => {
+        if (typeof PayApp === 'undefined') {
+            alert('결제 모듈을 불러오는 중입니다.');
+            return;
+        }
+
+        PayApp.setDefault('userid', 'YOUR_USERID');
+        PayApp.setDefault('shopname', '테스트상점');
+
+        PayApp.setParam('goodname', orderInfo.productName);
+        PayApp.setParam('price', orderInfo.amount);
+        PayApp.setParam('recvphone', orderInfo.phone);
+        PayApp.setParam('feedbackurl', 'https://yoursite.com/api/webhook');
+        PayApp.setParam('var1', orderInfo.orderId);
+
+        PayApp.payrequest();
+    };
+
+    return (
+        <button onClick={handlePayment}>
+            결제하기
+        </button>
+    );
+}
+
+export default PaymentButton;
+```
+
+### Vue.js
+
+```vue
+
+<template>
+    <button @click="requestPayment">결제하기</button>
+</template>
+
+<script>
+    export default {
+        props: {
+            orderInfo: {
+                type: Object,
+                required: true
+            }
+        },
+        mounted() {
+            // 스크립트 로드
+            const script = document.createElement('script');
+            script.src = 'https://lite.payapp.kr/public/api/v2/payapp-lite.js';
+            script.async = true;
+            document.head.appendChild(script);
+        },
+        methods: {
+            requestPayment() {
+                if (typeof PayApp === 'undefined') {
+                    alert('결제 모듈을 불러오는 중입니다.');
+                    return;
+                }
+
+                PayApp.setDefault('userid', 'YOUR_USERID');
+                PayApp.setDefault('shopname', '테스트상점');
+
+                PayApp.setParam('goodname', this.orderInfo.productName);
+                PayApp.setParam('price', this.orderInfo.amount);
+                PayApp.setParam('recvphone', this.orderInfo.phone);
+                PayApp.setParam('feedbackurl', 'https://yoursite.com/api/webhook');
+                PayApp.setParam('var1', this.orderInfo.orderId);
+
+                PayApp.payrequest();
+            }
+        }
+    }
+</script>
+```
+
+## 주의사항
+
+1. **인증 정보**: JavaScript API에서는 `userid`만 사용합니다. `linkkey`, `linkval`은 사용하지 마세요
+2. **HTTPS**: 프로덕션 환경에서는 반드시 HTTPS를 사용하세요
+3. **웹훅**: 결제 결과는 서버의 `feedbackurl`로 전달됩니다
+4. **보안**: 결제 검증은 반드시 서버에서 수행하세요
+
+---
+
+# 웹훅 알림
+
+결제 상태가 변경될 때 서버로 전송되는 웹훅(Feedback) 알림입니다.
+
+## 개요
+
+| 항목                    | 값                                   |
+|-----------------------|-------------------------------------|
+| **URL**               | `feedbackurl` 파라미터에 설정한 URL         |
+| **Method**            | POST                                |
+| **Content-Type**      | `application/x-www-form-urlencoded` |
+| **Expected Response** | HTTP 200, Body: `SUCCESS`           |
+
+## 수신 파라미터
+
+### 인증 정보
+
+| 파라미터      | 설명         |
+|-----------|------------|
+| `userid`  | 판매자 회원 아이디 |
+| `linkkey` | 연동 KEY     |
+| `linkval` | 연동 VALUE   |
+
+### 결제 정보
+
+| 파라미터           | 설명                             |
+|----------------|--------------------------------|
+| `mul_no`       | 결제요청번호                         |
+| `goodname`     | 상품명                            |
+| `price`        | 결제요청 금액                        |
+| `recvphone`    | 수신 휴대폰번호                       |
+| `memo`         | 메모                             |
+| `reqaddr`      | 주소요청 (1:요청, 0:요청안함)            |
+| `reqdate`      | 결제요청 일시                        |
+| `pay_memo`     | 결제시 입력한 메모                     |
+| `pay_addr`     | 결제시 입력한 주소                     |
+| `pay_date`     | 결제승인 일시                        |
+| `pay_type`     | 결제수단                           |
+| `pay_state`    | 결제요청 상태                        |
+| `var1`         | 임의 사용 변수 1                     |
+| `var2`         | 임의 사용 변수 2                     |
+| `payurl`       | 결제페이지 주소                       |
+| `csturl`       | 매출전표 URL                       |
+| `feedbacktype` | feedback 구분 (0:API, 1:공통통보URL) |
+| `buyerid`      | 구매자 아이디                        |
+| `canceldate`   | 취소 일시                          |
+| `cancelmemo`   | 취소 메모                          |
+| `rebill_no`    | 정기결제 등록번호                      |
+
+### pay_state (결제요청 상태)
+
+| 값    | 설명                |
+|------|-------------------|
+| `1`  | 결제요청              |
+| `4`  | 결제완료              |
+| `8`  | 요청취소              |
+| `9`  | 승인취소              |
+| `10` | 결제대기 (가상계좌 입금 대기) |
+| `32` | 요청취소              |
+| `64` | 승인취소              |
+| `70` | 부분취소              |
+| `71` | 부분취소              |
+
+> **참고**: 요청취소(8, 32)는 결제하지 않은 상태에서 취소, 승인취소(9, 64)는 결제완료 상태에서 취소입니다.
+
+### pay_type (결제수단)
+
+| 값    | 설명    |
+|------|-------|
+| `1`  | 신용카드  |
+| `2`  | 휴대전화  |
+| `4`  | 대면결제  |
+| `6`  | 계좌이체  |
+| `7`  | 가상계좌  |
+| `15` | 카카오페이 |
+| `16` | 네이버페이 |
+| `17` | 등록결제  |
+| `21` | 스마일페이 |
+| `22` | 위챗페이  |
+| `23` | 애플페이  |
+| `24` | 내통장결제 |
+| `25` | 토스페이  |
+
+### 카드 결제 정보 (pay_type=1)
+
+| 파라미터          | 설명             |
+|---------------|----------------|
+| `card_name`   | 카드사명           |
+| `payauthcode` | 승인번호           |
+| `card_quota`  | 할부 개월 (0: 일시불) |
+| `card_num`    | 카드번호 (마스킹)     |
+
+### 가상계좌 정보 (pay_type=7)
+
+| 파라미터        | 설명   |
+|-------------|------|
+| `vbank`     | 은행명  |
+| `vbankno`   | 계좌번호 |
+| `depositor` | 예금주  |
+
+### 네이버페이 정보 (pay_type=16)
+
+| 파라미터         | 설명                             |
+|--------------|--------------------------------|
+| `naverpoint` | 네이버 포인트 결제 금액                  |
+| `naverpay`   | 네이버페이 결제 구분 (카드:card, 계좌:bank) |
+
+### 스마일페이 정보 (pay_type=21)
+
+| 파라미터                   | 설명              |
+|------------------------|-----------------|
+| `smilepay_smilecash`   | 스마일캐시 이용금액      |
+| `smilepay_discountamt` | 스마일페이 프로모션 이용금액 |
+
+### 내통장결제 정보 (pay_type=24)
+
+| 파라미터                     | 설명                       |
+|--------------------------|--------------------------|
+| `myaccount_taxvatprice`  | 내통장결제 현금영수증 과세금액 (부가세포함) |
+| `myaccount_taxfreeprice` | 내통장결제 현금영수증 비과세금액        |
+| `myaccount_discountamt`  | 내통장결제 할인금액               |
+
+### 토스페이 정보 (pay_type=25)
+
+| 파라미터                  | 설명          |
+|-----------------------|-------------|
+| `tosspay_cashamt`     | 토스페이 현금성 금액 |
+| `tosspay_discountamt` | 토스페이 포인트    |
+
+## 웹훅 처리 예제
+
+### PHP
+
+```php
+<?php
+/**
+ * 웹노티(feedbackurl) 처리
+ *
+ * 결제요청시 feedbackurl로 작성하는 페이지입니다.
+ * 결제완료 또는 취소가 되면 feedbackurl을 payapp.kr에서 호출합니다.
+ *
+ * 중요:
+ * - feedbackurl 페이지는 외부로 노출되지 않도록 주의해야 합니다.
+ * - 이 페이지는 payapp 서버에서 호출하는 페이지입니다. 사용자는 이 페이지를 볼 수 없습니다.
+ * - feedbackurl은 여러번 호출될 수 있습니다. 각 상태별 중복처리되지 않도록 해야 합니다.
+ * - 이 페이지에서 페이지 이동을 하면 정상적인 동작이 되지 않습니다.
+ */
+
+// 아래 정보를 payapp 판매자의 정보로 입력하세요.
+$payappUserid  = 'YOUR_USERID';    // payapp 판매자 아이디
+$payappLinkkey = 'YOUR_LINKKEY';   // payapp 연동key
+$payappLinkval = 'YOUR_LINKVAL';   // payapp 연동value
+$orderPrice    = '1000';           // 결제요청한 금액 (DB에서 조회)
+
+$checkUserid = $_POST['userid'] == $payappUserid;
+$checkKey    = $_POST['linkkey'] == $payappLinkkey;
+$checkVal    = $_POST['linkval'] == $payappLinkval;
+$checkPrice  = $_POST['price'] == $orderPrice;
+
+// userid, linkkey, linkval 값을 비교 확인하고 동일한 경우에만 결제여부를 처리
+if ($checkUserid && $checkKey && $checkVal && $checkPrice) {
+    switch ($_POST['pay_state']) {
+        case '1':
+            // 결제요청
+            break;
+        case '4':
+            // 결제완료
+            // 이곳에서 결제완료에 대한 처리 (상품배송/서비스 제공 등)를 하시면 됩니다.
+            /*
+            TODO : 결제완료 처리
+            ex) UPDATE payrequest SET pay_state='결제완료', pay_date='{$_POST['pay_date']}'
+                WHERE orderno='{$_POST['var1']}' AND mul_no={$_POST['mul_no']};
+            */
+            break;
+        case '8':
+        case '32':
+            // 요청취소 (결제하지 않은 상태에서 취소)
+            /*
+            TODO : 결제요청 취소 처리
+            */
+            break;
+        case '9':
+        case '64':
+            // 승인취소 (결제완료 상태에서 취소)
+            /*
+            TODO : 결제승인 취소 처리
+            ex) UPDATE payrequest SET pay_state='결제취소', canceldate='{$_POST['canceldate']}'
+                WHERE orderno='{$_POST['var1']}' AND mul_no={$_POST['mul_no']};
+            */
+            break;
+        case '10':
+            // 결제대기 (가상계좌)
+            break;
+        case '70':
+        case '71':
+            // 부분취소
+            /*
+            TODO : 부분취소 처리
+            ex) UPDATE payrequest SET pay_state='결제취소', canceldate='{$_POST['canceldate']}',
+                cancelprice='{$_POST['price']}' WHERE orderno='{$_POST['var1']}' AND mul_no={$_POST['mul_no']};
+            */
+            break;
+        default:
+            break;
+    }
+}
+
+// 처리응답 - 결제요청시 checkretry가 'y'인 경우 응답이 'SUCCESS'가 아니면 재호출 (총 10회)
+echo 'SUCCESS';
+// 처리실패: echo 'FAIL';
+exit;
+?>
+```
+
+### Node.js (Express)
+
+```javascript
+/**
+ * 웹노티(feedbackurl) 처리
+ *
+ * 결제요청시 feedbackurl로 작성하는 페이지입니다.
+ * 결제완료 또는 취소가 되면 feedbackurl을 payapp.kr에서 호출합니다.
+ */
+
+const express = require('express');
+const router = express.Router();
+
+// 아래 정보를 payapp 판매자의 정보로 입력하세요.
+const PAYAPP_USERID = 'YOUR_USERID';
+const PAYAPP_LINKKEY = 'YOUR_LINKKEY';
+const PAYAPP_LINKVAL = 'YOUR_LINKVAL';
+
+/**
+ * feedbackurl 처리 함수
+ * @param {Object} postData - POST로 전달받은 데이터
+ * @param {string} orderPrice - 결제요청한 금액 (DB에서 조회)
+ * @returns {string} - 'SUCCESS' 또는 'FAIL'
+ */
+function handleFeedback(postData, orderPrice) {
+    const checkUserid = postData.userid === PAYAPP_USERID;
+    const checkKey = postData.linkkey === PAYAPP_LINKKEY;
+    const checkVal = postData.linkval === PAYAPP_LINKVAL;
+    const checkPrice = postData.price === orderPrice;
+
+    // userid, linkkey, linkval 값을 비교 확인하고 동일한 경우에만 결제여부를 처리
+    if (checkUserid && checkKey && checkVal && checkPrice) {
+        switch (postData.pay_state) {
+            case '1':
+                // 결제요청
+                break;
+            case '4':
+                // 결제완료 - 상품배송/서비스 제공 등 처리
+                /*
+                TODO : 결제완료 처리
+                ex) UPDATE payrequest SET pay_state='결제완료', pay_date='${postData.pay_date}'
+                    WHERE orderno='${postData.var1}' AND mul_no=${postData.mul_no};
+                */
+                break;
+            case '8':
+            case '32':
+                // 요청취소 (결제하지 않은 상태에서 취소)
+                break;
+            case '9':
+            case '64':
+                // 승인취소 (결제완료 상태에서 취소)
+                break;
+            case '10':
+                // 결제대기 (가상계좌)
+                break;
+            case '70':
+            case '71':
+                // 부분취소
+                break;
+            default:
+                break;
+        }
+    }
+
+    return 'SUCCESS';
+}
+
+router.post('/feedbackurl', express.urlencoded({extended: true}), (req, res) => {
+    const orderPrice = '1000'; // DB에서 조회한 주문 금액
+    const result = handleFeedback(req.body, orderPrice);
+    res.send(result);
+});
+
+module.exports = {router, handleFeedback};
+```
+
+### Python (Flask)
+
+```python
+from flask import Flask, request
+import os
+
+app = Flask(__name__)
+
+@app.route('/webhook/payapp', methods=['POST'])
+def payapp_webhook():
+    # 수신 데이터
+    userid = request.form.get('userid')
+    linkkey = request.form.get('linkkey')
+    linkval = request.form.get('linkval')
+    mul_no = request.form.get('mul_no')
+    pay_state = request.form.get('pay_state')
+    price = request.form.get('price')
+    order_id = request.form.get('var1')
+
+    # 1. 인증 정보 검증
+    if linkkey != os.environ['PAYAPP_LINKKEY'] or \
+       linkval != os.environ['PAYAPP_LINKVAL']:
+        return 'INVALID_AUTH', 403
+
+    # 2. 결제 상태에 따른 처리
+    if pay_state == '4':  # 결제 완료
+        handle_payment_complete(order_id, mul_no, int(price))
+    elif pay_state == '8':  # 결제 취소
+        handle_payment_cancelled(order_id, mul_no)
+    elif pay_state == '9':  # 환불 완료
+        handle_refund_complete(order_id, mul_no)
+    elif pay_state == '10':  # 가상계좌 입금 대기
+        handle_vbank_pending(
+            order_id,
+            mul_no,
+            request.form.get('vbank'),
+            request.form.get('vbankno'),
+            request.form.get('depositor')
+        )
+
+    # 3. 성공 응답
+    return 'SUCCESS'
+
+def handle_payment_complete(order_id, mul_no, amount):
+    # 주문 상태 업데이트
+    pass
+
+def handle_payment_cancelled(order_id, mul_no):
+    # 취소 처리
+    pass
+
+def handle_refund_complete(order_id, mul_no):
+    # 환불 처리
+    pass
+
+def handle_vbank_pending(order_id, mul_no, bank, account, depositor):
+    # 가상계좌 정보 저장
+    pass
+
+if __name__ == '__main__':
+    app.run()
+```
+
+## 중복 처리 방지
+
+```javascript
+// Redis를 사용한 중복 처리 방지
+const Redis = require('ioredis');
+const redis = new Redis();
+
+async function handleWebhook(req, res) {
+    const {mul_no, pay_state} = req.body;
+    const webhookKey = `webhook:${mul_no}:${pay_state}`;
+
+    // 중복 체크 (5분간 유지)
+    const exists = await redis.get(webhookKey);
+    if (exists) {
+        return res.send('SUCCESS');  // 이미 처리됨
+    }
+
+    // 처리 시작 마킹
+    await redis.setex(webhookKey, 300, '1');
+
+    // 결제 처리...
+
+    res.send('SUCCESS');
+}
+```
+
+## 주의사항
+
+1. **반드시 `SUCCESS` 반환**: 정상 처리 시 HTTP 200과 함께 Body에 `SUCCESS`를 반환해야 합니다
+2. **인증 검증 필수**: `linkkey`, `linkval`, `price`을 반드시 검증하세요
+3. **멱등성 보장**: 같은 웹훅이 여러 번 올 수 있으므로 중복 처리를 방지하세요
+4. **타임아웃**: 웹훅 처리는 빠르게 완료해야 합니다. 오래 걸리는 작업은 비동기로 처리하세요
+5. **리다이렉트 금지**: 웹훅 URL에서 리다이렉트를 하면 안 됩니다
+
+---
+
+# 정기결제 (Rebill)
+
+구독 서비스를 위한 정기결제 API입니다.
+
+## 정기결제 등록
+
+### 기본 정보
+
+| 항목          | 값              |
+|-------------|----------------|
+| **Command** | `rebillRegist` |
+| **Method**  | POST           |
+
+### 요청 파라미터
+
+#### 필수 파라미터
+
+| 파라미터              | 설명                     |
+|-------------------|------------------------|
+| `cmd`             | `rebillRegist`         |
+| `userid`          | 가맹점 ID                 |
+| `goodname`        | 상품명                    |
+| `goodprice`       | 정기결제 금액                |
+| `recvphone`       | 수신자 전화번호               |
+| `rebillCycleType` | 결제 주기 (Month/Week/Day) |
+| `rebillExpire`    | 종료일 (yyyy-mm-dd)       |
+
+#### 선택 파라미터
+
+| 파라미터          | 설명                                     |
+|---------------|----------------------------------------|
+| `recvemail`   | 수신 이메일                                 |
+| `memo`        | 정기결제 요청 메모                             |
+| `feedbackurl` | 결제완료 피드백 URL                           |
+| `var1`        | 임의변수 1                                 |
+| `var2`        | 임의변수 2                                 |
+| `smsuse`      | 정기결제요청 SMS 발송여부 (`n`: 발송안함)            |
+| `returnurl`   | 결제완료 후 이동할 링크 URL                      |
+| `openpaytype` | 결제 가능 수단 (`card`: 신용카드, `phone`: 휴대전화) |
+| `failurl`     | 결제실패 Noti URL (1회차 승인 실패는 Noti되지 않음)   |
+
+#### 주기별 파라미터
+
+**월간 결제 (rebillCycleType=Month)**
+
+| 파라미터               | 설명                 |
+|--------------------|--------------------|
+| `rebillCycleMonth` | 결제일 (1-31, 90: 말일) |
+
+**주간 결제 (rebillCycleType=Week)**
+
+| 파라미터              | 설명               |
+|-------------------|------------------|
+| `rebillCycleWeek` | 결제 요일 (1-7, 월-일) |
+
+**일간 결제 (rebillCycleType=Day)**
+
+| 파라미터             | 설명           |
+|------------------|--------------|
+| `rebillCycleDay` | 결제 주기 (일 단위) |
+
+### 응답
+
+```
+state=1&errorMessage=&rebill_no=12345&payurl=https://payapp.kr/...
+```
+
+| 필드          | 설명         |
+|-------------|------------|
+| `rebill_no` | 정기결제 등록 번호 |
+| `payurl`    | 결제 인증 URL  |
+
+### 예제
+
+#### 월간 구독 (매월 15일)
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "goodname=월간구독" \
+  -d "goodprice=9900" \
+  -d "recvphone=01012345678" \
+  -d "rebillCycleType=Month" \
+  -d "rebillCycleMonth=15" \
+  -d "rebillExpire=2025-12-31"
+```
+
+#### 매월 말일 결제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "goodname=월간구독" \
+  -d "goodprice=9900" \
+  -d "recvphone=01012345678" \
+  -d "rebillCycleType=Month" \
+  -d "rebillCycleMonth=90" \
+  -d "rebillExpire=2025-12-31"
+```
+
+#### 주간 결제 (매주 월요일)
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "goodname=주간구독" \
+  -d "goodprice=2900" \
+  -d "recvphone=01012345678" \
+  -d "rebillCycleType=Week" \
+  -d "rebillCycleWeek=1" \
+  -d "rebillExpire=2025-12-31"
+```
+
+## 정기결제 해지
+
+정기 결제 해지가 되면 다음 정기 결제 주기에 정기 결제가 발생되지 않습니다. 해지된 정기결제는 "승인"으로 변경되지 않습니다.
+
+### 요청 파라미터
+
+| 파라미터        | 필수 | 설명             |
+|-------------|----|----------------|
+| `cmd`       | 필수 | `rebillCancel` |
+| `userid`    | 필수 | 가맹점 ID         |
+| `rebill_no` | 필수 | 정기결제요청 등록번호    |
+| `linkkey`   | 필수 | 연동 KEY         |
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillCancel" \
+  -d "userid=YOUR_USERID" \
+  -d "rebill_no=12345" \
+  -d "linkkey=YOUR_LINKKEY"
+```
+
+## 정기결제 일시정지
+
+정기 결제 요청 건의 상태가 "승인"인 경우 일시정지가 가능합니다. 일시정지된 정기 결제 건은 다음 결제 주기에 정기 결제가 발생되지 않습니다. 일시정지된 정기 결제 건은 "승인" 상태로 변경이 가능합니다.
+
+### 요청 파라미터
+
+| 파라미터        | 필수 | 설명           |
+|-------------|----|--------------|
+| `cmd`       | 필수 | `rebillStop` |
+| `userid`    | 필수 | 가맹점 ID       |
+| `rebill_no` | 필수 | 정기결제요청 등록번호  |
+| `linkkey`   | 필수 | 연동 KEY       |
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillStop" \
+  -d "userid=YOUR_USERID" \
+  -d "rebill_no=12345" \
+  -d "linkkey=YOUR_LINKKEY"
+```
+
+## 정기결제 승인 (재개)
+
+정기 결제 요청 건의 상태가 "일시정지"인 경우 승인 상태로 변경이 가능합니다. 승인 상태인 정기 결제 건은 다음 결제 주기에 정기 결제가 발생합니다.
+
+### 요청 파라미터
+
+| 파라미터        | 필수 | 설명            |
+|-------------|----|---------------|
+| `cmd`       | 필수 | `rebillStart` |
+| `userid`    | 필수 | 가맹점 ID        |
+| `rebill_no` | 필수 | 정기결제요청 등록번호   |
+| `linkkey`   | 필수 | 연동 KEY        |
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=rebillStart" \
+  -d "userid=YOUR_USERID" \
+  -d "rebill_no=12345" \
+  -d "linkkey=YOUR_LINKKEY"
+```
+
+## Node.js 구현 예제
+
+```javascript
+const axios = require('axios');
+const qs = require('querystring');
+
+class PayAppSubscription {
+    constructor(userid, linkkey) {
+        this.userid = userid;
+        this.linkkey = linkkey;  // 해지/정지/재개 시 필요
+        this.apiUrl = 'https://api.payapp.kr/oapi/apiLoad.html';
+    }
+
+    async request(params) {
+        const response = await axios.post(
+            this.apiUrl,
+            qs.stringify({userid: this.userid, ...params})
+        );
+        return qs.parse(response.data);
+    }
+
+    // 월간 정기결제 등록 (linkkey 불필요)
+    async createMonthly(options) {
+        const {productName, price, phone, paymentDay, expireDate} = options;
+
+        return this.request({
+            cmd: 'rebillRegist',
+            goodname: productName,
+            goodprice: price,
+            recvphone: phone,
+            rebillCycleType: 'Month',
+            rebillCycleMonth: paymentDay,  // 1-31, 90: 말일
+            rebillExpire: expireDate  // yyyy-mm-dd
+        });
+    }
+
+    // 주간 정기결제 등록 (linkkey 불필요)
+    async createWeekly(options) {
+        const {productName, price, phone, dayOfWeek, expireDate} = options;
+
+        return this.request({
+            cmd: 'rebillRegist',
+            goodname: productName,
+            goodprice: price,
+            recvphone: phone,
+            rebillCycleType: 'Week',
+            rebillCycleWeek: dayOfWeek,  // 1-7 (월-일)
+            rebillExpire: expireDate
+        });
+    }
+
+    // 정기결제 해지 (linkkey 필요)
+    async cancel(rebillNo) {
+        return this.request({
+            cmd: 'rebillCancel',
+            rebill_no: rebillNo,
+            linkkey: this.linkkey
+        });
+    }
+
+    // 정기결제 일시정지 (linkkey 필요)
+    async pause(rebillNo) {
+        return this.request({
+            cmd: 'rebillStop',
+            rebill_no: rebillNo,
+            linkkey: this.linkkey
+        });
+    }
+
+    // 정기결제 재개 (linkkey 필요)
+    async resume(rebillNo) {
+        return this.request({
+            cmd: 'rebillStart',
+            rebill_no: rebillNo,
+            linkkey: this.linkkey
+        });
+    }
+}
+
+// 사용 예시
+async function main() {
+    const subscription = new PayAppSubscription(
+        process.env.PAYAPP_USERID,
+        process.env.PAYAPP_LINKKEY
+    );
+
+    // 월간 구독 생성 (매월 1일 결제)
+    const result = await subscription.createMonthly({
+        productName: '프리미엄 구독',
+        price: 9900,
+        phone: '01012345678',
+        paymentDay: 1,
+        expireDate: '2025-12-31'
+    });
+
+    if (result.state === '1') {
+        console.log('정기결제 등록 번호:', result.rebill_no);
+        console.log('결제 URL:', result.payurl);
+    }
+}
+```
+
+## 정기결제 흐름
+
+```
+1. rebillRegist API 호출
+          ↓
+2. rebill_no, payurl 응답 수신
+          ↓
+3. 사용자를 payurl로 리다이렉트 (첫 결제 인증)
+          ↓
+4. 사용자가 카드 정보 입력 및 인증
+          ↓
+5. feedbackurl로 결제 결과 수신
+          ↓
+6. 이후 설정된 주기마다 자동 결제 실행
+          ↓
+7. 각 결제마다 feedbackurl로 결과 수신
+```
+
+## 주의사항
+
+1. **첫 결제 인증 필수**: 사용자가 payurl에서 첫 결제를 완료해야 정기결제가 활성화됩니다
+2. **종료일 필수**: `rebillExpire`는 필수입니다.
+3. **결제 실패 시**: 정기결제가 중단됩니다
+4. **금액 변경**: 금액 또는 결제일 변경이 필요한 경우 기존 정기결제를 취소하고 새로 등록해야 합니다
+5. **휴대폰 정기결제**: 휴대전화 정기결제는 월간 정기결제만 (rebillCycleType=Month) 이용가능합니다
+
+---
+
+# 빌키 결제 (BILL)
+
+카드 정보를 등록하고 빌키(암호화된 카드 토큰)를 이용해 결제하는 API입니다.
+
+## 빌키 등록
+
+### 기본 정보
+
+| 항목          | 값            |
+|-------------|--------------|
+| **Command** | `billRegist` |
+| **Method**  | POST         |
+
+### 요청 파라미터
+
+| 파라미터          | 필수 | 설명                                  |
+|---------------|----|-------------------------------------|
+| `cmd`         | O  | `billRegist`                        |
+| `userid`      | O  | 가맹점 ID                              |
+| `cardNo`      | O  | 카드번호                                |
+| `expMonth`    | O  | 카드 유효기간 월 (MM)                      |
+| `expYear`     | O  | 카드 유효기간 년 (YY)                      |
+| `cardPw`      | O  | 카드 비밀번호 앞 2자리                       |
+| `buyerAuthNo` | O  | 구매자확인 - 개인: 생년월일(YYMMDD) 6자리, 사업자번호 |
+| `buyerPhone`  | O  | 구매자 전화번호                            |
+| `buyerName`   | O  | 구매자 성함                              |
+| `buyerId`     |    | 구매자 아이디                             |
+
+### 응답
+
+```
+state=1&errorMessage=&encBill=ENCRYPTED_BILL_KEY&billAuthNo=AUTH_KEY&cardno=4518****1111&cardname=[신한]
+```
+
+| 필드           | 설명                 |
+|--------------|--------------------|
+| `encBill`    | 등록결제 연동키 (결제 시 사용) |
+| `billAuthNo` | 등록결제 키             |
+| `cardno`     | 마스킹된 카드번호          |
+| `cardname`   | 카드사명               |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=billRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "cardNo=1234567890123456" \
+  -d "expMonth=12" \
+  -d "expYear=25" \
+  -d "cardPw=12" \
+  -d "buyerAuthNo=900101" \
+  -d "buyerPhone=01012345678" \
+  -d "buyerName=홍길동"
+```
+
+## 빌키 결제
+
+### 기본 정보
+
+| 항목          | 값         |
+|-------------|-----------|
+| **Command** | `billPay` |
+| **Method**  | POST      |
+
+### 요청 파라미터
+
+| 파라미터             | 필수 | 설명                                                 |
+|------------------|----|----------------------------------------------------|
+| `cmd`            | O  | `billPay`                                          |
+| `userid`         | O  | 가맹점 ID                                             |
+| `encBill`        | O  | 등록결제 연동키                                           |
+| `goodname`       | O  | 상품명                                                |
+| `price`          | O  | 상품가격                                               |
+| `recvphone`      | O  | 구매자 전화번호                                           |
+| `amount_taxable` |    | 공급가액                                               |
+| `amount_taxfree` |    | 면세금액                                               |
+| `amount_vat`     |    | 부가세                                                |
+| `feedbackurl`    |    | 결제완료 후 결과값을 리턴받을 고객사 URL                           |
+| `var1`           |    | 사용자 임의 변수 1                                        |
+| `var2`           |    | 사용자 임의 변수 2                                        |
+| `checkretry`     |    | feedbackurl 재시도 (`y`: 재시도, `n`: 안함) - 총 10회 재시도    |
+| `cardinst`       |    | 카드할부 개월 수 ('00','01','02'...) - 50,000원 이상부터 할부 가능 |
+
+### 응답
+
+```
+state=1&errorMessage=&CSTURL=https://payapp.kr/receipt/...&price=1000&mul_no=123456
+```
+
+| 필드       | 설명      |
+|----------|---------|
+| `CSTURL` | 영수증 URL |
+| `price`  | 결제금액    |
+| `mul_no` | 결제요청번호  |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=billPay" \
+  -d "userid=YOUR_USERID" \
+  -d "encBill=ENCRYPTED_BILL_KEY" \
+  -d "goodname=상품명" \
+  -d "price=10000" \
+  -d "recvphone=01012345678"
+```
+
+## 빌키 삭제
+
+### 기본 정보
+
+| 항목          | 값            |
+|-------------|--------------|
+| **Command** | `billDelete` |
+| **Method**  | POST         |
+
+### 요청 파라미터
+
+| 파라미터      | 필수 | 설명           |
+|-----------|----|--------------|
+| `cmd`     | O  | `billDelete` |
+| `userid`  | O  | 가맹점 ID       |
+| `encBill` | O  | 등록결제 연동키     |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=billDelete" \
+  -d "userid=YOUR_USERID" \
+  -d "encBill=ENCRYPTED_BILL_KEY"
+```
+
+## Node.js 구현 예제
+
+```javascript
+const axios = require('axios');
+const qs = require('querystring');
+
+class PayAppBilling {
+    constructor(userid) {
+        this.credentials = {userid};
+        this.apiUrl = 'https://api.payapp.kr/oapi/apiLoad.html';
+    }
+
+    async request(params) {
+        const response = await axios.post(
+            this.apiUrl,
+            qs.stringify({...this.credentials, ...params})
+        );
+        return qs.parse(response.data);
+    }
+
+    // 빌키 등록 (카드 등록)
+    async registerCard(cardInfo) {
+        const {
+            cardNumber,
+            expMonth,
+            expYear,
+            password,
+            birthOrBizNo,
+            phone,
+            name
+        } = cardInfo;
+
+        const result = await this.request({
+            cmd: 'billRegist',
+            cardNo: cardNumber,
+            expMonth,
+            expYear,
+            cardPw: password,  // 앞 2자리
+            buyerAuthNo: birthOrBizNo,
+            buyerPhone: phone,
+            buyerName: name
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true,
+                billKey: result.encBill,
+                maskedCardNumber: result.cardno,
+                cardIssuer: result.cardname
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 빌키 결제
+    async charge(billKey, orderInfo) {
+        const {productName, amount} = orderInfo;
+
+        const result = await this.request({
+            cmd: 'billPay',
+            encBill: billKey,
+            goodname: productName,
+            price: amount
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true,
+                paymentId: result.mul_no,
+                receiptUrl: result.CSTURL
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 빌키 삭제
+    async deleteCard(billKey) {
+        const result = await this.request({
+            cmd: 'billDelete',
+            encBill: billKey
+        });
+
+        return result.state === '1';
+    }
+}
+
+// 사용 예시
+async function main() {
+    const billing = new PayAppBilling(
+        process.env.PAYAPP_USERID
+    );
+
+    // 1. 카드 등록
+    const card = await billing.registerCard({
+        cardNumber: '1234567890123456',
+        expMonth: '12',
+        expYear: '25',
+        password: '12',
+        birthOrBizNo: '900101',
+        phone: '01012345678',
+        name: '홍길동'
+    });
+
+    console.log('빌키:', card.billKey);
+    console.log('카드:', card.maskedCardNumber, card.cardIssuer);
+
+    // 2. 빌키로 결제
+    const payment = await billing.charge(card.billKey, {
+        productName: '정기 구독료',
+        amount: 9900
+    });
+
+    console.log('결제 번호:', payment.paymentId);
+    console.log('영수증:', payment.receiptUrl);
+
+    // 3. 카드 삭제 (구독 해지 시)
+    // await billing.deleteCard(card.billKey);
+}
+```
+
+## 빌키 결제 흐름
+
+```
+1. 사용자로부터 카드 정보 수집
+          ↓
+2. billRegist API로 빌키 발급
+          ↓
+3. encBill(빌키)을 안전하게 저장
+          ↓
+4. 결제 필요 시 billPay API 호출
+          ↓
+5. 결제 결과 처리
+          ↓
+6. 구독 해지 시 billDelete API로 빌키 삭제
+```
+
+## 보안 주의사항
+
+1. **카드 정보 저장 금지**: 카드 번호, 유효기간 등 원본 카드 정보는 절대 저장하지 마세요
+2. **빌키만 저장**: `encBill` 값만 암호화하여 저장하세요
+3. **HTTPS 필수**: 모든 API 호출은 HTTPS로만 수행하세요
+4. **서버 사이드 처리**: 빌키 관련 모든 작업은 서버에서만 처리하세요
+5. **접근 제한**: 빌키에 대한 접근은 최소한의 권한으로 제한하세요
+
+---
+
+# 취소 및 환불
+
+결제 취소 및 환불 처리 API입니다.
+
+## 결제 취소 (정산 전)
+
+정산 전 결제를 취소하는 API입니다. 전체 취소와 부분 취소가 가능합니다.
+
+### 기본 정보
+
+| 항목 | 값 |
+|-----|---|
+| **Command** | `paycancel` |
+| **Method** | POST |
+
+### 요청 파라미터
+
+| 파라미터 | 필수 | 설명 |
+|---------|-----|------|
+| `cmd` | O | `paycancel` |
+| `userid` | O | 가맹점 ID |
+| `linkkey` | O | 연동 KEY |
+| `mul_no` | O | 결제요청번호 |
+| `cancelmemo` | O | 결제취소 메모 |
+| `cancelmode` | | 결제취소 모드 (`ready`: 결제요청 상태만 취소 가능) |
+| `partcancel` | | 부분 취소 여부 (`0`: 전체취소, `1`: 부분취소) |
+| `cancelprice` | | 결제취소 금액 (부분취소인 경우 필수) |
+| `cancel_taxable` | | 결제취소 과세 공급가액 |
+| `cancel_taxfree` | | 결제취소 면세 공급가액 |
+| `cancel_vat` | | 결제취소 부가세 |
+
+### 응답
+
+```
+state=1&errorMessage=
+```
+
+| 필드 | 설명 |
+|-----|------|
+| `state` | 상태 (1: 성공, 0: 실패) |
+| `errorMessage` | 실패시 오류 문자열 |
+
+### 전체 취소 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=paycancel" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "mul_no=123456" \
+  -d "cancelmemo=고객 요청에 의한 취소"
+```
+
+### 부분 취소 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=paycancel" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "mul_no=123456" \
+  -d "cancelmemo=일부 상품 취소" \
+  -d "partcancel=1" \
+  -d "cancelprice=5000"
+```
+
+## 환불 요청 (정산 후)
+
+정산이 완료된 결제에 대한 환불 요청 API입니다. D+5 경과 또는 정산 완료 후 사용합니다.
+
+### 기본 정보
+
+| 항목 | 값 |
+|-----|---|
+| **Command** | `paycancelreq` |
+| **Method** | POST |
+
+### 요청 파라미터
+
+| 파라미터 | 필수 | 설명 |
+|---------|-----|------|
+| `cmd` | O | `paycancelreq` |
+| `userid` | O | 가맹점 ID |
+| `linkkey` | O | 연동 KEY |
+| `mul_no` | O | 결제요청번호 |
+| `cancelmemo` | O | 결제요청취소 메모 |
+| `dpname` | | 입금자명 |
+| `partcancel` | | 결제취소요청 구분 (`0`: 전체취소, `1`: 부분취소) |
+| `cancelprice` | | 결제취소요청 금액 (부분취소인 경우 필수) |
+| `cancel_taxable` | | 결제취소요청 과세 공급가액 |
+| `cancel_taxfree` | | 결제취소요청 면세 공급가액 |
+| `cancel_vat` | | 결제취소요청 부가세 |
+
+### 응답
+
+```
+state=1&errorMessage=&cr_dpname=홍길동&partcancel=0&paybackprice=10000&paybackbank=신한 110-123-456789
+```
+
+| 필드 | 설명 |
+|-----|------|
+| `state` | 상태 (1: 성공, 0: 실패) |
+| `errorMessage` | 실패시 오류 문자열 |
+| `cr_dpname` | 입금자명 (호출 파라메터) |
+| `partcancel` | 결제취소 요청 구분 (호출 파라메터) |
+| `paybackprice` | 취소 반환금 |
+| `partprice` | 결제취소요청 금액 |
+| `cancel_taxable` | 결제취소요청 과세 공급가액 |
+| `cancel_vat` | 결제취소요청 부가세 |
+| `cancel_taxfree` | 결제취소요청 면세 공급가액 |
+| `paybackbank` | 취소 반환금 입금계좌 |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=paycancelreq" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "mul_no=123456" \
+  -d "cancelmemo=환불 요청"
+```
+
+## Node.js 구현 예제
+
+```javascript
+const axios = require('axios');
+const qs = require('querystring');
+
+class PayAppCancellation {
+    constructor(userid, linkkey) {
+        this.credentials = { userid, linkkey };
+        this.apiUrl = 'https://api.payapp.kr/oapi/apiLoad.html';
+    }
+
+    async request(params) {
+        const response = await axios.post(
+            this.apiUrl,
+            qs.stringify({ ...this.credentials, ...params })
+        );
+        return qs.parse(response.data);
+    }
+
+    // 전체 취소 (정산 전)
+    async cancelFull(mulNo, memo = '') {
+        const result = await this.request({
+            cmd: 'paycancel',
+            mul_no: mulNo,
+            cancelmemo: memo,
+            partcancel: '0'
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 부분 취소 (정산 전)
+    async cancelPartial(mulNo, amount, memo = '') {
+        const result = await this.request({
+            cmd: 'paycancel',
+            mul_no: mulNo,
+            cancelmemo: memo,
+            partcancel: '1',
+            cancelprice: amount
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 환불 요청 (정산 후)
+    async requestRefund(mulNo, memo = '') {
+        const result = await this.request({
+            cmd: 'paycancelreq',
+            mul_no: mulNo,
+            cancelmemo: memo
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true,
+                refundAmount: parseInt(result.paybackprice),
+                refundBank: result.paybackbank
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 부분 환불 요청 (정산 후)
+    async requestPartialRefund(mulNo, amount, memo = '') {
+        const result = await this.request({
+            cmd: 'paycancelreq',
+            mul_no: mulNo,
+            cancelmemo: memo,
+            partcancel: '1',
+            cancelprice: amount
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true,
+                refundAmount: parseInt(result.paybackprice),
+                refundBank: result.paybackbank
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+}
+
+// 사용 예시
+async function main() {
+    const cancel = new PayAppCancellation(
+        process.env.PAYAPP_USERID,
+        process.env.PAYAPP_LINKKEY
+    );
+
+    // 전체 취소
+    const fullCancel = await cancel.cancelFull('123456', '고객 요청');
+    console.log('취소 성공:', fullCancel.success);
+
+    // 부분 취소
+    const partialCancel = await cancel.cancelPartial('123457', 5000, '일부 상품 취소');
+    console.log('부분 취소 성공:', partialCancel.success);
+
+    // 환불 요청 (정산 후)
+    const refund = await cancel.requestRefund('123458', '환불 요청');
+    console.log('환불 금액:', refund.refundAmount);
+    console.log('환불 계좌:', refund.refundBank);
+}
+```
+
+## 취소/환불 흐름
+
+```
+결제 완료
+    │
+    ├── D+5 이전 (정산 전)
+    │       │
+    │       ├── 전체 취소 → paycancel (partcancel=0)
+    │       │
+    │       └── 부분 취소 → paycancel (partcancel=1)
+    │
+    └── D+5 이후 (정산 후)
+            │
+            ├── 전체 환불 → paycancelreq (partcancel=0)
+            │
+            └── 부분 환불 → paycancelreq (partcancel=1)
+```
+
+## 주의사항
+
+1. **정산 전/후 구분**: 정산 전에는 `paycancel`, 정산 후에는 `paycancelreq`를 사용하세요
+2. **부분 취소 한도**: 부분 취소는 남은 결제 금액 내에서만 가능합니다
+3. **취소 불가 케이스**: 이미 취소된 결제, 환불 진행 중인 결제는 취소할 수 없습니다
+4. **웹훅 확인**: 취소/환불 완료 시 웹훅(pay_state=9, 64)으로 결과가 전송됩니다
+
+---
+
+# 현금영수증
+
+현금영수증 발행 및 취소 API입니다.
+
+## 현금영수증 발행
+
+### 기본 정보
+
+| 항목          | 값              |
+|-------------|----------------|
+| **Command** | `cashStRegist` |
+| **Method**  | POST           |
+
+### 요청 파라미터
+
+| 파라미터            | 필수 | 설명                                                              |
+|-----------------|----|-----------------------------------------------------------------|
+| `cmd`           | O  | `cashStRegist`                                                  |
+| `userid`        | O  | 가맹점 ID                                                          |
+| `linkkey`       | O  | 연동 KEY                                                          |
+| `good_name`     | O  | 상품명                                                             |
+| `buyr_name`     | O  | 구매자명                                                            |
+| `id_info`       | O  | 신분확인번호 - 휴대폰번호(소득공제용, 11자리) 또는 사업자번호(지출증빙용, 10자리). 숫자만(하이픈 미포함) |
+| `trad_time`     | O  | 원거래시각 (예: 20151231183120, 년월일시분초. 거래일로부터 6일이내 발행가능)             |
+| `amt_tot`       | O  | 거래금액 (공급가액 + 봉사료 + 부가가치세)                                       |
+| `amt_sup`       | O  | 공급가액                                                            |
+| `amt_tax`       | O  | 부가가치세                                                           |
+| `amt_svc`       | O  | 봉사료                                                             |
+| `tr_code`       | O  | 발행용도 (0: 소득공제용, 1: 지출증빙용)                                       |
+| `corp_tax_type` | O  | 과세유형 (TG01: 과세, TG02: 면세)                                       |
+| `buyr_tel1`     |    | 구매자 휴대폰                                                         |
+| `buyr_mail`     |    | 구매자 이메일                                                         |
+| `mul_no`        |    | 결제요청번호                                                          |
+
+> **자진발급**: 고객 미신청의 경우 `id_info = '0100001234'`로 발급 가능합니다.
+
+### 금액 계산
+
+```
+총 금액(amt_tot) = 공급가액(amt_sup) + 부가세(amt_tax) + 봉사료(amt_svc)
+```
+
+### 응답
+
+```
+state=1&errorMessage=&cashstno=123456789&receipt_no=AB123456&cashsturl=https://...
+```
+
+| 필드             | 설명                |
+|----------------|-------------------|
+| `state`        | 상태 (1: 성공, 0: 실패) |
+| `errorMessage` | 실패시 오류 문자열        |
+| `cashstno`     | 발행번호              |
+| `receipt_no`   | 현금영수증 승인번호        |
+| `cashsturl`    | 발행 URL            |
+
+### 예제
+
+#### 소득공제용 발행
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=cashStRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "good_name=테스트상품" \
+  -d "buyr_name=홍길동" \
+  -d "id_info=01012345678" \
+  -d "trad_time=20250101120000" \
+  -d "amt_tot=11000" \
+  -d "amt_sup=10000" \
+  -d "amt_tax=1000" \
+  -d "amt_svc=0" \
+  -d "tr_code=0" \
+  -d "corp_tax_type=TG01"
+```
+
+#### 지출증빙용 발행 (사업자)
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=cashStRegist" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "good_name=사무용품" \
+  -d "buyr_name=테스트회사" \
+  -d "id_info=1234567890" \
+  -d "trad_time=20250101120000" \
+  -d "amt_tot=110000" \
+  -d "amt_sup=100000" \
+  -d "amt_tax=10000" \
+  -d "amt_svc=0" \
+  -d "tr_code=1" \
+  -d "corp_tax_type=TG01"
+```
+
+## 현금영수증 취소
+
+### 기본 정보
+
+| 항목          | 값              |
+|-------------|----------------|
+| **Command** | `cashStCancel` |
+| **Method**  | POST           |
+
+### 요청 파라미터
+
+| 파라미터       | 필수 | 설명                   |
+|------------|----|----------------------|
+| `cmd`      | O  | `cashStCancel`       |
+| `userid`   | O  | 가맹점 ID               |
+| `linkkey`  | O  | 연동 KEY               |
+| `cashstno` | O  | 발행번호 (발행시 저장했던 발행번호) |
+
+### 응답
+
+| 필드             | 설명                |
+|----------------|-------------------|
+| `state`        | 상태 (1: 성공, 0: 실패) |
+| `errorMessage` | 실패시 오류 문자열        |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=cashStCancel" \
+  -d "userid=YOUR_USERID" \
+  -d "linkkey=YOUR_LINKKEY" \
+  -d "cashstno=123456789"
+```
+
+## 네이버페이 현금영수증 발행대상 금액조회
+
+네이버페이로 결제된 주문건의 현금영수증 발행대상 금액을 조회합니다.
+
+> **참고**: 네이버페이로 결제된 주문건만 조회 가능합니다.
+
+### 기본 정보
+
+| 항목          | 값                      |
+|-------------|------------------------|
+| **Command** | `getNaverpayCashPrice` |
+| **Method**  | POST                   |
+
+### 요청 파라미터
+
+| 파라미터      | 필수 | 설명                     |
+|-----------|----|------------------------|
+| `cmd`     | O  | `getNaverpayCashPrice` |
+| `userid`  | O  | 가맹점 ID                 |
+| `mul_no`  | O  | 결제요청번호                 |
+| `linkkey` | O  | 연동 KEY                 |
+
+### 응답
+
+```
+state=1&errorMessage=&totalCashAmount=10000&supplyCashAmount=9091&vatCashAmount=909
+```
+
+| 필드                 | 설명                                           |
+|--------------------|----------------------------------------------|
+| `state`            | 상태 (1: 성공, 0: 실패)                            |
+| `errorMessage`     | 실패시 오류 문자열                                   |
+| `totalCashAmount`  | 현금영수증 발행 대상 총금액                              |
+| `supplyCashAmount` | 현금성 총 공급가                                    |
+| `vatCashAmount`    | 현금성 총 부가세 (현금성 총 공급가가 있고 현금성 총 부가세가 0일경우 면세) |
+
+### 예제
+
+```bash
+curl -X POST https://api.payapp.kr/oapi/apiLoad.html \
+  -d "cmd=getNaverpayCashPrice" \
+  -d "userid=YOUR_USERID" \
+  -d "mul_no=123456"
+```
+
+## Node.js 구현 예제
+
+```javascript
+const axios = require('axios');
+const qs = require('querystring');
+
+class PayAppCashReceipt {
+    constructor(userid, linkkey) {
+        this.credentials = {userid, linkkey};
+        this.apiUrl = 'https://api.payapp.kr/oapi/apiLoad.html';
+    }
+
+    async request(params) {
+        const response = await axios.post(
+            this.apiUrl,
+            qs.stringify({...this.credentials, ...params})
+        );
+        return qs.parse(response.data);
+    }
+
+    // 현금영수증 발행
+    async issue(receiptInfo) {
+        const {
+            productName,
+            buyerName,
+            identityNo,    // 휴대폰번호 또는 사업자번호
+            transactionTime,  // YYYYMMDDHHmmss
+            totalAmount,
+            supplyAmount,
+            taxAmount,
+            serviceAmount = 0,
+            type,          // 'deduction' (소득공제) or 'expense' (지출증빙)
+            taxType = 'taxable'  // 'taxable' or 'tax-free'
+        } = receiptInfo;
+
+        const result = await this.request({
+            cmd: 'cashStRegist',
+            good_name: productName,
+            buyr_name: buyerName,
+            id_info: identityNo,
+            trad_time: transactionTime,
+            amt_tot: totalAmount,
+            amt_sup: supplyAmount,
+            amt_tax: taxAmount,
+            amt_svc: serviceAmount,
+            tr_code: type === 'deduction' ? '0' : '1',
+            corp_tax_type: taxType === 'taxable' ? 'TG01' : 'TG02'
+        });
+
+        if (result.state === '1') {
+            return {
+                success: true,
+                receiptNo: result.cashstno
+            };
+        }
+
+        throw new Error(result.errorMessage);
+    }
+
+    // 현금영수증 취소
+    async cancel(receiptNo) {
+        const result = await this.request({
+            cmd: 'cashStCancel',
+            cashstno: receiptNo
+        });
+
+        return result.state === '1';
+    }
+
+    // 금액 계산 헬퍼 (과세 상품)
+    static calculateAmounts(totalAmount) {
+        const supplyAmount = Math.round(totalAmount / 1.1);
+        const taxAmount = totalAmount - supplyAmount;
+
+        return {
+            totalAmount,
+            supplyAmount,
+            taxAmount,
+            serviceAmount: 0
+        };
+    }
+
+    // 거래일시 포맷 헬퍼
+    static formatTransactionTime(date = new Date()) {
+        const pad = (n) => String(n).padStart(2, '0');
+
+        return (
+            date.getFullYear() +
+            pad(date.getMonth() + 1) +
+            pad(date.getDate()) +
+            pad(date.getHours()) +
+            pad(date.getMinutes()) +
+            pad(date.getSeconds())
+        );
+    }
+}
+
+// 사용 예시
+async function main() {
+    const cashReceipt = new PayAppCashReceipt(
+        process.env.PAYAPP_USERID,
+        process.env.PAYAPP_LINKKEY
+    );
+
+    // 금액 계산
+    const amounts = PayAppCashReceipt.calculateAmounts(11000);
+
+    // 소득공제용 현금영수증 발행
+    const receipt = await cashReceipt.issue({
+        productName: '테스트 상품',
+        buyerName: '홍길동',
+        identityNo: '01012345678',
+        transactionTime: PayAppCashReceipt.formatTransactionTime(),
+        ...amounts,
+        type: 'deduction',
+        taxType: 'taxable'
+    });
+
+    console.log('현금영수증 번호:', receipt.receiptNo);
+
+    // 현금영수증 취소
+    // await cashReceipt.cancel(receipt.receiptNo);
+}
+```
+
+## 파라미터 설명
+
+### tr_code (발행용도)
+
+| 값   | 설명   | 사용 대상  |
+|-----|------|--------|
+| `0` | 소득공제 | 개인 소비자 |
+| `1` | 지출증빙 | 사업자    |
+
+### corp_tax_type (과세유형)
+
+| 값      | 설명     |
+|--------|--------|
+| `TG01` | 과세     |
+| `TG02` | 비과세/면세 |
+
+### id_info (식별정보)
+
+| 용도   | 형식           | 예시          |
+|------|--------------|-------------|
+| 소득공제 | 휴대폰번호 (11자리) | 01012345678 |
+| 지출증빙 | 사업자번호 (10자리) | 1234567890  |
+
+## 주의사항
+
+1. **발행 기한**: 현금영수증은 거래일로부터 **6일 이내** 발행 가능합니다
+2. **확인 시점**: 발행한 날짜의 3일 후 '현금영수증.kr'에서 확인이 가능합니다
+3. **금액 일치**: `amt_tot`은 `amt_sup + amt_tax + amt_svc`와 일치해야 합니다
+4. **거래일시 형식**: `trad_time`은 반드시 `YYYYMMDDHHmmss` 형식이어야 합니다
+5. **식별정보 검증**: 휴대폰번호는 11자리, 사업자번호는 10자리여야 합니다 (하이픈 미포함)
+6. **발행 후 취소**: 발행된 현금영수증은 `cashstno`를 사용해 취소할 수 있습니다
+7. **자진발급**: 고객 미신청의 경우 `id_info = '0100001234'`로 발급 가능합니다
+
+---
+
+# PayApp(App Link, Universal Link) 연동 매뉴얼
+
+## 주의사항
+
+1. **PayApp 설치 필수**: 판매자용 연동 입니다. 사용자 기기에 PayApp이 설치되어 있어야 합니다
+2. **URL Scheme 등록**: 결과 수신을 위해 앱의 URL Scheme을 등록해야 합니다
+3. **보안**: 결제 결과는 반드시 서버에서 다시 검증해야 합니다
+
+## AppToApp (App Link, Universal Link)
+
+### 연동 방식
+
+1. App Link(AOS), Universal Link(iOS)를 이용하여 PayApp 결제를 요청합니다.
+2. PayApp 설치 시 앱으로 이동하며, 미설치 시 PayApp 웹 페이지로 이동합니다.
+
+> **참고** React-Native 환경은 AOS / iOS 방식과 동일합니다.
+
+### 고객사 앱 스키마 연동
+
+결제 완료 후 고객사 앱으로 복귀하기 위한 **Return URI 스키마**를 설정합니다.
+(보안을 위해 결제완료 처리는 feedbackurl 페이지에서 하셔야 합니다.)
+
+### 원격결제 요청 파라미터
+
+구매자에게 **문자 메시지**를 전송하여 결제를 요청하는 방식입니다.
+
+| 파라미터        | 필수 | 설명                        |
+|-------------|----|---------------------------|
+| 호출 URI      | ✓  | https://payapp.kr/sdk-app |
+| reqType     | ✓  | REMOTE                    |
+| returnUri   | ✓  | 고객사 리턴 URI                |
+| phoneNumber | ✓  | 수신 전화번호                   |
+| goodName    | ✓  | 상품명                       |
+| goodPrice   | ✓  | 결제 금액 (1,000원 이상)         |
+| hasTax      |    | 과세(1) / 면세(0)             |
+| feedbackurl |    | 결과 수신 URL                 |
+| checkretry  |    | 재시도 여부(y/n)               |
+| var1        |    | 임의 변수                     |
+| var2        |    | 임의 변수                     |
+
+### 대면결제 요청 파라미터
+
+| 파라미터        | 필수 | 설명                                                                                                                                                                                                                 |
+|-------------|----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 호출 URI      | ✓  | https://payapp.kr/sdk-app                                                                                                                                                                                          |
+| reqType     | ✓  | OCR(카메라결제) / NAVER_PAY(네이버페이) / KAKAO_PAY(카카오페이) / SMILE_PAY(스마일페이) / APPLE_PAY(애플페이) / PAYCO(페이코) / MY_ACCOUNT(내통장결제) / WECHAT_PAY(위챗페이) / QR(QR 결제) / MANUAL(수기결제) / NFC(NFC 결제, AOS 전용) / SAMSUNG(삼성페이, AOS 전용) |
+| returnUri   | ✓  | 고객사 리턴 URI                                                                                                                                                                                                         |
+| goodName    | ✓  | 상품명                                                                                                                                                                                                                |
+| goodPrice   | ✓  | 결제 금액                                                                                                                                                                                                              |
+| cardinst    |    | 할부 개월                                                                                                                                                                                                              |
+| hasTax      |    | 과세 여부                                                                                                                                                                                                              |
+| feedbackurl |    | 결과 수신 URL                                                                                                                                                                                                          |
+| var1        |    | 임의 변수                                                                                                                                                                                                              |
+| var2        |    | 임의 변수                                                                                                                                                                                                              |
+
+### 응답
+
+| 파라미터           | 비고                                                                       |
+|----------------|--------------------------------------------------------------------------|
+| state          | 상태 (1: 성공, 0: 실패)                                                        |
+| mul_no         | 결제 요청 번호                                                                 |
+| csturl         | 페이앱 영수증 URL                                                              |
+| errorMessage   | 에러 메시지                                                                   |
+| errorCode      | 에러 코드<br>9000: 로그인 오류<br>9010: 필수 파라미터 누락<br>9020: 결제타입 오류<br>9040: 시간초과 |
+| cardName       | 카드사 이름                                                                   |
+| cardNum        | 카드번호                                                                     |
+| cardAuthNumber | 카드 승인 번호                                                                 |
+| date           | 결제일                                                                      |
+| installment    | 할부 개월                                                                    |
+| goodName       | 상품명                                                                      |
+| var1           | 임의 사용 변수 1                                                               |
+| var2           | 임의 사용 변수 2                                                               |
+
+## 결제 호출 예제
+
+### 공통 파라미터
+
+```java
+String param = "https://payapp.kr/sdk-app"
+        + "?reqType=" + reqType
+        + "&returnUri=" + returnUri
+        + "&goodName=" + goodName
+        + "&goodPrice=" + goodPrice;
+```
+
+### iOS (Swift)
+
+```swift
+if let appUrl = URL(string: param) {
+    UIApplication.shared.open(appUrl)
+}
+```
+
+### Android (Java)
+
+```java
+startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(param)));
+```
+
+## WebToApp
+
+앱 내 WebView 또는 모바일 브라우저에서 PayApp 호출 방식입니다.
+
+* 동작 방식은 App Link와 동일
+* WebView 사용 시 returnUri에 앱 스키마 지정
+* 브라우저 사용 시 URL 지정
+
+### WebToApp 호출 샘플 (JavaScript)
+
+```javascript
+function call(reqType, isAllPayReqType) {
+    document.location.href = "https://payapp.kr/sdk-app?reqType=" + reqType +
+        "&isAllPayReqType=" + isAllPayReqType +
+        "&phoneNumber=01000000000" +
+        "&goodPrice=1000" +
+        "&goodName=" + reqType + " 테스트" +
+        "&hasTax=1" +
+        "&returnUri=https://my_returnUrl.kr" +
+        "&var1=" + reqType + " test" +
+        "&var2=var2 test" +
+        "&feedbackurl=" +
+        "&checkretry=n";
+}
+```
+
+### 응답
+
+| 파라미터           | 비고                                                                       |
+|----------------|--------------------------------------------------------------------------|
+| state          | 상태 (1: 성공, 0: 실패)                                                        |
+| mul_no         | 결제 요청 번호                                                                 |
+| csturl         | 페이앱 영수증 URL                                                              |
+| errorMessage   | 에러 메시지                                                                   |
+| errorCode      | 에러 코드<br>9000: 로그인 오류<br>9010: 필수 파라미터 누락<br>9020: 결제타입 오류<br>9040: 시간초과 |
+| cardName       | 카드사 이름                                                                   |
+| cardNum        | 카드번호                                                                     |
+| cardAuthNumber | 카드 승인 번호                                                                 |
+| date           | 결제일                                                                      |
+| installment    | 할부 개월                                                                    |
+| goodName       | 상품명                                                                      |
+| var1           | 임의 사용 변수 1                                                               |
+| var2           | 임의 사용 변수 2                                                               |
+
+## AppToWeb
+
+### 연동 방식
+
+REST API를 통한 결제창 URL 연동을 이용하여 PayApp 결제를 요청합니다.
+
+### 호출 파라미터
+
+| 파라미터           | 필수 | Type   | Description                                                |
+|----------------|----|--------|------------------------------------------------------------|
+| cmd            | 필수 | String | 결제요청 payrequest                                            |
+| userid         | 필수 | String | 판매자 회원 아이디                                                 |
+| goodname       | 필수 | String | 상품명                                                        |
+| price          | 필수 | int    | 결제요청 금액                                                    |
+| recvphone      | 필수 | String | 수신 휴대폰번호                                                   |
+| memo           |    | String | 메모                                                         |
+| reqaddr        |    | int    | 주소요청 (1:요청, 0:요청안함)                                        |
+| feedbackurl    |    | String | 결제완료 후 결과값을 리턴받을 고객사 URL                                   |
+| var1           |    | String | 임의 사용 변수 1                                                 |
+| var2           |    | String | 임의 사용 변수 2                                                 |
+| smsuse         |    | String | 결제요청 문자 발송여부 (n: 발송안함)                                     |
+| vccode         |    | String | 국제전화 국가번호                                                  |
+| returnurl      |    | String | 결제완료 후 이동할 링크 URL                                          |
+| amount_taxable |    | int    | 과세 공급가액                                                    |
+| amount_taxfree |    | int    | 면세 공급가액                                                    |
+| amount_vat     |    | int    | 부가세                                                        |
+| openpaytype    |    | String | 결제수단 선택 (콤마 구분)<br>예: `phone,card`<br>값이 없으면 모든 결제수단 선택 가능 |
+| checkretry     |    | String | feedbackurl 재시도 (y/n, 총 10회)                               |
+| recvemail      |    | String | 수신 이메일 주소                                                  |
+| skip_cstpage   |    | String | 매출전표 페이지 이동 여부 (y: 이동 안함, returnurl로 POST)                 |
+| appurl         |    | String | 앱스키마 (카드사앱 아님)                                             |
+| subuserid      |    | String | 부계정 아이디                                                    |
+| buyerid        |    | String | 구매자 아이디                                                    |
+
+### 응답 파라미터
+
+| 파라미터         | Type              | Description  |
+|--------------|-------------------|--------------|
+| state        | 상태 (1: 성공, 0: 실패) |
+| errorMessage | String            | 실패 시 오류 문자열  |
+| mul_no       | int               | 성공 시 결제요청 번호 |
+| payurl       | String            | 결제창 URL      |
+| qrurl        | String            | 결제창 QR URL   |
+
+### 요청 예제
+
+```java
+호출 URL : https://api.payapp.kr/oapi/apiLoad.html
+String param = "cmd=payrequest"
+                + "userid=[고객사 아이디]"
+                + "goodname=api%20test"
+                + "price=1000"
+                + "recvphone=[구매자 휴대전화 번호]"
+                + "smsuse=n"
+
+```
+
+### 요청 응답
+
+```text
+state=1&errorMessage=&mul_no=2000&payurl=http%3A%2F%2Fpayapp.kr%2F000000000000
+```
+
+### 결제창 URL(payurl) 페이지 열기
+
+#### AppCard Scheme 등록 - Android (AOS) Manifest
+
+```xml
+<queries>
+    <!-- 신용카드, 간편결제, 계좌이체, 본인인증 앱 목록 포함 -->
+    <package android:name="kvp.jjy.MispAndroid320"/>
+    <package android:name="com.kbcard.cxh.appcard"/>
+    <package android:name="com.lotte.lottesmartpay"/>
+    <package android:name="com.lcacApp"/>
+    <package android:name="com.hyundaicard.appcard"/>
+    <package android:name="kr.co.samsungcard.mpocket"/>
+    <package android:name="com.shcard.smartpay"/>
+    <package android:name="nh.smart.mobilecard"/>
+    <package android:name="nh.smart.nhallonepay"/>
+    <package android:name="com.samsung.android.spay"/>
+    <package android:name="com.nhnent.payapp"/>
+    <package android:name="kr.co.citibank.citimobile"/>
+    <package android:name="kr.co.citibank.cardapp"/>
+    <package android:name="com.skp.android.paypin"/>
+    <package android:name="com.lge.lgpay"/>
+    <package android:name="com.lotte.lpay"/>
+    <package android:name="com.wooricard.wpay"/>
+    <package android:name="com.hanaskcard.paycla"/>
+    <package android:name="com.wooricard.smartapp"/>
+    <package android:name="com.tmoney.nfc_app"/>
+    <package android:name="com.tmoney.inapp"/>
+    <package android:name="viva.republica.toss"/>
+    <package android:name="com.shinhan.smartcaremgr"/>
+    <package android:name="com.kakaobank.channel"/>
+    <!-- 백신 및 공인인증 앱 포함 -->
+</queries>
+```
+
+#### AppCard Scheme 등록 - iOS Info.plist
+
+```xml
+
+<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>payappReq</string>
+    <string>ispmobile</string>
+    <string>kb-acp</string>
+    <string>lotteappcard</string>
+    <string>lottesmartpay</string>
+    <string>hdcardappcardansimclick</string>
+    <string>smhyundaiansimclick</string>
+    <string>mpocket.online.ansimclick</string>
+    <string>scardcertiapp</string>
+    <string>shinhan-sr-ansimclick</string>
+    <string>smshinhanansimclick</string>
+    <string>nhappcardansimclick</string>
+    <string>nhallonepayansimclick</string>
+    <string>nonghyupcardansimclick</string>
+    <string>cloudpay</string>
+    <string>citispay</string>
+    <string>citicardappkr</string>
+    <string>citimobileapp</string>
+    <string>NA</string>
+    <string>kftc-bankpay</string>
+    <string>paypin</string>
+    <string>payco</string>
+    <string>paycoapplogin</string>
+    <string>tswansimclick</string>
+    <string>bankwallet</string>
+    <string>uppay</string>
+    <string>hanaskcardmobileportal</string>
+    <string>callonlinepay</string>
+    <string>lpayapp</string>
+    <string>wooripay</string>
+    <string>com.wooricard.wcard</string>
+    <string>hanawalletmembers</string>
+    <string>qhanamopmoasign</string>
+    <string>NewSmartPib</string>
+    <string>liivbank</string>
+    <string>supertoss</string>
+    <string>shinsegaeeasypayment</string>
+    <string>kakaotalk</string>
+    <string>tauthlink</string>
+    <string>ktauthexternalcall</string>
+    <string>upluscorporation</string>
+    <string>kb-bankpay</string>
+    <string>naversearchthirdlogin</string>
+    <string>lmslpay</string>
+    <string>newliiv</string>
+    <string>NewSmartPib</string>
+    <string>kakaobank</string>
+    <string>monimopay</string>
+    <string>monimopayauth</string>
+    <string>kbbank</string>
+    <string>ukbanksmartbanknonloginpay</string>
+</array>
+```
+
+### Android (AOS) 호출
+
+**앱 내 WebView 호출 (AppCard Scheme 등록 필수)**
+
+```java
+Intent intent = new Intent(context, WebActivity.class);
+intent.putExtra("url", payurl);
+context.startActivity(intent);
+```
+
+**브라우저 호출**
+
+```java
+Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(payurl));
+startActivity(intent);
+```
+
+### iOS 호출
+
+**앱 내 WebView 호출 (AppCard Scheme 등록 필수)**
+
+```swift
+var wkWebView: WKWebView?
+let request = URLRequest(url: URL(string: payurl!)!)
+wkWebView.load(request)
+```
+
+**브라우저 호출**
+
+```swift
+if let url = URL(string: payurl) {
+    UIApplication.shared.open(url, options: [:], completionHandler: nil)
+}
+```
