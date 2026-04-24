@@ -92,11 +92,9 @@ function SettingsPageContent() {
 
   // 구독 액션 로딩 상태
   const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [downgradeLoading, setDowngradeLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
   // 모달 상태
-  const [downgradeOpen, setDowngradeOpen] = useState(false);
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=step1, 2=step2
 
   const dashboardStore = useDashboardData();
@@ -200,47 +198,20 @@ function SettingsPageContent() {
     }
   };
 
-  const handleDowngrade = async () => {
-    setDowngradeLoading(true);
-    try {
-      const res = await fetch("/api/subscription/downgrade", { method: "POST" });
-      const json = await res.json() as { ok?: boolean; effectiveDate?: string; error?: string };
-      if (!res.ok || !json.ok) {
-        toast.error(json.error ?? "다운그레이드 요청에 실패했습니다.");
-        return;
-      }
-      const dateLabel = json.effectiveDate ? formatDate(json.effectiveDate) : "다음 결제일";
-      toast.success(`${dateLabel}부터 베이직 플랜이 적용됩니다.`);
-      setDowngradeOpen(false);
-      await fetchSubInfo();
-    } catch {
-      toast.error("다운그레이드 요청 중 오류가 발생했습니다.");
-    } finally {
-      setDowngradeLoading(false);
-    }
-  };
-
   const handleCancel = async () => {
     setCancelLoading(true);
     try {
       const res = await fetch("/api/subscription/cancel", { method: "POST" });
-      const json = await res.json() as { ok?: boolean; usableUntil?: string; manualReview?: boolean; refundAmount?: number; pendingRefundAmount?: number; message?: string; error?: string };
+      const json = await res.json() as { ok?: boolean; cleared?: boolean; currentPeriodEnd?: string; error?: string };
       if (!res.ok || !json.ok) {
         toast.error(json.error ?? "구독 해지에 실패했습니다.");
         return;
       }
-      if (isPendingBilling) {
-        toast.success(json.message ?? "진행 중인 결제가 취소되었습니다.");
-      } else if (json.manualReview) {
-        const refundLabel = json.refundAmount && json.refundAmount > 0
-          ? ` 비례환불 ${formatAmount(json.refundAmount)}이 처리되었고`
-          : "";
-        toast.success(`해지 요청이 접수되었습니다.${refundLabel} 나머지 정리 항목은 수동 확인 후 마무리됩니다.`);
+      if (isPendingBilling || json.cleared) {
+        toast.success("진행 중인 결제가 취소되었습니다.");
       } else {
-        const refundLabel = json.refundAmount && json.refundAmount > 0
-          ? ` 비례환불 ${formatAmount(json.refundAmount)}이 함께 처리되었습니다.`
-          : "";
-        toast.success(`구독이 해지되어 다음 결제부터 자동 갱신이 중단됩니다.${refundLabel}`);
+        const until = json.currentPeriodEnd ? ` ${formatDate(json.currentPeriodEnd)}까지 서비스를 이용하실 수 있습니다.` : "";
+        toast.success(`구독이 해지되었습니다.${until}`);
       }
       setCancelStep(0);
       window.location.reload();
@@ -599,34 +570,6 @@ function SettingsPageContent() {
 
         </div>
       </div>
-
-      {/* 다운그레이드 확인 모달 (legacy, kept for safety) */}
-      <AlertDialog open={downgradeOpen} onOpenChange={setDowngradeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>베이직으로 다운그레이드</AlertDialogTitle>
-            <AlertDialogDescription>
-              {subInfo?.currentPeriodEnd
-                ? `다음 결제일(${formatDate(subInfo.currentPeriodEnd)})부터 베이직 플랜(월 ${PLAN_PRICING.basic.monthly.toLocaleString()}원)이 적용됩니다.`
-                : `다음 결제일부터 베이직 플랜(월 ${PLAN_PRICING.basic.monthly.toLocaleString()}원)이 적용됩니다.`}
-              <br />
-              현재 구독 기간 중 환불은 제공되지 않습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={downgradeLoading}>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDowngrade();
-              }}
-              disabled={downgradeLoading}
-            >
-              {downgradeLoading ? "처리 중..." : "다운그레이드"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* 구독 해지 1단계 모달 */}
       <AlertDialog open={cancelStep === 1} onOpenChange={(open) => { if (!open) setCancelStep(0); }}>

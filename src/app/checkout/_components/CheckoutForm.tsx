@@ -206,7 +206,7 @@ export default function CheckoutForm({ plan }: CheckoutFormProps) {
           </li>
           <li className="flex gap-2">
             <span className="text-foreground font-semibold shrink-0">•</span>
-            구독 해지는 다음 결제부터 적용되며, 해지 시 남은 기간에 대한 자동 비례환불이 함께 처리됩니다.
+            구독 해지는 다음 결제부터 적용되며, 해지 후에도 남은 이용기간 동안 서비스를 계속 이용하실 수 있습니다.
           </li>
           <li className="flex gap-2">
             <span className="text-foreground font-semibold shrink-0">•</span>
