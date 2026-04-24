@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { cancelPayment, cancelRebill, deleteBillKey, isPayAppTimeoutError } from "@/shared/lib/payapp";
-import { addDaysToKstDate } from "@/shared/lib/payapp-time";
+import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
+import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 import { buildProratedRefundBreakdown, type RefundableChargeRow } from "@/shared/lib/payapp-refunds";
 import { requiresRemoteCleanupReview } from "@/shared/lib/payapp-launch-rules";
 
@@ -46,6 +47,12 @@ export async function POST() {
 
     if (subscription.status === "pending_billing") {
       const cleanup = await tryDisableFutureBilling(subscription.bill_key, subscription.rebill_no);
+      const hasCurrentEntitlement =
+        !!subscription.current_period_end && subscription.current_period_end >= getKstDateString();
+      const targetStatus = hasCurrentEntitlement ? "pending_cancel" : "stopped";
+      const targetPeriodEnd = hasCurrentEntitlement
+        ? subscription.current_period_end
+        : addDaysToKstDate(cancelRequestedAt, -1);
 
       if (!cleanup.ok) {
         await queueRemoteCleanupReview(
@@ -56,49 +63,57 @@ export async function POST() {
           cleanupPayload
         );
 
-        await supabase
+        const { error: updateError } = await supabase
           .from("subscriptions")
           .update({
-            status: "stopped",
-            current_period_end: addDaysToKstDate(cancelRequestedAt, -1),
+            status: targetStatus,
+            current_period_end: targetPeriodEnd,
             next_billing_date: null,
-            pending_billing_started_at: null,
-            cancel_requested_at: cancelRequestedAt,
-            remote_cleanup_required: true,
-            remote_cleanup_queued_at: cancelRequestedAt,
-            last_manual_review_at: cancelRequestedAt,
-            last_manual_review_reason: cleanup.error,
+            pending_action: null,
+            pending_plan: null,
+            pending_start_date: null,
+            bill_key: null,
+            rebill_no: null,
           })
           .eq("id", subscription.id);
+
+        if (updateError) {
+          return NextResponse.json({ error: updateError.message }, { status: 500 });
+        }
 
         return NextResponse.json({
           ok: true,
           message:
-            "결제 전 구독은 중단되었지만 결제수단 해제 확인이 필요합니다. 고객센터에서 확인 후 안내드립니다.",
-          usableUntil: null,
+            "진행 중인 결제가 취소되었지만 결제수단 해제 확인이 필요합니다. 고객센터에서 확인 후 안내드립니다.",
+          usableUntil: hasCurrentEntitlement ? targetPeriodEnd : null,
           manualReview: true,
         });
       }
 
-      await supabase
+      const { error: updateError } = await supabase
         .from("subscriptions")
         .update({
-          status: "stopped",
-          current_period_end: addDaysToKstDate(cancelRequestedAt, -1),
+          status: targetStatus,
+          current_period_end: targetPeriodEnd,
           next_billing_date: null,
-          pending_billing_started_at: null,
-          cancel_requested_at: cancelRequestedAt,
-          remote_cleanup_required: false,
-          remote_cleanup_queued_at: null,
-          last_manual_review_at: null,
-          last_manual_review_reason: null,
+          pending_action: null,
+          pending_plan: null,
+          pending_start_date: null,
+          bill_key: null,
+          rebill_no: null,
         })
         .eq("id", subscription.id);
 
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+
       return NextResponse.json({
         ok: true,
-        message: "결제 전 구독이 중단되었습니다.",
-        usableUntil: null,
+        message: hasCurrentEntitlement
+          ? "진행 중인 결제가 취소되었습니다. 현재 이용 권한은 만료일까지 유지됩니다."
+          : "진행 중인 결제가 취소되어 구독 준비가 중단되었습니다.",
+        usableUntil: hasCurrentEntitlement ? targetPeriodEnd : null,
       });
     }
 
@@ -115,13 +130,30 @@ export async function POST() {
         );
     }
 
-    const { data: refundablePayments, error: paymentError } = await supabase
+    let { data: refundablePayments, error: paymentError } = await supabase
       .from("payment_history")
       .select("mul_no, amount, purpose, paid_at, provider_paid_at, refunded_at, refund_amount")
       .eq("user_id", user.userId)
       .in("purpose", ["subscription", "upgrade_diff"])
       .eq("pay_state", 4)
       .limit(50);
+
+    if (paymentError && isPaymentHistoryColumnMissingError(paymentError, ["provider_paid_at", "refund_amount"])) {
+      const fallback = await supabase
+        .from("payment_history")
+        .select("mul_no, amount, purpose, paid_at, refunded_at")
+        .eq("user_id", user.userId)
+        .in("purpose", ["subscription", "upgrade_diff"])
+        .eq("pay_state", 4)
+        .limit(50);
+
+      refundablePayments = (fallback.data ?? []).map((payment) => ({
+        ...payment,
+        provider_paid_at: null,
+        refund_amount: null,
+      }));
+      paymentError = fallback.error;
+    }
 
     if (paymentError) {
       return NextResponse.json({ error: paymentError.message }, { status: 500 });
@@ -159,13 +191,21 @@ export async function POST() {
         }
 
         refundedAmount += line.refundAmount;
-        const { error: historyUpdateError } = await supabase
+        let { error: historyUpdateError } = await supabase
           .from("payment_history")
           .update({
             refunded_at: cancelRequestedAt,
             refund_amount: line.refundAmount,
           })
           .eq("mul_no", line.mulNo);
+
+        if (historyUpdateError && isPaymentHistoryColumnMissingError(historyUpdateError, ["refund_amount"])) {
+          const fallback = await supabase
+            .from("payment_history")
+            .update({ refunded_at: cancelRequestedAt })
+            .eq("mul_no", line.mulNo);
+          historyUpdateError = fallback.error;
+        }
 
         if (historyUpdateError) {
           pendingRefundAmount += line.refundAmount;

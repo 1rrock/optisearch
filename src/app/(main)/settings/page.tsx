@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useDashboardData } from "@/shared/hooks/use-user";
 import { useUserStore } from "@/shared/stores/user-store";
+import { calcProRatedDiff } from "@/shared/lib/subscription-upgrade-rules";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import {
@@ -28,6 +30,7 @@ interface SubscriptionInfo {
   plan: PlanId;
   status: string | null;
   currentPeriodEnd: string | null;
+  nextBillingDate: string | null;
   pendingAction: string | null;
   pendingPlan: string | null;
   pendingStartDate: string | null;
@@ -38,6 +41,18 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function getTodayKstDateString(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function isGracePeriodEligible(status: string | null, currentPeriodEnd: string | null): boolean {
+  return (
+    !!currentPeriodEnd &&
+    (status === "pending_cancel" || status === "stopped") &&
+    currentPeriodEnd >= getTodayKstDateString()
+  );
 }
 
 function UsageBar({ label, used, limit, icon }: { label: string; used: number; limit: number; icon: React.ReactNode }) {
@@ -121,6 +136,7 @@ function SettingsPageContent() {
         plan?: string;
         status?: string;
         currentPeriodEnd?: string;
+        nextBillingDate?: string;
         pendingAction?: string;
         pendingPlan?: string;
         pendingStartDate?: string;
@@ -130,6 +146,7 @@ function SettingsPageContent() {
         plan: (json.plan ?? "free") as PlanId,
         status: json.status ?? null,
         currentPeriodEnd: json.currentPeriodEnd ?? null,
+        nextBillingDate: json.nextBillingDate ?? null,
         pendingAction: json.pendingAction ?? null,
         pendingPlan: json.pendingPlan ?? null,
         pendingStartDate: json.pendingStartDate ?? null,
@@ -272,12 +289,14 @@ function SettingsPageContent() {
     setCancelLoading(true);
     try {
       const res = await fetch("/api/subscription/cancel", { method: "POST" });
-      const json = await res.json() as { ok?: boolean; usableUntil?: string; manualReview?: boolean; refundAmount?: number; pendingRefundAmount?: number; error?: string };
+      const json = await res.json() as { ok?: boolean; usableUntil?: string; manualReview?: boolean; refundAmount?: number; pendingRefundAmount?: number; message?: string; error?: string };
       if (!res.ok || !json.ok) {
         toast.error(json.error ?? "구독 해지에 실패했습니다.");
         return;
       }
-      if (json.manualReview) {
+      if (isPendingBilling) {
+        toast.success(json.message ?? "진행 중인 결제가 취소되었습니다.");
+      } else if (json.manualReview) {
         const refundLabel = json.refundAmount && json.refundAmount > 0
           ? ` 비례환불 ${formatAmount(json.refundAmount)}이 처리되었고`
           : "";
@@ -303,6 +322,19 @@ function SettingsPageContent() {
     (subInfo !== null && plan !== "free" && subInfo?.status == null);
   const isStopped = subInfo?.status === "stopped";
   const isPendingCancel = subInfo?.status === "pending_cancel";
+  const isPendingBilling = subInfo?.status === "pending_billing";
+  const hasGracePeriodEntitlement = isGracePeriodEligible(subInfo?.status ?? null, subInfo?.currentPeriodEnd ?? null);
+  const graceUpgradeAmount =
+    plan === "basic" && hasGracePeriodEntitlement
+      ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, subInfo?.currentPeriodEnd ?? null)
+      : null;
+  const wasRedirectedFromCheckout = searchParams.get("already") === "1";
+  const hasPendingBillingRedirect = searchParams.get("pending") === "1";
+  const cancelActionDescription = isPendingBilling
+    ? "카드 등록 또는 결제 확인 진행을 중단합니다. 진행 중인 결제가 취소되며, 구독은 활성화되지 않습니다."
+    : subInfo?.currentPeriodEnd
+    ? `${formatDate(subInfo.currentPeriodEnd)}까지 이용 가능하며, 다음 결제부터 자동 갱신이 중단됩니다.`
+    : "현재 구독 기간 만료 후 자동갱신이 중단됩니다.";
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto w-full">
@@ -346,6 +378,24 @@ function SettingsPageContent() {
                   <CardDescription>현재 플랜 및 일일 사용량을 확인합니다.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-6 pt-6">
+
+                  {wasRedirectedFromCheckout && (
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                      <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                        이미 활성화된 구독이 있어 결제 페이지 대신 구독 관리로 이동했습니다. 여기서 업그레이드, 다운그레이드, 해지 상태를 확인할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
+
+                  {hasPendingBillingRedirect && (
+                    <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+                      <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                        결제 확인이 끝나지 않은 구독이 있어 결제 페이지 대신 구독 관리로 이동했습니다. 여기서 상태를 확인하거나 진행 중인 결제를 취소할 수 있습니다.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Pending action 알림 배너 */}
                   {subInfo?.pendingAction === "upgrade" && (
@@ -406,6 +456,35 @@ function SettingsPageContent() {
                     </div>
                   )}
 
+                  {isPendingBilling && (
+                    <div className="flex flex-col gap-4 p-4 rounded-xl bg-blue-50/50 border border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/50">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-sm font-bold text-foreground">카드 등록 / 결제 확인 진행 중</span>
+                        <span className="text-xs text-muted-foreground leading-relaxed">
+                          카드 등록 또는 첫 결제 확인이 아직 마무리되지 않았습니다.
+                          {subInfo?.nextBillingDate
+                            ? ` 다음 결제 예정일은 ${formatDate(subInfo.nextBillingDate)}입니다.`
+                            : " 결제 확인이 끝나면 구독 상태가 자동으로 반영됩니다."}
+                          진행을 멈추려면 아래에서 결제 진행 취소를 할 수 있습니다.
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button asChild variant="outline" className="rounded-xl font-bold w-full sm:w-auto">
+                          <Link href="/settings/billing">결제 내역 보기</Link>
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          className="rounded-xl font-bold w-full sm:w-auto"
+                          onClick={() => setCancelStep(1)}
+                          disabled={cancelLoading}
+                        >
+                          진행 중인 결제 취소
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {isPendingCancel && subInfo?.currentPeriodEnd && (
                     <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
                       <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
@@ -421,9 +500,14 @@ function SettingsPageContent() {
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">현재 플랜</span>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold text-foreground">{pricing.label}</span>
-                        {plan !== "free" && !isStopped && !isPendingCancel && (
+                        {plan !== "free" && !isStopped && !isPendingCancel && !isPendingBilling && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                             활성
+                          </span>
+                        )}
+                        {isPendingBilling && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
+                            결제 확인 중
                           </span>
                         )}
                         {isPendingCancel && (
@@ -447,13 +531,13 @@ function SettingsPageContent() {
                   </div>
 
                   {/* 다음 결제일 */}
-                  {plan !== "free" && subInfo?.currentPeriodEnd && (
+                  {plan !== "free" && (subInfo?.currentPeriodEnd || subInfo?.nextBillingDate) && (
                     <div className="flex items-center justify-between text-sm px-1">
                       <span className="text-muted-foreground font-medium">
-                        {isStopped || isPendingCancel ? "이용 만료일" : "다음 결제일"}
+                        {isStopped || isPendingCancel ? "이용 만료일" : isPendingBilling ? "결제 예정일" : "다음 결제일"}
                       </span>
                       <span className="font-semibold text-foreground">
-                        {formatDate(subInfo.currentPeriodEnd)}
+                        {formatDate(subInfo.currentPeriodEnd ?? subInfo.nextBillingDate ?? null)}
                       </span>
                     </div>
                   )}
@@ -494,6 +578,51 @@ function SettingsPageContent() {
                         <Button asChild className="rounded-xl font-bold shrink-0 w-full sm:w-auto">
                           <a href="/pricing">업그레이드</a>
                         </Button>
+                      </div>
+                    )}
+
+                    {plan !== "free" && !isPendingBilling && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-foreground">결제 내역</span>
+                          <span className="text-xs text-muted-foreground">영수증, 결제 내역, 환불 가능 여부를 확인합니다.</span>
+                        </div>
+                        <Button asChild variant="outline" className="rounded-xl font-bold shrink-0 ml-4">
+                          <Link href="/settings/billing">결제 내역 보기</Link>
+                        </Button>
+                      </div>
+                    )}
+
+                    {plan !== "free" && hasGracePeriodEntitlement && subInfo?.currentPeriodEnd && (
+                      <div className="flex flex-col gap-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-sm font-bold text-foreground">
+                            {isPendingCancel ? "현재 권한을 유지한 채 다음 결제를 정할 수 있어요" : "남은 이용 기간 안에 다음 결제를 정할 수 있어요"}
+                          </span>
+                          <span className="text-xs text-muted-foreground leading-relaxed">
+                            현재 {pricing.label} 이용 권한은 {formatDate(subInfo.currentPeriodEnd)}까지 유지됩니다.
+                            같은 플랜을 계속 쓰면 {formatDate(subInfo.currentPeriodEnd)}부터 {pricing.label} 월 {pricing.monthly.toLocaleString()}원 정기결제가 다시 시작됩니다.
+                            {plan === "basic" && graceUpgradeAmount !== null && (
+                              <>
+                                {" "}
+                                프로로 변경하면 {graceUpgradeAmount === 0 ? "오늘 추가 결제 없이" : `오늘 ${formatAmount(graceUpgradeAmount)}이 즉시 결제되고`} 결제 확인 후 프로 권한이 바로 적용되며, 다음 정기결제는 {formatDate(subInfo.currentPeriodEnd)}부터 월 {PLAN_PRICING.pro.monthly.toLocaleString()}원입니다.
+                              </>
+                            )}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button asChild variant="outline" className="rounded-xl font-bold w-full sm:w-auto">
+                            <a href={`/checkout?plan=${subInfo.plan}`}>
+                              {isPendingCancel ? "같은 플랜 계속 사용" : "같은 플랜 재구독"}
+                            </a>
+                          </Button>
+                          {plan === "basic" && (
+                            <Button asChild className="rounded-xl font-bold w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+                              <a href="/checkout?plan=pro">프로로 바로 업그레이드</a>
+                            </Button>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -585,27 +714,6 @@ function SettingsPageContent() {
                         </p>
                       </div>
                     )}
-
-                    {/* 재구독 CTA — stopped 상태 유저 */}
-                    {isStopped && subInfo?.currentPeriodEnd && (
-                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-primary/5 border border-primary/20">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-bold text-foreground">구독을 재개하시겠어요?</span>
-                          <span className="text-xs text-muted-foreground">
-                            카드를 등록하면 {formatDate(subInfo.currentPeriodEnd)} 이후부터 자동 결제가 시작됩니다.
-                          </span>
-                        </div>
-                        <div className="flex gap-2 shrink-0 w-full sm:w-auto">
-                          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold flex-1 sm:flex-initial">
-                            <a href="/pricing">다른 플랜</a>
-                          </Button>
-                          <Button asChild size="sm" className="rounded-xl font-bold flex-1 sm:flex-initial">
-                            <a href={`/checkout?plan=${subInfo.plan}`}>재구독</a>
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
                   </div>
                 </CardContent>
               </Card>
@@ -709,13 +817,9 @@ function SettingsPageContent() {
       <AlertDialog open={cancelStep === 1} onOpenChange={(open) => { if (!open) setCancelStep(0); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>구독을 해지하시겠어요?</AlertDialogTitle>
+            <AlertDialogTitle>{isPendingBilling ? "진행 중인 결제를 취소할까요?" : "구독을 해지하시겠어요?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              {subInfo?.currentPeriodEnd
-                ? `이용기간 만료일(${formatDate(subInfo.currentPeriodEnd)})까지 서비스를 사용하실 수 있습니다.`
-                : "현재 결제 기간이 끝날 때까지 서비스를 이용하실 수 있습니다."}
-              <br />
-              다음 주기부터 자동 결제가 중단됩니다. 정말 해지하시겠어요?
+              {cancelActionDescription}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -726,8 +830,8 @@ function SettingsPageContent() {
                 setCancelStep(2);
               }}
             >
-              해지
-            </AlertDialogAction>
+                {isPendingBilling ? "결제 진행 취소" : "해지"}
+              </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -738,9 +842,9 @@ function SettingsPageContent() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive">최종 확인</AlertDialogTitle>
             <AlertDialogDescription>
-              구독 해지를 최종 확인합니다. 이 작업은 되돌릴 수 없습니다.
-              <br />
-              해지 후에는 현재 결제 기간이 종료되면 무료 플랜으로 전환됩니다.
+              {isPendingBilling
+                ? "진행 중인 카드 등록 또는 결제 확인을 취소합니다. 이 작업은 되돌릴 수 없습니다."
+                : "구독 해지를 최종 확인합니다. 이 작업은 되돌릴 수 없습니다. 해지 후에는 현재 결제 기간이 종료되면 무료 플랜으로 전환됩니다."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -753,7 +857,7 @@ function SettingsPageContent() {
               }}
               disabled={cancelLoading}
             >
-              {cancelLoading ? "처리 중..." : "해지 확인"}
+              {cancelLoading ? "처리 중..." : isPendingBilling ? "결제 진행 취소 확인" : "해지 확인"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

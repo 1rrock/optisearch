@@ -73,4 +73,57 @@ describe("subscription cancel route", () => {
       ])
     );
   });
+
+  it("treats pending_billing cancellation as payment-progress cancel while preserving current entitlement", async () => {
+    const supabase = createMockSupabase({
+      tables: {
+        subscriptions: {
+          select: { data: { id: "sub-1", bill_key: null, rebill_no: null, status: "pending_billing", current_period_end: "2099-05-23" }, error: null },
+          update: { data: null, error: null },
+        },
+      },
+    });
+    mocks.createServerClient.mockResolvedValue(supabase);
+
+    const response = await POST();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      ok: true,
+      usableUntil: "2099-05-23",
+    });
+    expect(String(payload.message)).toContain("진행 중인 결제가 취소되었습니다");
+    expect(supabase.operations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          table: "subscriptions",
+          operation: "update",
+          payload: expect.objectContaining({
+            status: "pending_cancel",
+            current_period_end: "2099-05-23",
+            next_billing_date: null,
+          }),
+        }),
+      ])
+    );
+  });
+
+  it("does not return success when pending_billing subscription update fails", async () => {
+    const supabase = createMockSupabase({
+      tables: {
+        subscriptions: {
+          select: { data: { id: "sub-1", bill_key: null, rebill_no: null, status: "pending_billing", current_period_end: null }, error: null },
+          update: { data: null, error: { message: "update failed" } },
+        },
+      },
+    });
+    mocks.createServerClient.mockResolvedValue(supabase);
+
+    const response = await POST();
+    const payload = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(payload.error).toBe("update failed");
+  });
 });

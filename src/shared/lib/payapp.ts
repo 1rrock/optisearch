@@ -68,7 +68,8 @@ interface CreateOneOffPaymentParams {
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-const PAYAPP_API_URL = "https://api.payapp.kr/oapi/apiLoad.html";
+const PAYAPP_API_URL =
+  process.env.PAYAPP_API_URL?.trim() || "https://api.payapp.kr/oapi/apiLoad.html";
 const TIMEOUT_MS = 30_000;
 
 export class PayAppTimeoutError extends Error {
@@ -93,6 +94,42 @@ export function defaultRebillExpire(yearsFromNow = 4): string {
 }
 
 const isDev = process.env.NODE_ENV !== "production";
+const isLocalPayAppTest = process.env.PAYAPP_LOCAL_TEST_MODE === "true";
+const localTestDefaultPrice = Number(process.env.PAYAPP_LOCAL_TEST_PRICE ?? "1000");
+
+function toLocalTestCompatibleParams(
+  params: Record<string, string | number | undefined>
+): Record<string, string | number | undefined> {
+  if (!isLocalPayAppTest) {
+    return params;
+  }
+
+  const cmd = String(params.cmd ?? "");
+
+  if (cmd === "billRegist") {
+    return {
+      ...params,
+      cmd: "payrequest",
+      price: Number.isFinite(localTestDefaultPrice) ? localTestDefaultPrice : 1000,
+      reqaddr: "n",
+      reqmode: "krw",
+      goodprice: undefined,
+    };
+  }
+
+  if (cmd === "billPay") {
+    return {
+      ...params,
+      cmd: "payrequest",
+      reqaddr: "n",
+      reqmode: "krw",
+      // PAYAPP_LOCAL_TEST는 billPay/encBill을 지원하지 않음
+      encBill: undefined,
+    };
+  }
+
+  return params;
+}
 
 function getRequiredEnv(key: string): string {
   const value = process.env[key];
@@ -112,15 +149,16 @@ function buildBaseParams(): Record<string, string> {
 async function callApi(
   params: Record<string, string | number | undefined>
 ): Promise<Record<string, string>> {
+  const requestParams = toLocalTestCompatibleParams(params);
   const body = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(requestParams)) {
     if (value !== undefined && value !== null) {
       body.append(key, String(value));
     }
   }
 
   if (isDev) {
-    const safeParams = { ...params, linkkey: "[REDACTED]" };
+    const safeParams = { ...requestParams, linkkey: "[REDACTED]" };
     console.log("[payapp] REQUEST →", safeParams);
   }
 

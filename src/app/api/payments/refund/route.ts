@@ -3,6 +3,7 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { cancelPayment, cancelRebill, deleteBillKey } from "@/shared/lib/payapp";
 import { REFUND_POLICY } from "@/shared/config/constants";
+import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
 import { addDaysToKstDate } from "@/shared/lib/payapp-time";
 import {
   pickFirstSubscriptionPaymentMulNo,
@@ -40,11 +41,24 @@ export async function POST(request: Request) {
 
   try {
     const supabase = await createServerClient();
-    const { data: payment, error: paymentError } = await supabase
+    let { data: payment, error: paymentError } = await supabase
       .from("payment_history")
       .select("id, user_id, mul_no, amount, paid_at, provider_paid_at, purpose, refunded_at")
       .eq("mul_no", mulNo)
       .maybeSingle();
+
+    if (paymentError && isPaymentHistoryColumnMissingError(paymentError, ["provider_paid_at"])) {
+      const fallback = await supabase
+        .from("payment_history")
+        .select("id, user_id, mul_no, amount, paid_at, purpose, refunded_at")
+        .eq("mul_no", mulNo)
+        .maybeSingle();
+
+      payment = fallback.data
+        ? { ...fallback.data, provider_paid_at: null }
+        : null;
+      paymentError = fallback.error;
+    }
 
     if (paymentError) {
       return NextResponse.json({ error: paymentError.message }, { status: 500 });
@@ -70,13 +84,29 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: subscriptionPayments, error: firstPaymentError } = await supabase
+    let { data: subscriptionPayments, error: firstPaymentError } = await supabase
       .from("payment_history")
       .select("mul_no, purpose, provider_paid_at, paid_at")
       .eq("user_id", user.userId)
       .eq("purpose", "subscription")
       .not("paid_at", "is", null)
       .limit(100);
+
+    if (firstPaymentError && isPaymentHistoryColumnMissingError(firstPaymentError, ["provider_paid_at"])) {
+      const fallback = await supabase
+        .from("payment_history")
+        .select("mul_no, purpose, paid_at")
+        .eq("user_id", user.userId)
+        .eq("purpose", "subscription")
+        .not("paid_at", "is", null)
+        .limit(100);
+
+      subscriptionPayments = (fallback.data ?? []).map((payment) => ({
+        ...payment,
+        provider_paid_at: null,
+      }));
+      firstPaymentError = fallback.error;
+    }
 
     if (firstPaymentError) {
       return NextResponse.json({ error: firstPaymentError.message }, { status: 500 });
@@ -177,13 +207,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error: paymentUpdateError } = await supabase
+    let { error: paymentUpdateError } = await supabase
       .from("payment_history")
       .update({
         refunded_at: nowIso,
         refund_amount: paymentRow.amount,
       })
       .eq("mul_no", mulNo);
+
+    if (paymentUpdateError && isPaymentHistoryColumnMissingError(paymentUpdateError, ["refund_amount"])) {
+      const fallback = await supabase
+        .from("payment_history")
+        .update({ refunded_at: nowIso })
+        .eq("mul_no", mulNo);
+      paymentUpdateError = fallback.error;
+    }
 
     if (paymentUpdateError) {
       return NextResponse.json({ error: paymentUpdateError.message }, { status: 500 });

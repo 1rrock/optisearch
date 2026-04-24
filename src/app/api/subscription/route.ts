@@ -4,7 +4,7 @@ import { getKstDateString } from "@/shared/lib/payapp-time";
 
 /**
  * GET /api/subscription — 현재 구독(플랜) 정보 조회
- * 반환: plan, status, currentPeriodEnd, pendingAction, pendingPlan, pendingStartDate
+ * 반환: plan, status, currentPeriodEnd, nextBillingDate, pendingAction, pendingPlan, pendingStartDate
  */
 export async function GET() {
   const user = await getAuthenticatedUser();
@@ -21,7 +21,7 @@ export async function GET() {
     const todayKST = getKstDateString();
     const { data: sub, error: subError } = await supabase
       .from("subscriptions")
-      .select("plan, status, current_period_end, pending_action, pending_plan, pending_start_date, failed_charge_count")
+      .select("plan, status, current_period_end, next_billing_date, pending_action, pending_plan, pending_start_date, failed_charge_count")
       .eq("user_id", user.userId)
       .or(`status.eq.active,status.eq.pending_billing,and(status.eq.pending_cancel,current_period_end.gte.${todayKST}),and(status.eq.stopped,current_period_end.gte.${todayKST})`)
       .order("status", { ascending: true }) // 'active' sorts before 'stopped'
@@ -40,6 +40,7 @@ export async function GET() {
       plan,
       status: sub?.status ?? null,
       currentPeriodEnd: sub?.current_period_end ?? null,
+      nextBillingDate: sub?.next_billing_date ?? null,
       pendingAction: sub?.pending_action ?? null,
       pendingPlan: sub?.pending_plan ?? null,
       pendingStartDate: sub?.pending_start_date ?? null,

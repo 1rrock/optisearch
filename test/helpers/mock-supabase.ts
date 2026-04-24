@@ -19,6 +19,8 @@ export interface MockQueryContext {
   filters: Array<
     | { type: "eq"; column: string; value: unknown }
     | { type: "in"; column: string; values: unknown[] }
+    | { type: "gte"; column: string; value: unknown }
+    | { type: "not"; column: string; operator: string; value: unknown }
   >;
   upsertOptions?: { onConflict?: string };
   resolveMode: ResolveMode;
@@ -90,6 +92,28 @@ class QueryBuilder<T = unknown> implements PromiseLike<MockSupabaseResult<T>> {
 
   in(column: string, values: unknown[]) {
     this.filters.push({ type: "in", column, values });
+    return this;
+  }
+
+  gte(column: string, value: unknown) {
+    this.filters.push({ type: "gte", column, value });
+    return this;
+  }
+
+  not(column: string, operator: string, value: unknown) {
+    this.filters.push({ type: "not", column, operator, value });
+    return this;
+  }
+
+  or(_filter: string) {
+    return this;
+  }
+
+  order(_column: string, _options?: { ascending?: boolean }) {
+    return this;
+  }
+
+  limit(_count: number) {
     return this;
   }
 

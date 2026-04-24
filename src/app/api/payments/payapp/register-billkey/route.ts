@@ -2,17 +2,21 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { registerBillKey } from "@/shared/lib/payapp";
-import { PLAN_PRICING } from "@/shared/config/constants";
+import { PLAN_PRICING, UPGRADE_DIFF } from "@/shared/config/constants";
 import type { PlanId } from "@/shared/config/constants";
 import { getKstDateString } from "@/shared/lib/payapp-time";
+import {
+  calcProRatedDiff,
+  isGracePeriodEligible,
+} from "@/shared/lib/subscription-upgrade-rules";
 
 /**
  * POST /api/payments/payapp/register-billkey
  * Body: { plan: "basic" | "pro", phone: string }
  *
  * 신규 구독: billRegist 완료 후 webhook에서 즉시 first_charge billPay 시도
- * 재구독(stopped + grace period): current_period_end 이후 첫 청구
- * stopped basic → pro with grace period: 안전한 상용 정책 확정 전까지 셀프서비스 차단
+ * 동일 플랜 grace 재구독: current_period_end 이후 첫 청구
+ * grace 기간 basic → pro: billRegist 후 webhook에서 upgrade_diff 즉시 청구
  */
 export async function POST(request: Request) {
   const user = await getAuthenticatedUser();
@@ -51,60 +55,72 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "이미 활성화된 구독이 있습니다." }, { status: 409 });
   }
 
-  // 2. stopped 행 조회 → grace period 및 next_billing_date 결정
-  const { data: stoppedSub } = await supabase
+  // 2. grace 행 조회 → deferred same-plan 재구독 / basic→pro diff upgrade 판별
+  const { data: graceSub } = await supabase
     .from("subscriptions")
     .select("id, status, current_period_end, plan")
     .eq("user_id", user.userId)
-    .eq("status", "stopped")
+    .in("status", ["pending_cancel", "stopped"])
+    .order("status", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  const hasGracePeriod =
-    !!stoppedSub?.current_period_end &&
-    stoppedSub.current_period_end > todayKST;
+  const hasGracePeriod = isGracePeriodEligible(
+    graceSub?.status,
+    graceSub?.current_period_end,
+    todayKST
+  );
+
+  const { data: latestSub } = graceSub
+    ? { data: null }
+    : await supabase
+        .from("subscriptions")
+        .select("id, status")
+        .eq("user_id", user.userId)
+        .order("current_period_end", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+  const targetSubscription = graceSub ?? latestSub;
 
   const nextBillingDate = hasGracePeriod
-    ? stoppedSub!.current_period_end
+    ? graceSub?.current_period_end ?? todayKST
     : todayKST;
 
-  // 3. stopped basic → pro with grace period는 기존 차액 경로가 상용 안전하지 않으므로 차단
   const isDiffUpgrade =
     hasGracePeriod &&
-    stoppedSub!.plan === "basic" &&
+    graceSub?.plan === "basic" &&
     plan === "pro";
-
-  if (isDiffUpgrade) {
-    return NextResponse.json(
-      {
-        error:
-          "현재 이용기간이 남아 있는 베이직→프로 재구독은 셀프 전환이 일시 중단되었습니다. 고객센터로 문의해 주세요.",
-      },
-      { status: 409 }
-    );
-  }
+  const upsertPlan: PlanId = isDiffUpgrade ? "basic" : plan;
+  const proRatedAmount = isDiffUpgrade
+    ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, nextBillingDate)
+    : 0;
 
   // 4. DB에 pending_billing + next_billing_date 사전 저장
   const upsertPayload = {
     user_id: user.userId,
     status: "pending_billing" as const,
-    plan: plan as PlanId,
+    plan: upsertPlan,
     next_billing_date: nextBillingDate,
+    pending_action: isDiffUpgrade ? "upgrade" : null,
+    pending_plan: isDiffUpgrade ? ("pro" as PlanId) : null,
+    pending_start_date: isDiffUpgrade ? nextBillingDate : null,
     bill_key: null as string | null,
     failed_charge_count: 0,
     rebill_no: null as string | null,
-    pending_billing_started_at: new Date().toISOString(),
-    bill_key_registered_at: null as string | null,
-    last_manual_review_at: null as string | null,
-    last_manual_review_reason: null as string | null,
-    legacy_billing_model: "bill_key" as const,
   };
 
-  const { error: upsertError } = await supabase
-    .from("subscriptions")
-    .upsert(upsertPayload, { onConflict: "user_id" });
+  const subscriptionMutation = targetSubscription?.id
+    ? await supabase
+        .from("subscriptions")
+        .update(upsertPayload)
+        .eq("id", targetSubscription.id)
+    : await supabase
+        .from("subscriptions")
+        .insert(upsertPayload);
 
-  if (upsertError) {
-    console.error("[register-billkey] DB upsert error:", upsertError.message);
+  if (subscriptionMutation.error) {
+    console.error("[register-billkey] DB write error:", subscriptionMutation.error.message);
     return NextResponse.json({ error: "구독 준비 중 오류가 발생했습니다." }, { status: 500 });
   }
 
@@ -128,11 +144,29 @@ export async function POST(request: Request) {
 
   if (result.state !== 1 || !result.payurl) {
     // rollback: pending_billing → stopped (또는 삭제)
-    await supabase
-      .from("subscriptions")
-      .update({ status: "stopped", next_billing_date: null, bill_key: null })
-      .eq("user_id", user.userId)
-      .eq("status", "pending_billing");
+    const rollbackStatus = targetSubscription?.status ?? "stopped";
+    const rollbackPayload = {
+      status: rollbackStatus,
+      next_billing_date: null,
+      pending_action: null,
+      pending_plan: null,
+      pending_start_date: null,
+      bill_key: null,
+    };
+
+    if (targetSubscription?.id) {
+      await supabase
+        .from("subscriptions")
+        .update(rollbackPayload)
+        .eq("id", targetSubscription.id)
+        .eq("status", "pending_billing");
+    } else {
+      await supabase
+        .from("subscriptions")
+        .update(rollbackPayload)
+        .eq("user_id", user.userId)
+        .eq("status", "pending_billing");
+    }
 
     return NextResponse.json(
       { error: result.errorMessage ?? "카드 등록 요청에 실패했습니다." },
@@ -145,6 +179,8 @@ export async function POST(request: Request) {
     plan,
     nextBillingDate,
     isDiffUpgrade,
+    upsertPlan,
+    proRatedAmount,
     pricing: PLAN_PRICING[plan as PlanId].monthly,
   });
 
@@ -152,7 +188,7 @@ export async function POST(request: Request) {
     ok: true,
     payurl: result.payurl,
     nextBillingDate,
-    isDiffUpgrade: false,
-    proRatedAmount: 0,
+    isDiffUpgrade,
+    proRatedAmount,
   });
 }

@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { REFUND_POLICY } from "@/shared/config/constants";
-import { pickFirstSubscriptionPaymentMulNo } from "@/shared/lib/payapp-launch-rules";
+import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
+import { pickFirstSubscriptionPaymentMulNo, type SubscriptionPaymentLike } from "@/shared/lib/payapp-launch-rules";
 
 export interface PaymentHistoryItem {
   id: string;
@@ -20,6 +21,18 @@ export interface PaymentHistoryItem {
   refundBlockReason: string | null;
 }
 
+type PaymentHistoryRow = {
+  id: string;
+  mul_no: string;
+  amount: number;
+  vat: number | null;
+  purpose: string | null;
+  paid_at: string;
+  provider_paid_at: string | null;
+  refunded_at: string | null;
+  receipt_url: string | null;
+};
+
 /**
  * GET /api/billing/history
  * 최근 12개월 결제 내역 조회 (최신순)
@@ -36,7 +49,10 @@ export async function GET() {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
-    const { data: payments, error: payError } = await supabase
+    let payments: PaymentHistoryRow[] = [];
+    let payError: { message: string } | null = null;
+
+    const enhanced = await supabase
       .from("payment_history")
       .select("id, mul_no, amount, vat, purpose, paid_at, provider_paid_at, refunded_at, receipt_url")
       .eq("user_id", user.userId)
@@ -44,15 +60,41 @@ export async function GET() {
       .order("paid_at", { ascending: false })
       .limit(100);
 
+    payments = (enhanced.data ?? []) as unknown as PaymentHistoryRow[];
+    payError = enhanced.error;
+
+    if (payError && isPaymentHistoryColumnMissingError(payError, ["provider_paid_at"])) {
+      const fallback = await supabase
+        .from("payment_history")
+        .select("id, mul_no, amount, vat, purpose, paid_at, refunded_at, receipt_url")
+        .eq("user_id", user.userId)
+        .gte("paid_at", twelveMonthsAgo.toISOString())
+        .order("paid_at", { ascending: false })
+        .limit(100);
+
+      payments = ((fallback.data ?? []) as unknown as Array<Omit<PaymentHistoryRow, "provider_paid_at">>).map((payment) => ({
+        ...payment,
+        provider_paid_at: null,
+      }));
+      payError = fallback.error;
+    }
+
     if (payError) {
       console.error("[billing/history] DB error:", payError.message);
       return NextResponse.json({ error: "결제 내역 조회에 실패했습니다." }, { status: 500 });
     }
 
     const now = Date.now();
-    const firstSubscriptionMulNo = pickFirstSubscriptionPaymentMulNo(payments ?? []);
+    const firstSubscriptionMulNo = pickFirstSubscriptionPaymentMulNo(
+      payments.map((payment): SubscriptionPaymentLike => ({
+        mul_no: payment.mul_no,
+        purpose: payment.purpose,
+        provider_paid_at: payment.provider_paid_at ?? null,
+        paid_at: payment.paid_at,
+      }))
+    );
 
-    const items: PaymentHistoryItem[] = (payments ?? []).map((p) => {
+    const items: PaymentHistoryItem[] = payments.map((p) => {
       // 환불 가능 여부 판단 (UI 조건만 — 사용량은 /api/payments/refund에서 최종 검증)
       let canRefund = false;
       let refundBlockReason: string | null = null;

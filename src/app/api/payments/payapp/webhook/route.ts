@@ -1,6 +1,8 @@
 import { billPay, verifyWebhookLinkVal } from "@/shared/lib/payapp";
-import { PLAN_PRICING } from "@/shared/config/constants";
+import { PLAN_PRICING, UPGRADE_DIFF } from "@/shared/config/constants";
 import type { PlanId } from "@/shared/config/constants";
+import { isPaymentAttemptsMissingError } from "@/shared/lib/payment-attempt-compat";
+import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
 import { createServerClient } from "@/shared/lib/supabase";
 import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 import {
@@ -13,6 +15,10 @@ import {
   parsePayAppWebhook,
   type PayAppWebhookPayload,
 } from "../_lib/payapp-webhook";
+import {
+  calcProRatedDiff,
+  isGracePeriodEligible,
+} from "@/shared/lib/subscription-upgrade-rules";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
 
@@ -29,12 +35,28 @@ type SubscriptionRow = {
   id: string;
   status: string | null;
   plan: string | null;
+  pending_action?: string | null;
+  pending_plan?: string | null;
   bill_key: string | null;
   rebill_no: string | null;
   failed_charge_count: number | null;
-  legacy_billing_model?: string | null;
   next_billing_date?: string | null;
+  current_period_end?: string | null;
 };
+
+const isLocalPayAppTestMode = process.env.PAYAPP_LOCAL_TEST_MODE === "true";
+
+function resolveBillKeyForProcessing(payload: PayAppWebhookPayload): string | null {
+  if (payload.billKey) {
+    return payload.billKey;
+  }
+
+  if (isLocalPayAppTestMode && payload.mulNo) {
+    return `local-test-${payload.mulNo}`;
+  }
+
+  return null;
+}
 
 type PaymentHistoryUpsert = {
   userId: string;
@@ -248,7 +270,9 @@ async function saveBillKeyRegistration(
   supabase: SupabaseClient,
   payload: PayAppWebhookPayload
 ): Promise<ProcessingOutcome> {
-  if (!payload.billKey) {
+  const billKey = resolveBillKeyForProcessing(payload);
+
+  if (!billKey) {
     return {
       kind: "manual_review",
       reason: "billkey_registration succeeded without encBill",
@@ -258,13 +282,11 @@ async function saveBillKeyRegistration(
   const { data, error } = await supabase
     .from("subscriptions")
     .update({
-      bill_key: payload.billKey,
-      bill_key_registered_at: payload.payDateIso ?? new Date().toISOString(),
-      legacy_billing_model: "bill_key",
+      bill_key: billKey,
     })
     .eq("user_id", payload.userId)
     .eq("status", "pending_billing")
-    .select("id, plan, next_billing_date")
+    .select("id, plan, pending_action, pending_plan, next_billing_date, current_period_end")
     .maybeSingle();
 
   if (error) {
@@ -280,7 +302,43 @@ async function saveBillKeyRegistration(
 
   const subscription = data as SubscriptionRow;
   const todayKst = getKstDateString();
+
+  const hasGraceDiffUpgradeMarker =
+    subscription.plan === "basic" &&
+    subscription.pending_action === "upgrade" &&
+    subscription.pending_plan === "pro";
+
+  if (hasGraceDiffUpgradeMarker) {
+    if (!subscription.current_period_end || subscription.current_period_end < todayKst) {
+      return {
+        kind: "manual_review",
+        reason: "grace upgrade marker is missing a valid current_period_end",
+      };
+    }
+
+    return dispatchGracePeriodUpgradeCharge(supabase, payload, subscription, billKey);
+  }
+
   if (!shouldDispatchFirstCharge(subscription.next_billing_date, todayKst)) {
+    const isDeferredSamePlanContinuation =
+      !!subscription.current_period_end &&
+      !subscription.pending_action &&
+      !subscription.pending_plan;
+
+    if (isDeferredSamePlanContinuation) {
+      const { error: activationError } = await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+        })
+        .eq("id", subscription.id)
+        .eq("status", "pending_billing");
+
+      if (activationError) {
+        throw new Error(`[webhook] deferred continuation activation failed: ${activationError.message}`);
+      }
+    }
+
     return { kind: "processed" };
   }
 
@@ -292,14 +350,14 @@ async function saveBillKeyRegistration(
     };
   }
 
-  const attempt = await ensureFirstChargeAttempt(supabase, subscription.id, payload.userId, payload.billKey, plan);
+  const attempt = await ensureFirstChargeAttempt(supabase, subscription.id, payload.userId, billKey, plan);
   if (attempt.status !== "pending") {
     return { kind: "processed" };
   }
 
   try {
     const chargeResult = await billPay({
-      billKey: payload.billKey,
+      billKey,
       goodname: `옵티서치 ${plan === "pro" ? "프로" : "베이직"}`,
       price: PLAN_PRICING[plan].monthly,
       recvphone: process.env.PAYAPP_DEFAULT_RECVPHONE ?? "01000000000",
@@ -309,22 +367,26 @@ async function saveBillKeyRegistration(
     });
 
     if (chargeResult.state !== 1) {
-      await supabase
-        .from("payment_attempts")
-        .update({
-          status: "failed",
-          provider_response_payload: chargeResult.raw,
-          manual_review_reason: chargeResult.errorMessage ?? "first charge billPay failed",
-          resolved_at: new Date().toISOString(),
-        })
-        .eq("id", attempt.id);
+      if (attempt.tracked && attempt.id) {
+        const { error: attemptUpdateError } = await supabase
+          .from("payment_attempts")
+          .update({
+            status: "failed",
+            provider_response_payload: chargeResult.raw,
+            manual_review_reason: chargeResult.errorMessage ?? "first charge billPay failed",
+            resolved_at: new Date().toISOString(),
+          })
+          .eq("id", attempt.id);
+
+        if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+          throw new Error(`[webhook] first-charge attempt update failed: ${attemptUpdateError.message}`);
+        }
+      }
 
       await supabase
         .from("subscriptions")
         .update({
           next_billing_date: null,
-          last_manual_review_at: new Date().toISOString(),
-          last_manual_review_reason: chargeResult.errorMessage ?? "first charge billPay failed",
         })
         .eq("id", subscription.id);
 
@@ -334,32 +396,42 @@ async function saveBillKeyRegistration(
       };
     }
 
-    await supabase
-      .from("payment_attempts")
-      .update({
-        status: "dispatched",
-        mul_no: chargeResult.mulNo ?? null,
-        provider_response_payload: chargeResult.raw,
-      })
-      .eq("id", attempt.id);
+    if (attempt.tracked && attempt.id) {
+      const { error: attemptUpdateError } = await supabase
+        .from("payment_attempts")
+        .update({
+          status: "dispatched",
+          mul_no: chargeResult.mulNo ?? null,
+          provider_response_payload: chargeResult.raw,
+        })
+        .eq("id", attempt.id);
+
+      if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+        throw new Error(`[webhook] first-charge attempt update failed: ${attemptUpdateError.message}`);
+      }
+    }
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    await supabase
-      .from("payment_attempts")
-      .update({
-        status: resolveAttemptFailureStatus(error),
-        provider_response_payload: { error: reason },
-        manual_review_reason: reason,
-        resolved_at: new Date().toISOString(),
-      })
-      .eq("id", attempt.id);
+    if (attempt.tracked && attempt.id) {
+      const { error: attemptUpdateError } = await supabase
+        .from("payment_attempts")
+        .update({
+          status: resolveAttemptFailureStatus(error),
+          provider_response_payload: { error: reason },
+          manual_review_reason: reason,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("id", attempt.id);
+
+      if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+        throw new Error(`[webhook] first-charge attempt update failed: ${attemptUpdateError.message}`);
+      }
+    }
 
     await supabase
       .from("subscriptions")
       .update({
         next_billing_date: null,
-        last_manual_review_at: new Date().toISOString(),
-        last_manual_review_reason: reason,
       })
       .eq("id", subscription.id);
 
@@ -375,7 +447,7 @@ async function ensureFirstChargeAttempt(
   userId: string,
   billKey: string,
   plan: PlanId
-): Promise<{ id: string; status: string }> {
+): Promise<{ id: string | null; status: string; tracked: boolean }> {
   const attemptKey = buildPaymentAttemptKey("first_charge", subscriptionId, billKey);
   const { data: inserted, error: insertError } = await supabase
     .from("payment_attempts")
@@ -395,7 +467,11 @@ async function ensureFirstChargeAttempt(
     .maybeSingle();
 
   if (!insertError && inserted) {
-    return inserted as { id: string; status: string };
+    return { ...(inserted as { id: string; status: string }), tracked: true };
+  }
+
+  if (insertError && isPaymentAttemptsMissingError(insertError)) {
+    return { id: null, status: "pending", tracked: false };
   }
 
   if (insertError && insertError.code !== "23505") {
@@ -408,11 +484,154 @@ async function ensureFirstChargeAttempt(
     .eq("attempt_key", attemptKey)
     .maybeSingle();
 
+  if (existingError && isPaymentAttemptsMissingError(existingError)) {
+    return { id: null, status: "pending", tracked: false };
+  }
+
   if (existingError || !existing) {
     throw new Error(`[webhook] first-charge attempt fetch failed: ${existingError?.message ?? "missing attempt row"}`);
   }
 
-  return existing as { id: string; status: string };
+  return { ...(existing as { id: string; status: string }), tracked: true };
+}
+
+async function dispatchGracePeriodUpgradeCharge(
+  supabase: SupabaseClient,
+  payload: PayAppWebhookPayload,
+  subscription: SubscriptionRow,
+  billKey: string
+): Promise<ProcessingOutcome> {
+  const billingDate = subscription.current_period_end ?? subscription.next_billing_date ?? null;
+  const amount = calcProRatedDiff(UPGRADE_DIFF.basicToPro, billingDate);
+
+  if (amount === 0) {
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({
+        status: "active",
+        plan: "pro",
+        next_billing_date: subscription.next_billing_date ?? subscription.current_period_end ?? null,
+        pending_action: null,
+        pending_plan: null,
+        pending_start_date: null,
+      })
+      .eq("id", subscription.id)
+      .eq("status", "pending_billing");
+
+    if (error) {
+      throw new Error(`[webhook] grace upgrade free activation failed: ${error.message}`);
+    }
+
+    return { kind: "processed" };
+  }
+
+  const nowIso = new Date().toISOString();
+  const attemptKey = buildPaymentAttemptKey("upgrade_diff", subscription.id, nowIso);
+  const { error: insertError } = await supabase.from("payment_attempts").insert({
+    attempt_key: attemptKey,
+    user_id: payload.userId,
+    subscription_id: subscription.id,
+    attempt_kind: "upgrade_diff",
+    status: "pending",
+    amount,
+    provider_request_payload: {
+      plan: "pro",
+      amount,
+      source: "billkey_registration",
+    },
+  });
+
+  const shouldTrackAttempts = !insertError;
+
+  if (insertError && !isPaymentAttemptsMissingError(insertError)) {
+    throw new Error(`[webhook] grace upgrade attempt insert failed: ${insertError.message}`);
+  }
+
+  try {
+    const chargeResult = await billPay({
+      billKey,
+      goodname: "옵티서치 pro 업그레이드 차액",
+      price: amount,
+      recvphone: process.env.PAYAPP_DEFAULT_RECVPHONE ?? "01000000000",
+      var1: `${payload.userId}:pro`,
+      var2: "upgrade_diff",
+      feedbackurl: process.env.PAYAPP_FEEDBACK_URL,
+    });
+
+    if (chargeResult.state !== 1) {
+      const reason = chargeResult.errorMessage ?? "upgrade billPay failed after billkey registration";
+
+      if (shouldTrackAttempts) {
+        const { error: attemptUpdateError } = await supabase
+          .from("payment_attempts")
+          .update({
+            status: "failed",
+            mul_no: chargeResult.mulNo ?? null,
+            provider_response_payload: chargeResult.raw,
+            manual_review_reason: reason,
+            resolved_at: nowIso,
+          })
+          .eq("attempt_key", attemptKey);
+
+        if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+          throw new Error(`[webhook] grace upgrade attempt update failed: ${attemptUpdateError.message}`);
+        }
+      }
+
+      await supabase
+        .from("subscriptions")
+        .update({
+          next_billing_date: subscription.next_billing_date,
+        })
+        .eq("id", subscription.id);
+
+      return { kind: "manual_review", reason };
+    }
+
+    if (shouldTrackAttempts) {
+      const { error: attemptUpdateError } = await supabase
+        .from("payment_attempts")
+        .update({
+          status: "dispatched",
+          mul_no: chargeResult.mulNo ?? null,
+          provider_response_payload: chargeResult.raw,
+        })
+        .eq("attempt_key", attemptKey);
+
+      if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+        throw new Error(`[webhook] grace upgrade attempt update failed: ${attemptUpdateError.message}`);
+      }
+    }
+
+    return { kind: "processed" };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+
+    if (shouldTrackAttempts) {
+      const { error: attemptUpdateError } = await supabase
+        .from("payment_attempts")
+        .update({
+          status: resolveAttemptFailureStatus(error),
+          provider_response_payload: { error: reason },
+          manual_review_reason: reason,
+          resolved_at: new Date().toISOString(),
+        })
+        .eq("attempt_key", attemptKey);
+
+      if (attemptUpdateError && !isPaymentAttemptsMissingError(attemptUpdateError)) {
+        throw new Error(`[webhook] grace upgrade attempt update failed: ${attemptUpdateError.message}`);
+      }
+    }
+
+    await supabase
+      .from("subscriptions")
+      .update({
+        next_billing_date: subscription.next_billing_date,
+      })
+      .eq("id", subscription.id);
+
+    return { kind: "manual_review", reason };
+  }
 }
 
 async function handleSubscriptionSuccess(
@@ -470,11 +689,7 @@ async function handleSubscriptionSuccess(
       pending_action: null,
       pending_plan: null,
       pending_start_date: null,
-      pending_billing_started_at: null,
-      last_manual_review_at: null,
-      last_manual_review_reason: null,
       ...(payload.rebillNo && !subscription.bill_key ? { rebill_no: payload.rebillNo } : {}),
-      legacy_billing_model: subscription.bill_key ? subscription.legacy_billing_model ?? "bill_key" : payload.rebillNo ? "rebill" : subscription.legacy_billing_model ?? "none",
     })
     .eq("id", subscription.id)
     .in("status", ["active", "pending_billing"]);
@@ -558,8 +773,6 @@ async function handleSubscriptionFailure(
       .update({
         next_billing_date: null,
         failed_charge_count: 0,
-        last_manual_review_at: new Date().toISOString(),
-        last_manual_review_reason: reason,
       })
       .eq("id", subscription.id);
 
@@ -629,25 +842,40 @@ async function handleUpgradeSuccess(
   });
 
   const subscription = await getSubscriptionRow(supabase, payload.userId);
-  if (!subscription || subscription.status !== "active") {
+  const todayKst = getKstDateString();
+  const isGraceUpgrade = isGracePeriodEligible(
+    subscription?.status,
+    subscription?.current_period_end,
+    todayKst
+  );
+  const isPendingBillingGraceUpgrade =
+    subscription?.status === "pending_billing" &&
+    subscription.plan === "basic" &&
+    subscription.pending_action === "upgrade" &&
+    subscription.pending_plan === "pro" &&
+    !!subscription.current_period_end &&
+    subscription.current_period_end >= todayKst;
+
+  if (!subscription || (!isGraceUpgrade && !isPendingBillingGraceUpgrade && subscription.status !== "active")) {
     return {
       kind: "manual_review",
-      reason: "upgrade_diff success received without active subscription row",
+      reason: "upgrade_diff success received without an eligible subscription row",
     };
   }
 
+  const nextBillingDate = subscription.next_billing_date ?? subscription.current_period_end ?? null;
   const { error } = await supabase
     .from("subscriptions")
     .update({
+      status: "active",
       plan: "pro",
+      next_billing_date: nextBillingDate,
       pending_action: null,
       pending_plan: null,
       pending_start_date: null,
-      remote_cleanup_required: Boolean(subscription.rebill_no && !subscription.bill_key),
-      remote_cleanup_queued_at: null,
     })
     .eq("id", subscription.id)
-    .eq("status", "active");
+    .in("status", ["active", "pending_billing", "pending_cancel", "stopped"]);
 
   if (error) {
     throw new Error(`[webhook] upgrade success update failed: ${error.message}`);
@@ -660,7 +888,7 @@ async function handleUpgradeSuccess(
 async function getSubscriptionRow(supabase: SupabaseClient, userId: string): Promise<SubscriptionRow | null> {
   const { data, error } = await supabase
     .from("subscriptions")
-    .select("id, status, plan, bill_key, rebill_no, failed_charge_count, legacy_billing_model")
+    .select("id, status, plan, pending_action, pending_plan, bill_key, rebill_no, failed_charge_count, next_billing_date, current_period_end")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -691,6 +919,10 @@ async function resolvePaymentAttempt(
     .eq("mul_no", mulNo)
     .in("status", ["pending", "dispatched", "provider_unknown", "manual_review"]);
 
+  if (error && isPaymentAttemptsMissingError(error)) {
+    return;
+  }
+
   if (error) {
     throw new Error(`[webhook] payment attempt update failed: ${error.message}`);
   }
@@ -702,11 +934,23 @@ async function upsertPaymentHistory(
 ): Promise<void> {
   if (!record.mulNo) return;
 
-  const { data: existing, error: existingError } = await supabase
+  let { data: existing, error: existingError } = await supabase
     .from("payment_history")
     .select("paid_at, refunded_at, refund_amount")
     .eq("mul_no", record.mulNo)
     .maybeSingle();
+
+  if (existingError && isPaymentHistoryColumnMissingError(existingError, ["refund_amount"])) {
+    const fallback = await supabase
+      .from("payment_history")
+      .select("paid_at, refunded_at")
+      .eq("mul_no", record.mulNo)
+      .maybeSingle();
+    existing = fallback.data
+      ? { ...fallback.data, refund_amount: null }
+      : null;
+    existingError = fallback.error;
+  }
 
   if (existingError) {
     throw new Error(`[webhook] payment_history fetch failed: ${existingError.message}`);
@@ -724,27 +968,36 @@ async function upsertPaymentHistory(
     existing?.refund_amount ??
     (isRefundState ? record.amount : null);
 
-  const { error } = await supabase.from("payment_history").upsert(
+  const basePayload = {
+    user_id: record.userId,
+    mul_no: record.mulNo,
+    rebill_no: record.rebillNo,
+    amount: record.amount,
+    vat: Math.round((record.amount * 10) / 110),
+    pay_state: record.payState,
+    pay_type: record.payType,
+    purpose: record.purpose,
+    receipt_url: record.receiptUrl,
+    paid_at: paidAt,
+    refunded_at: refundedAt,
+    raw: record.raw,
+  };
+
+  let { error } = await supabase.from("payment_history").upsert(
     {
-      user_id: record.userId,
-      mul_no: record.mulNo,
-      rebill_no: record.rebillNo,
-      amount: record.amount,
-      vat: Math.round((record.amount * 10) / 110),
-      pay_state: record.payState,
-      pay_type: record.payType,
-      purpose: record.purpose,
-      receipt_url: record.receiptUrl,
-      paid_at: paidAt,
-      refunded_at: refundedAt,
+      ...basePayload,
       refund_amount: refundAmount,
-      provider_paid_at: existing?.paid_at ? record.providerPaidAt : record.providerPaidAt,
+      provider_paid_at: record.providerPaidAt,
       provider_cancelled_at: record.providerCancelledAt,
       payapp_event_key: record.payappEventKey,
-      raw: record.raw,
     },
     { onConflict: "mul_no" }
   );
+
+  if (error && isPaymentHistoryColumnMissingError(error, ["refund_amount", "provider_paid_at", "provider_cancelled_at", "payapp_event_key"])) {
+    const fallback = await supabase.from("payment_history").upsert(basePayload, { onConflict: "mul_no" });
+    error = fallback.error;
+  }
 
   if (error) {
     throw new Error(`[webhook] payment_history upsert failed: ${error.message}`);

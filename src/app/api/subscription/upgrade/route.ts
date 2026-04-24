@@ -3,22 +3,20 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { billPay, isPayAppTimeoutError } from "@/shared/lib/payapp";
 import { UPGRADE_DIFF } from "@/shared/config/constants";
+import { isPaymentAttemptsMissingError } from "@/shared/lib/payment-attempt-compat";
+import { getKstDateString } from "@/shared/lib/payapp-time";
 import {
   buildPaymentAttemptKey,
   resolveAttemptFailureStatus,
 } from "@/shared/lib/payapp-launch-rules";
+import {
+  calcProRatedDiff,
+  isGracePeriodEligible,
+  resolveUpgradeBillingDate,
+} from "@/shared/lib/subscription-upgrade-rules";
 
-/** 남은 기간 비례 업그레이드 차액 계산 (KST, 30일 기준, 올림) */
-function calcProRatedDiff(fullDiff: number, nextBillingDate: string | null): number {
-  if (!nextBillingDate) return fullDiff;
-  const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-  const todayKST = new Date(Date.now() + KST_OFFSET_MS);
-  const nextDate = new Date(nextBillingDate + "T00:00:00+09:00");
-  const remainingMs = nextDate.getTime() - todayKST.getTime();
-  const remainingDays = Math.max(0, Math.ceil(remainingMs / (1000 * 60 * 60 * 24)));
-  if (remainingDays === 0) return 0;
-  const proRated = Math.ceil((fullDiff * remainingDays) / 30);
-  return proRated;
+function buildUpgradeableSubscriptionFilter(todayKST: string): string {
+  return `status.eq.active,and(status.eq.pending_cancel,current_period_end.gte.${todayKST}),and(status.eq.stopped,current_period_end.gte.${todayKST})`;
 }
 
 /**
@@ -30,16 +28,25 @@ export async function GET() {
   if (!user || user.plan !== "basic") {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  const todayKST = getKstDateString();
   const supabase = await createServerClient();
   const { data: sub } = await supabase
     .from("subscriptions")
-    .select("next_billing_date, current_period_end")
+    .select("status, next_billing_date, current_period_end")
     .eq("user_id", user.userId)
-    .eq("status", "active")
+    .or(buildUpgradeableSubscriptionFilter(todayKST))
+    .order("status", { ascending: true })
+    .limit(1)
     .maybeSingle();
 
-  const amount = calcProRatedDiff(UPGRADE_DIFF.basicToPro, sub?.next_billing_date ?? null);
-  const nextBillingDate = sub?.next_billing_date ?? null;
+  const nextBillingDate = resolveUpgradeBillingDate(
+    sub?.status ?? null,
+    sub?.current_period_end ?? null,
+    sub?.next_billing_date ?? null,
+    todayKST
+  );
+  const amount = calcProRatedDiff(UPGRADE_DIFF.basicToPro, nextBillingDate);
 
   return NextResponse.json({ previewAmount: amount, nextBillingDate });
 }
@@ -69,14 +76,19 @@ export async function POST() {
 
   try {
     const supabase = await createServerClient();
+    const todayKST = getKstDateString();
 
     const { data: sub } = await supabase
       .from("subscriptions")
       .select("id, status, bill_key, rebill_no, pending_action, current_period_end, next_billing_date")
       .eq("user_id", user.userId)
+      .or(buildUpgradeableSubscriptionFilter(todayKST))
+      .order("status", { ascending: true })
+      .limit(1)
       .maybeSingle();
 
-    if (sub?.status !== "active") {
+    const isGraceUpgrade = isGracePeriodEligible(sub?.status, sub?.current_period_end, todayKST);
+    if (!sub || (sub.status !== "active" && !isGraceUpgrade)) {
       return NextResponse.json(
         { error: "활성 구독이 없습니다." },
         { status: 400 }
@@ -95,21 +107,34 @@ export async function POST() {
 
     // ── 분기 A: bill_key 존재 → 즉시 차액 청구 ──
     if (sub?.bill_key) {
-      const amount = calcProRatedDiff(UPGRADE_DIFF.basicToPro, sub.next_billing_date);
+      const billingDate = resolveUpgradeBillingDate(
+        sub.status,
+        sub.current_period_end,
+        sub.next_billing_date,
+        todayKST
+      );
+      const amount = calcProRatedDiff(UPGRADE_DIFF.basicToPro, billingDate);
 
       // 결제일이 오늘: 차액 0 → 실제 결제 없이 plan 업그레이드 (다음 Cron이 pro 가격으로 청구)
       if (amount === 0) {
         await supabase
           .from("subscriptions")
-          .update({ plan: "pro" })
+          .update({
+            status: "active",
+            plan: "pro",
+            next_billing_date: billingDate,
+            pending_action: null,
+            pending_plan: null,
+            pending_start_date: null,
+          })
           .eq("id", sub.id)
-          .eq("status", "active");
+          .in("status", ["active", "pending_cancel", "stopped"]);
         return NextResponse.json({ ok: true, method: "free_upgrade", proRatedAmount: 0 });
       }
 
       const nowIso = new Date().toISOString();
       const attemptKey = buildPaymentAttemptKey("upgrade_diff", sub.id, nowIso);
-      await supabase.from("payment_attempts").insert({
+      const attemptInsert = await supabase.from("payment_attempts").insert({
         attempt_key: attemptKey,
         user_id: user.userId,
         subscription_id: sub.id,
@@ -118,6 +143,11 @@ export async function POST() {
         amount,
         provider_request_payload: { plan: "pro", amount },
       });
+
+      const shouldTrackAttempts = !attemptInsert.error;
+      if (attemptInsert.error && !isPaymentAttemptsMissingError(attemptInsert.error)) {
+        throw new Error(attemptInsert.error.message);
+      }
 
       try {
         const result = await billPay({
@@ -130,13 +160,19 @@ export async function POST() {
           feedbackurl,
         });
 
-        await supabase.from("payment_attempts").update({
-          status: result.state === 1 ? "dispatched" : "failed",
-          mul_no: result.mulNo ?? null,
-          provider_response_payload: result.raw,
-          manual_review_reason: result.state === 1 ? null : result.errorMessage ?? "upgrade billPay failed",
-          resolved_at: result.state === 1 ? null : nowIso,
-        }).eq("attempt_key", attemptKey);
+        if (shouldTrackAttempts) {
+          const attemptUpdate = await supabase.from("payment_attempts").update({
+            status: result.state === 1 ? "dispatched" : "failed",
+            mul_no: result.mulNo ?? null,
+            provider_response_payload: result.raw,
+            manual_review_reason: result.state === 1 ? null : result.errorMessage ?? "upgrade billPay failed",
+            resolved_at: result.state === 1 ? null : nowIso,
+          }).eq("attempt_key", attemptKey);
+
+          if (attemptUpdate.error && !isPaymentAttemptsMissingError(attemptUpdate.error)) {
+            throw new Error(attemptUpdate.error.message);
+          }
+        }
 
         if (result.state === 1) {
           return NextResponse.json({
@@ -152,12 +188,18 @@ export async function POST() {
           { status: 502 }
         );
       } catch (error) {
-        await supabase.from("payment_attempts").update({
-          status: resolveAttemptFailureStatus(error),
-          provider_response_payload: { error: error instanceof Error ? error.message : String(error) },
-          manual_review_reason: error instanceof Error ? error.message : String(error),
-          resolved_at: new Date().toISOString(),
-        }).eq("attempt_key", attemptKey);
+        if (shouldTrackAttempts) {
+          const attemptUpdate = await supabase.from("payment_attempts").update({
+            status: resolveAttemptFailureStatus(error),
+            provider_response_payload: { error: error instanceof Error ? error.message : String(error) },
+            manual_review_reason: error instanceof Error ? error.message : String(error),
+            resolved_at: new Date().toISOString(),
+          }).eq("attempt_key", attemptKey);
+
+          if (attemptUpdate.error && !isPaymentAttemptsMissingError(attemptUpdate.error)) {
+            throw new Error(attemptUpdate.error.message);
+          }
+        }
 
         if (isPayAppTimeoutError(error)) {
           return NextResponse.json(

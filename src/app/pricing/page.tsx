@@ -4,10 +4,11 @@ import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
 import { useEffect, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
+import { calcProRatedDiff } from "@/shared/lib/subscription-upgrade-rules";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { PLAN_PRICING, UPGRADE_DIFF, type PlanId } from "@/shared/config/constants";
 
 type FeatureValue = string | boolean;
 
@@ -55,35 +56,74 @@ function TableFeatureCell({ value }: { value: FeatureValue }) {
   return <span className="text-sm font-semibold text-foreground">{value}</span>;
 }
 
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function formatAmount(amount: number): string {
+  return `${amount.toLocaleString()}원`;
+}
+
+function getTodayKstDateString(): string {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+function isGracePeriodEligible(status: string | null | undefined, currentPeriodEnd: string | null | undefined): boolean {
+  return (
+    !!currentPeriodEnd &&
+    (status === "pending_cancel" || status === "stopped") &&
+    currentPeriodEnd >= getTodayKstDateString()
+  );
+}
+
 interface PlanCardProps {
   planId: PlanId;
   currentPlan: PlanId | null;
   isPopular?: boolean;
   checkoutHref: string;
   currentStatus?: string;
+  currentPeriodEnd?: string | null;
 }
 
-function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus }: PlanCardProps) {
+function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus, currentPeriodEnd }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
-  const isCurrent = currentStatus !== "stopped" && currentPlan === planId;
+  const hasGracePeriod = isGracePeriodEligible(currentStatus, currentPeriodEnd);
+  const isGraceCurrentPlan = hasGracePeriod && currentPlan === planId;
+  const isGraceBasicToPro = hasGracePeriod && currentPlan === "basic" && planId === "pro";
+  const isPendingBilling = currentStatus === "pending_billing";
+  const graceUpgradeAmount = isGraceBasicToPro
+    ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, currentPeriodEnd ?? null)
+    : null;
+  const isCurrent = currentStatus !== "stopped" && currentPlan === planId && !hasGracePeriod;
 
   const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
   const currentRank = currentPlan ? planRank[currentPlan] : -1;
   const effectiveRank = currentStatus === "stopped" ? -1 : currentRank;
   const thisRank = planRank[planId];
-  const isSubscribed = effectiveRank >= thisRank && effectiveRank > 0;
+  const isSubscribed = !isGraceCurrentPlan && effectiveRank >= thisRank && effectiveRank > 0;
   const canUpgrade = !isCurrent && thisRank > effectiveRank;
 
   // Determine button href and label
-  const isUpgradingFromBasic = currentPlan === "basic" && planId === "pro" && canUpgrade && currentStatus !== "stopped";
-  const buttonHref = isUpgradingFromBasic ? "/settings" : checkoutHref;
+  const isUpgradingFromBasic = currentPlan === "basic" && planId === "pro" && canUpgrade && currentStatus !== "stopped" && !hasGracePeriod && !isPendingBilling;
+  const buttonHref = isPendingBilling ? "/settings?pending=1" : isUpgradingFromBasic ? "/settings" : checkoutHref;
 
   const ctaLabel = isCurrent
     ? "현재 플랜"
+    : isPendingBilling
+    ? "설정에서 확인"
+    : isUpgradingFromBasic
+    ? "설정에서 업그레이드"
+    : isGraceCurrentPlan
+    ? currentStatus === "pending_cancel"
+      ? "만료 후 계속 사용"
+      : "재구독"
     : isSubscribed
     ? "현재 플랜"
     : planId === "free"
     ? "시작하기"
+    : isGraceBasicToPro
+    ? "즉시 업그레이드"
     : currentStatus === "stopped" && currentPlan === planId
     ? "재구독"
     : "결제하기";
@@ -110,8 +150,10 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus 
             <span className={`text-lg font-bold ${isPopular ? "text-primary" : "text-muted-foreground"}`}>
               {pricing.label}
             </span>
-            {isCurrent && (
-              <Badge className="text-[10px] px-2 py-0.5 font-black tracking-wide">현재 플랜</Badge>
+            {(isCurrent || isGraceCurrentPlan) && (
+              <Badge className="text-[10px] px-2 py-0.5 font-black tracking-wide">
+                {isCurrent ? "현재 플랜" : "현재 권한"}
+              </Badge>
             )}
           </div>
           <div className="flex items-baseline gap-1">
@@ -163,6 +205,32 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus 
         >
           <Link href={buttonHref}>{ctaLabel}</Link>
         </Button>
+
+        {isGraceCurrentPlan && currentPeriodEnd && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {formatDate(currentPeriodEnd)}까지 현재 권한 유지 · 이후 {pricing.label} 월 {formatAmount(pricing.monthly)} 정기결제 재개
+          </p>
+        )}
+
+        {isGraceBasicToPro && currentPeriodEnd && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            {graceUpgradeAmount === 0
+              ? "오늘 추가 결제 없이 프로 권한이 바로 적용되고"
+              : `오늘 ${formatAmount(graceUpgradeAmount ?? 0)} 즉시 결제 후 프로 권한이 바로 적용되고`} 다음 정기결제는 {formatDate(currentPeriodEnd)}부터 월 {formatAmount(PLAN_PRICING.pro.monthly)}입니다.
+          </p>
+        )}
+
+        {isUpgradingFromBasic && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            현재 베이직 사용 중이라 프로 변경은 설정에서 차액 결제로 진행됩니다.
+          </p>
+        )}
+
+        {isPendingBilling && (
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            현재 결제 진행 상태를 먼저 확인해야 합니다. 새 결제는 설정의 구독 관리에서 이어서 처리하세요.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -175,19 +243,31 @@ export default function PricingPage() {
 function PricingContent() {
   const { isAuthenticated } = useIsAuthenticated();
   const userPlan = useUserPlan();
-  const [subStatus, setSubStatus] = useState<string | null>(null);
+  const [subInfo, setSubInfo] = useState<{ status: string | null; currentPeriodEnd: string | null }>({
+    status: null,
+    currentPeriodEnd: null,
+  });
 
   useEffect(() => {
     if (!isAuthenticated) return;
     fetch("/api/subscription")
       .then((res) => res.json())
       .then((data) => {
-        if (data?.status) setSubStatus(data.status);
+        setSubInfo({
+          status: data?.status ?? null,
+          currentPeriodEnd: data?.currentPeriodEnd ?? null,
+        });
       })
       .catch(() => {});
   }, [isAuthenticated]);
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
+  const hasGracePeriodEntitlement = isGracePeriodEligible(subInfo.status, subInfo.currentPeriodEnd) && !!currentPlan && currentPlan !== "free";
+  const graceUpgradeAmount =
+    currentPlan === "basic" && hasGracePeriodEntitlement
+      ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, subInfo.currentPeriodEnd)
+      : null;
+  const hasPendingBilling = subInfo.status === "pending_billing";
 
   const checkoutPathByPlan: Record<PlanId, string> = {
     free: "/dashboard",
@@ -213,26 +293,80 @@ function PricingContent() {
         </p>
       </div>
 
+      {hasPendingBilling && (
+        <div className="max-w-5xl mx-auto w-full rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-bold text-foreground">결제 진행 중인 구독이 있습니다</span>
+            <span className="text-xs text-muted-foreground">
+              새 결제를 시작하기보다 설정에서 현재 진행 상태를 확인하거나 취소하는 것이 안전합니다.
+            </span>
+          </div>
+          <Button asChild className="rounded-xl font-bold w-full sm:w-auto">
+            <Link href="/settings?pending=1">구독 관리로 이동</Link>
+          </Button>
+        </div>
+      )}
+
+      {hasGracePeriodEntitlement && currentPlan && subInfo.currentPeriodEnd && (
+        <div className="max-w-5xl mx-auto w-full rounded-2xl border border-primary/20 bg-primary/5 p-4 sm:p-5 flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="outline" className="font-bold">
+                {subInfo.status === "pending_cancel" ? "해지 예정" : "해지됨"}
+              </Badge>
+              <span className="text-sm font-bold text-foreground">
+                현재 {PLAN_PRICING[currentPlan].label} 권한은 {formatDate(subInfo.currentPeriodEnd)}까지 유지됩니다.
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              같은 플랜을 계속 쓰면 {formatDate(subInfo.currentPeriodEnd)}부터 {PLAN_PRICING[currentPlan].label} 월 {formatAmount(PLAN_PRICING[currentPlan].monthly)} 정기결제가 다시 시작됩니다.
+              {currentPlan === "basic" && graceUpgradeAmount !== null && (
+                <>
+                  {" "}
+                  프로로 변경하면 {graceUpgradeAmount === 0 ? "오늘 추가 결제 없이" : `오늘 ${formatAmount(graceUpgradeAmount)} 즉시 결제 후`} 프로 권한이 바로 적용되고, 다음 정기결제는 {formatDate(subInfo.currentPeriodEnd)}부터 월 {formatAmount(PLAN_PRICING.pro.monthly)}입니다.
+                </>
+              )}
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button asChild variant="outline" className="rounded-xl font-bold w-full sm:w-auto">
+              <Link href={getCheckoutHref(currentPlan)}>
+                {subInfo.status === "pending_cancel" ? "같은 플랜 계속 사용" : "같은 플랜 재구독"}
+              </Link>
+            </Button>
+            {currentPlan === "basic" && (
+              <Button asChild className="rounded-xl font-bold w-full sm:w-auto">
+                <Link href={getCheckoutHref("pro")}>프로로 바로 업그레이드</Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Plan cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto w-full items-start">
         <PlanCard
           planId="free"
           currentPlan={currentPlan}
           checkoutHref={getCheckoutHref("free")}
-          currentStatus={subStatus ?? undefined}
+          currentStatus={subInfo.status ?? undefined}
+          currentPeriodEnd={subInfo.currentPeriodEnd}
         />
         <PlanCard
           planId="basic"
           currentPlan={currentPlan}
           isPopular
           checkoutHref={getCheckoutHref("basic")}
-          currentStatus={subStatus ?? undefined}
+          currentStatus={subInfo.status ?? undefined}
+          currentPeriodEnd={subInfo.currentPeriodEnd}
         />
         <PlanCard
           planId="pro"
           currentPlan={currentPlan}
           checkoutHref={getCheckoutHref("pro")}
-          currentStatus={subStatus ?? undefined}
+          currentStatus={subInfo.status ?? undefined}
+          currentPeriodEnd={subInfo.currentPeriodEnd}
         />
       </div>
 
