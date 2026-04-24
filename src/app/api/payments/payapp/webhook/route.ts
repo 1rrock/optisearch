@@ -190,6 +190,7 @@ async function recordPaymentHistory(
       purpose: payload.purpose,
       receipt_url: payload.receiptUrl,
       status: kind,
+      paid_at: payload.payDateIso ?? new Date().toISOString(),
       raw: payload.raw,
     },
     { onConflict: "mul_no" }

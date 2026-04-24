@@ -143,10 +143,17 @@ function SettingsPageContent() {
     url.searchParams.delete("billing");
     window.history.replaceState({}, "", url.toString());
 
-    void fetchSubInfo().then(() => {
+    void (async () => {
+      const res = await fetch("/api/subscription");
+      const data = await res.json() as { plan?: string; status?: string; hasPendingBilling?: boolean };
       void refreshDashboard();
-      toast.success("결제 확인이 진행 중입니다. 잠시 후 구독 상태를 다시 확인해 주세요.", { duration: 5000 });
-    });
+      if (data.status === "active") {
+        toast.success("구독이 활성화되었습니다.", { duration: 4000 });
+      } else {
+        toast.success("결제 확인이 진행 중입니다. 잠시 후 구독 상태를 다시 확인해 주세요.", { duration: 5000 });
+      }
+      void fetchSubInfo();
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
