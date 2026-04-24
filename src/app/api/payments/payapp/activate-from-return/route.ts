@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
-import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
+import { addMonthsToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 
 /**
  * PayApp returnurl 수신 핸들러.
@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
     if (pending) {
       const todayKst = getKstDateString();
-      const nextPeriodEnd = addDaysToKstDate(todayKst, 30);
+      const nextPeriodEnd = addMonthsToKstDate(todayKst, 1);
       const nowIso = new Date().toISOString();
 
       await supabase

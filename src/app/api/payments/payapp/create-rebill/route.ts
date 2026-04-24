@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { registerRebill, defaultRebillExpire } from "@/shared/lib/payapp";
+import { getKstDayOfMonth } from "@/shared/lib/payapp-time";
 import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 
 /**
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
     recvphone: phone,
     rebillCycleType: "Month",
     rebillExpire: defaultRebillExpire(4),
+    rebillCycleMonth: getKstDayOfMonth(),
     var1: `${user.userId}:${plan}`,
     var2: "rebill_registration",
     openpaytype: "card",

@@ -1,6 +1,6 @@
 import { verifyWebhookLinkVal } from "@/shared/lib/payapp";
 import { createServerClient } from "@/shared/lib/supabase";
-import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
+import { addMonthsToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 import { buildWebhookKeys, parsePayAppWebhook } from "../_lib/payapp-webhook";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerClient>>;
@@ -114,7 +114,7 @@ async function handleSuccess(
       console.warn("[payapp webhook] cannot create subscription: missing plan/userId in var1");
       return;
     }
-    const nextPeriodEnd = addDaysToKstDate(todayKst, 30);
+    const nextPeriodEnd = addMonthsToKstDate(todayKst, 1);
     await supabase.from("subscriptions").insert({
       user_id: payload.userId,
       plan,
@@ -132,7 +132,7 @@ async function handleSuccess(
     sub.current_period_end && sub.status === "active"
       ? String(sub.current_period_end).slice(0, 10)
       : todayKst;
-  const nextPeriodEnd = addDaysToKstDate(periodBase, 30);
+  const nextPeriodEnd = addMonthsToKstDate(periodBase, 1);
 
   await supabase
     .from("subscriptions")
