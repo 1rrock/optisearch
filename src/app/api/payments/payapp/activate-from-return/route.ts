@@ -1,83 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 
 /**
- * PayApp returnurl handler.
+ * PayApp returnurl 수신 핸들러.
  *
- * With `skip_cstpage=y`, PayApp POSTs 매출전표 params (pay_state, rebill_no, var1,
- * mul_no, price) to this URL from the browser as a cross-site form submit —
- * auth cookies (SameSite=Lax) do NOT cross, so we trust var1 (`userId:plan`)
- * as the user identifier. Idempotent on rebill_no; webhook may have fired first.
+ * rebillRegist는 returnurl을 **파라미터 없는 GET**으로만 호출한다 (PayApp 문서 확인).
+ * 따라서 결제 완료 신호로만 사용하고, 실제 활성화는 create-rebill에서 미리 박아둔
+ * pending_billing 행을 active로 전환하는 방식으로 처리한다.
+ *
+ * Webhook(feedbackurl)이 먼저 떨어지면 이미 active 상태이므로 idempotent 하게 skip 된다.
  */
-export async function POST(request: NextRequest) {
-  const form = await request.formData();
-  const payState = Number(form.get("pay_state") ?? "0");
-  const rebillNo = String(form.get("rebill_no") ?? "");
-  const mulNo = String(form.get("mul_no") ?? "");
-  const var1 = String(form.get("var1") ?? "");
-  const price = Number(form.get("price") ?? "0");
-
+export async function GET(request: NextRequest) {
   const origin = new URL(request.url).origin;
 
-  if (payState !== 4 || !rebillNo) {
-    return NextResponse.redirect(new URL("/checkout?error=payment_failed", origin), 303);
-  }
-
-  const colonIdx = var1.indexOf(":");
-  const userId = colonIdx > 0 ? var1.slice(0, colonIdx) : "";
-  const plan = colonIdx > 0 ? var1.slice(colonIdx + 1) : "";
-
-  if (!userId || (plan !== "basic" && plan !== "pro")) {
-    return NextResponse.redirect(new URL("/settings?from=payment", origin), 303);
+  const user = await getAuthenticatedUser();
+  if (!user) {
+    return NextResponse.redirect(new URL("/login?callbackUrl=/settings", origin));
   }
 
   try {
     const supabase = await createServerClient();
 
-    const { data: existing } = await supabase
+    const { data: pending } = await supabase
       .from("subscriptions")
-      .select("id")
-      .eq("rebill_no", rebillNo)
+      .select("id, rebill_no, plan, status")
+      .eq("user_id", user.userId)
+      .eq("status", "pending_billing")
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (!existing) {
+    if (pending) {
       const todayKst = getKstDateString();
       const nextPeriodEnd = addDaysToKstDate(todayKst, 30);
       const nowIso = new Date().toISOString();
 
-      await supabase.from("subscriptions").insert({
-        user_id: userId,
-        plan,
-        rebill_no: rebillNo,
-        status: "active",
-        current_period_end: nextPeriodEnd,
-        next_billing_date: nextPeriodEnd,
-        last_charged_at: nowIso,
-      });
-
-      if (mulNo) {
-        await supabase.from("payment_history").upsert(
-          {
-            user_id: userId,
-            mul_no: mulNo,
-            rebill_no: rebillNo,
-            amount: price,
-            status: "success",
-            purpose: "subscription",
-          },
-          { onConflict: "mul_no" }
-        );
-      }
+      await supabase
+        .from("subscriptions")
+        .update({
+          status: "active",
+          current_period_end: nextPeriodEnd,
+          next_billing_date: nextPeriodEnd,
+          last_charged_at: nowIso,
+        })
+        .eq("id", pending.id);
     }
   } catch (err) {
     console.error("[activate-from-return] error:", err instanceof Error ? err.message : err);
   }
 
-  return NextResponse.redirect(new URL("/settings?from=payment", origin), 303);
-}
-
-/** Fallback: user lands here via GET (no skip_cstpage) — just bounce to settings. */
-export async function GET(request: NextRequest) {
-  return NextResponse.redirect(new URL("/settings?from=payment", request.url));
+  return NextResponse.redirect(new URL("/settings?from=payment", origin));
 }

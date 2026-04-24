@@ -71,7 +71,6 @@ export async function POST(request: Request) {
     smsuse: "n",
     feedbackurl: process.env.PAYAPP_FEEDBACK_URL,
     returnurl: `${origin}/api/payments/payapp/activate-from-return`,
-    skip_cstpage: "y",
   });
 
   if (result.state !== 1 || !result.payurl || !result.rebillNo) {
@@ -80,6 +79,19 @@ export async function POST(request: Request) {
       { error: result.errorMessage ?? "정기결제 등록에 실패했습니다." },
       { status: 502 }
     );
+  }
+
+  // PayApp rebillRegist의 returnurl은 파라미터 없는 GET으로만 호출되므로
+  // activate-from-return 핸들러가 user → rebill_no 매핑을 찾을 수 있게 pending 행을 만든다.
+  // webhook이 먼저 떨어지면 status=active로 덮어써짐 (idempotent).
+  const { error: insertError } = await supabase.from("subscriptions").insert({
+    user_id: user.userId,
+    plan,
+    rebill_no: result.rebillNo,
+    status: "pending_billing",
+  });
+  if (insertError) {
+    console.error("[create-rebill] pending_billing insert failed:", insertError.message);
   }
 
   return NextResponse.json({
