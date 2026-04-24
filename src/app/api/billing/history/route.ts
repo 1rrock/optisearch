@@ -75,8 +75,8 @@ export async function GET() {
       .from("payment_history")
       .select("id, mul_no, amount, vat, purpose, paid_at, provider_paid_at, refunded_at, receipt_url")
       .eq("user_id", user.userId)
-      .gte("paid_at", twelveMonthsAgo.toISOString())
-      .order("paid_at", { ascending: false })
+      .or(`paid_at.gte.${twelveMonthsAgo.toISOString()},paid_at.is.null`)
+      .order("paid_at", { ascending: false, nullsFirst: false })
       .limit(100);
 
     payments = (enhanced.data ?? []) as unknown as PaymentHistoryRow[];
@@ -87,8 +87,8 @@ export async function GET() {
         .from("payment_history")
         .select("id, mul_no, amount, vat, purpose, paid_at, refunded_at, receipt_url")
         .eq("user_id", user.userId)
-        .gte("paid_at", twelveMonthsAgo.toISOString())
-        .order("paid_at", { ascending: false })
+        .or(`paid_at.gte.${twelveMonthsAgo.toISOString()},paid_at.is.null`)
+        .order("paid_at", { ascending: false, nullsFirst: false })
         .limit(100);
 
       payments = ((fallback.data ?? []) as unknown as Array<Omit<PaymentHistoryRow, "provider_paid_at">>).map((payment) => ({
