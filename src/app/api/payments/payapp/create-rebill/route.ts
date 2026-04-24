@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     openpaytype: "card",
     smsuse: "n",
     feedbackurl: process.env.PAYAPP_FEEDBACK_URL,
-    returnurl: `${origin}/settings?from=payment`,
+    returnurl: `${origin}/api/payments/payapp/activate-from-return`,
   });
 
   if (result.state !== 1 || !result.payurl || !result.rebillNo) {
