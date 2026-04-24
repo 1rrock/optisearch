@@ -71,6 +71,7 @@ export async function POST(request: Request) {
     smsuse: "n",
     feedbackurl: process.env.PAYAPP_FEEDBACK_URL,
     returnurl: `${origin}/api/payments/payapp/activate-from-return`,
+    skip_cstpage: "y",
   });
 
   if (result.state !== 1 || !result.payurl || !result.rebillNo) {

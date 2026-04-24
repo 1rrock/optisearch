@@ -1,45 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { addDaysToKstDate, getKstDateString } from "@/shared/lib/payapp-time";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+/**
+ * PayApp returnurl handler.
+ *
+ * With `skip_cstpage=y`, PayApp POSTs 매출전표 params (pay_state, rebill_no, var1,
+ * mul_no, price) to this URL from the browser as a cross-site form submit —
+ * auth cookies (SameSite=Lax) do NOT cross, so we trust var1 (`userId:plan`)
+ * as the user identifier. Idempotent on rebill_no; webhook may have fired first.
+ */
+export async function POST(request: NextRequest) {
+  const form = await request.formData();
+  const payState = Number(form.get("pay_state") ?? "0");
+  const rebillNo = String(form.get("rebill_no") ?? "");
+  const mulNo = String(form.get("mul_no") ?? "");
+  const var1 = String(form.get("var1") ?? "");
+  const price = Number(form.get("price") ?? "0");
 
-  // PayApp passes these as query params (snake_case in practice)
-  const payState = Number(searchParams.get("pay_state") ?? searchParams.get("payState") ?? "0");
-  const rebillNo = searchParams.get("rebill_no") ?? searchParams.get("rebillNo");
-  const mulNo = searchParams.get("mul_no") ?? searchParams.get("mulNo");
-  const var1 = searchParams.get("var1") ?? "";
-  const price = Number(searchParams.get("price") ?? "0");
+  const origin = new URL(request.url).origin;
 
-  // Payment not successful → back to checkout
-  if (payState !== 4) {
-    return NextResponse.redirect(new URL("/checkout?error=payment_failed", request.url));
+  if (payState !== 4 || !rebillNo) {
+    return NextResponse.redirect(new URL("/checkout?error=payment_failed", origin), 303);
   }
 
-  if (!rebillNo) {
-    return NextResponse.redirect(new URL("/checkout?error=payment_failed", request.url));
-  }
-
-  // Parse userId:plan from var1
   const colonIdx = var1.indexOf(":");
-  const userId = colonIdx > 0 ? var1.slice(0, colonIdx) : var1;
-  const plan = colonIdx > 0 ? var1.slice(colonIdx + 1) : null;
+  const userId = colonIdx > 0 ? var1.slice(0, colonIdx) : "";
+  const plan = colonIdx > 0 ? var1.slice(colonIdx + 1) : "";
 
-  if (!plan || !userId) {
-    return NextResponse.redirect(new URL("/settings?from=payment", request.url));
+  if (!userId || (plan !== "basic" && plan !== "pro")) {
+    return NextResponse.redirect(new URL("/settings?from=payment", origin), 303);
   }
 
   try {
-    const user = await getAuthenticatedUser();
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-
     const supabase = await createServerClient();
 
-    // Idempotent: webhook may have already created the subscription
     const { data: existing } = await supabase
       .from("subscriptions")
       .select("id")
@@ -52,7 +47,7 @@ export async function GET(request: NextRequest) {
       const nowIso = new Date().toISOString();
 
       await supabase.from("subscriptions").insert({
-        user_id: user.userId,
+        user_id: userId,
         plan,
         rebill_no: rebillNo,
         status: "active",
@@ -64,7 +59,7 @@ export async function GET(request: NextRequest) {
       if (mulNo) {
         await supabase.from("payment_history").upsert(
           {
-            user_id: user.userId,
+            user_id: userId,
             mul_no: mulNo,
             rebill_no: rebillNo,
             amount: price,
@@ -77,8 +72,12 @@ export async function GET(request: NextRequest) {
     }
   } catch (err) {
     console.error("[activate-from-return] error:", err instanceof Error ? err.message : err);
-    // Don't fail hard — user paid, redirect to settings and let them see status
   }
 
+  return NextResponse.redirect(new URL("/settings?from=payment", origin), 303);
+}
+
+/** Fallback: user lands here via GET (no skip_cstpage) — just bounce to settings. */
+export async function GET(request: NextRequest) {
   return NextResponse.redirect(new URL("/settings?from=payment", request.url));
 }

@@ -33,6 +33,8 @@ interface RegisterRebillParams {
   feedbackurl?: string;
   returnurl?: string;
   failurl?: string;
+  /** `y`: 매출전표 스킵, returnurl로 결제정보를 POST 전달 */
+  skip_cstpage?: "y" | "n";
 }
 
 interface CancelPaymentParams {
@@ -159,6 +161,7 @@ export async function registerRebill(
     ...(params.feedbackurl !== undefined && { feedbackurl: params.feedbackurl }),
     ...(params.returnurl !== undefined && { returnurl: params.returnurl }),
     ...(params.failurl !== undefined && { failurl: params.failurl }),
+    ...(params.skip_cstpage !== undefined && { skip_cstpage: params.skip_cstpage }),
   });
   return parseResult(raw);
 }
