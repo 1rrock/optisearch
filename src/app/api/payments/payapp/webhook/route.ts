@@ -189,7 +189,6 @@ async function recordPaymentHistory(
       pay_type: payload.payType,
       purpose: payload.purpose,
       receipt_url: payload.receiptUrl,
-      status: kind,
       paid_at: payload.payDateIso ?? new Date().toISOString(),
       raw: payload.raw,
     },
