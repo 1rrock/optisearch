@@ -1,14 +1,19 @@
 import { NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
-import { cancelPayment, cancelRebill, deleteBillKey } from "@/shared/lib/payapp";
+import { cancelPayment, cancelRebill } from "@/shared/lib/payapp";
 import { REFUND_POLICY } from "@/shared/config/constants";
-import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
-import { addDaysToKstDate } from "@/shared/lib/payapp-time";
-import {
-  pickFirstSubscriptionPaymentMulNo,
-  requiresRemoteCleanupReview,
-} from "@/shared/lib/payapp-launch-rules";
+
+/**
+ * POST /api/payments/refund
+ * Body: { mulNo }
+ *
+ * 셀프 환불 조건:
+ * - 결제 후 REFUND_POLICY.maxDaysSincePayment 일 이내
+ * - 키워드 검색 ≤ REFUND_POLICY.maxKeywordSearches
+ * - AI 기능 사용 ≤ REFUND_POLICY.maxAiUsage
+ * - 첫 정기구독 결제 건에 한함
+ */
 
 type RefundablePaymentRow = {
   id: string;
@@ -41,24 +46,12 @@ export async function POST(request: Request) {
 
   try {
     const supabase = await createServerClient();
-    let { data: payment, error: paymentError } = await supabase
+
+    const { data: payment, error: paymentError } = await supabase
       .from("payment_history")
       .select("id, user_id, mul_no, amount, paid_at, provider_paid_at, purpose, refunded_at")
       .eq("mul_no", mulNo)
       .maybeSingle();
-
-    if (paymentError && isPaymentHistoryColumnMissingError(paymentError, ["provider_paid_at"])) {
-      const fallback = await supabase
-        .from("payment_history")
-        .select("id, user_id, mul_no, amount, paid_at, purpose, refunded_at")
-        .eq("mul_no", mulNo)
-        .maybeSingle();
-
-      payment = fallback.data
-        ? { ...fallback.data, provider_paid_at: null }
-        : null;
-      paymentError = fallback.error;
-    }
 
     if (paymentError) {
       return NextResponse.json({ error: paymentError.message }, { status: 500 });
@@ -68,15 +61,12 @@ export async function POST(request: Request) {
     if (!paymentRow) {
       return NextResponse.json({ error: "해당 결제 내역을 찾을 수 없습니다." }, { status: 404 });
     }
-
     if (paymentRow.user_id !== user.userId) {
       return NextResponse.json({ error: "이 결제에 대한 권한이 없습니다." }, { status: 403 });
     }
-
     if (paymentRow.refunded_at) {
       return NextResponse.json({ error: "이미 환불 처리된 결제입니다." }, { status: 400 });
     }
-
     if (paymentRow.purpose !== "subscription") {
       return NextResponse.json(
         { error: "첫 정기구독 결제 건만 셀프 환불할 수 있습니다." },
@@ -84,36 +74,22 @@ export async function POST(request: Request) {
       );
     }
 
-    let { data: subscriptionPayments, error: firstPaymentError } = await supabase
+    // 첫 정기구독 결제인지 확인
+    const { data: subscriptionPayments, error: firstPaymentError } = await supabase
       .from("payment_history")
-      .select("mul_no, purpose, provider_paid_at, paid_at")
+      .select("mul_no, provider_paid_at, paid_at")
       .eq("user_id", user.userId)
       .eq("purpose", "subscription")
       .not("paid_at", "is", null)
-      .limit(100);
-
-    if (firstPaymentError && isPaymentHistoryColumnMissingError(firstPaymentError, ["provider_paid_at"])) {
-      const fallback = await supabase
-        .from("payment_history")
-        .select("mul_no, purpose, paid_at")
-        .eq("user_id", user.userId)
-        .eq("purpose", "subscription")
-        .not("paid_at", "is", null)
-        .limit(100);
-
-      subscriptionPayments = (fallback.data ?? []).map((payment) => ({
-        ...payment,
-        provider_paid_at: null,
-      }));
-      firstPaymentError = fallback.error;
-    }
+      .order("paid_at", { ascending: true })
+      .limit(1);
 
     if (firstPaymentError) {
       return NextResponse.json({ error: firstPaymentError.message }, { status: 500 });
     }
 
-    const firstSubscriptionMulNo = pickFirstSubscriptionPaymentMulNo(subscriptionPayments ?? []);
-    if (!firstSubscriptionMulNo || firstSubscriptionMulNo !== mulNo) {
+    const firstMulNo = subscriptionPayments?.[0]?.mul_no ?? null;
+    if (firstMulNo !== mulNo) {
       return NextResponse.json(
         { error: "첫 정기구독 결제 건만 셀프 환불이 가능합니다." },
         { status: 400 }
@@ -124,14 +100,11 @@ export async function POST(request: Request) {
     if (!paidAtIso) {
       return NextResponse.json({ error: "결제 일시 정보가 없습니다." }, { status: 400 });
     }
-
-    const paidAt = new Date(paidAtIso);
-    const daysSincePayment = (Date.now() - paidAt.getTime()) / (1000 * 60 * 60 * 24);
+    const daysSincePayment =
+      (Date.now() - new Date(paidAtIso).getTime()) / (1000 * 60 * 60 * 24);
     if (daysSincePayment > REFUND_POLICY.maxDaysSincePayment) {
       return NextResponse.json(
-        {
-          error: `결제일로부터 ${REFUND_POLICY.maxDaysSincePayment}일이 경과하여 환불이 불가합니다.`,
-        },
+        { error: `결제일로부터 ${REFUND_POLICY.maxDaysSincePayment}일이 경과하여 환불이 불가합니다.` },
         { status: 400 }
       );
     }
@@ -145,7 +118,6 @@ export async function POST(request: Request) {
     if (aiError) {
       return NextResponse.json({ error: aiError.message }, { status: 500 });
     }
-
     if ((aiCount ?? 0) > REFUND_POLICY.maxAiUsage) {
       return NextResponse.json({ error: "AI 기능 사용 이력이 있어 환불이 불가합니다." }, { status: 400 });
     }
@@ -159,12 +131,9 @@ export async function POST(request: Request) {
     if (searchError) {
       return NextResponse.json({ error: searchError.message }, { status: 500 });
     }
-
     if ((searchCount ?? 0) > REFUND_POLICY.maxKeywordSearches) {
       return NextResponse.json(
-        {
-          error: `키워드 검색을 ${REFUND_POLICY.maxKeywordSearches}회 초과하여 환불이 불가합니다.`,
-        },
+        { error: `키워드 검색을 ${REFUND_POLICY.maxKeywordSearches}회 초과하여 환불이 불가합니다.` },
         { status: 400 }
       );
     }
@@ -173,13 +142,9 @@ export async function POST(request: Request) {
       mulNo,
       memo: "7일 이내 첫 정기구독 결제 환불",
     });
-
     if (cancelResult.state !== 1) {
       return NextResponse.json(
-        {
-          error: "결제 취소 API 호출에 실패했습니다. 고객센터에서 확인이 필요합니다.",
-          detail: cancelResult.errorMessage,
-        },
+        { error: "결제 취소에 실패했습니다. 고객센터에 문의해주세요.", detail: cancelResult.errorMessage },
         { status: 502 }
       );
     }
@@ -187,125 +152,43 @@ export async function POST(request: Request) {
     const nowIso = new Date().toISOString();
     const { data: subscription } = await supabase
       .from("subscriptions")
-      .select("id, bill_key, rebill_no")
+      .select("id, rebill_no")
       .eq("user_id", user.userId)
       .maybeSingle();
 
-    const cleanup = await tryDisableFutureBilling(subscription?.bill_key ?? null, subscription?.rebill_no ?? null);
-
-    if (subscription && !cleanup.ok) {
-      await queueRemoteCleanupReview(
-        supabase,
-        user.userId,
-        subscription.id,
-        cleanup.error,
-        {
-          billKey: subscription.bill_key,
-          rebillNo: subscription.rebill_no,
-          refundedMulNo: mulNo,
-        }
-      );
+    // rebill best-effort 취소
+    if (subscription?.rebill_no) {
+      try {
+        await cancelRebill(subscription.rebill_no);
+      } catch (err) {
+        console.warn("[refund] rebillCancel best-effort failed:", err);
+      }
     }
 
-    let { error: paymentUpdateError } = await supabase
+    await supabase
       .from("payment_history")
-      .update({
-        refunded_at: nowIso,
-        refund_amount: paymentRow.amount,
-      })
+      .update({ refunded_at: nowIso })
       .eq("mul_no", mulNo);
 
-    if (paymentUpdateError && isPaymentHistoryColumnMissingError(paymentUpdateError, ["refund_amount"])) {
-      const fallback = await supabase
-        .from("payment_history")
-        .update({ refunded_at: nowIso })
-        .eq("mul_no", mulNo);
-      paymentUpdateError = fallback.error;
-    }
-
-    if (paymentUpdateError) {
-      return NextResponse.json({ error: paymentUpdateError.message }, { status: 500 });
-    }
-
     if (subscription) {
-      const { error: subscriptionUpdateError } = await supabase
+      await supabase
         .from("subscriptions")
         .update({
           status: "stopped",
           stopped_reason: "refunded",
-          current_period_end: addDaysToKstDate(nowIso, -1),
-          next_billing_date: null,
-          cancel_requested_at: nowIso,
-          remote_cleanup_required: requiresRemoteCleanupReview(cleanup.ok),
-          remote_cleanup_queued_at: requiresRemoteCleanupReview(cleanup.ok) ? nowIso : null,
-          last_manual_review_at: requiresRemoteCleanupReview(cleanup.ok) ? nowIso : null,
-          last_manual_review_reason: !cleanup.ok ? cleanup.error : null,
+          canceled_at: nowIso,
         })
         .eq("id", subscription.id);
-
-      if (subscriptionUpdateError) {
-        return NextResponse.json({ error: subscriptionUpdateError.message }, { status: 500 });
-      }
     }
 
     return NextResponse.json({
       ok: true,
       refundedAmount: paymentRow.amount,
-      manualReview: requiresRemoteCleanupReview(cleanup.ok),
     });
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "서버 오류가 발생했습니다." },
+      { error: err instanceof Error ? err.message : "서버 오류가 발생했습니다." },
       { status: 500 }
     );
-  }
-}
-
-async function tryDisableFutureBilling(
-  billKey: string | null,
-  rebillNo: string | null
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (billKey) {
-    const result = await deleteBillKey({ billKey });
-    if (result.state !== 1) {
-      return { ok: false, error: result.errorMessage ?? "billDelete failed" };
-    }
-    return { ok: true };
-  }
-
-  if (rebillNo) {
-    const result = await cancelRebill(rebillNo);
-    if (result.state !== 1) {
-      return { ok: false, error: result.errorMessage ?? "rebillCancel failed" };
-    }
-    return { ok: true };
-  }
-
-  return { ok: true };
-}
-
-async function queueRemoteCleanupReview(
-  supabase: Awaited<ReturnType<typeof createServerClient>>,
-  userId: string,
-  subscriptionId: string,
-  reason: string,
-  payload: Record<string, string | null>
-): Promise<void> {
-  const nowIso = new Date().toISOString();
-  const { error } = await supabase.from("payment_attempts").insert({
-    attempt_key: `remote_cleanup:${subscriptionId}:${nowIso}`,
-    user_id: userId,
-    subscription_id: subscriptionId,
-    attempt_kind: "remote_cleanup",
-    status: "manual_review",
-    amount: 0,
-    provider_request_payload: payload,
-    manual_review_reason: reason,
-    requested_at: nowIso,
-    resolved_at: nowIso,
-  });
-
-  if (error) {
-    throw new Error(`[payments/refund] remote cleanup queue failed: ${error.message}`);
   }
 }

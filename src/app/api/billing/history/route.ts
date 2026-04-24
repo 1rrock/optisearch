@@ -3,7 +3,26 @@ import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { REFUND_POLICY } from "@/shared/config/constants";
 import { isPaymentHistoryColumnMissingError } from "@/shared/lib/payment-history-compat";
-import { pickFirstSubscriptionPaymentMulNo, type SubscriptionPaymentLike } from "@/shared/lib/payapp-launch-rules";
+
+type SubscriptionPaymentLike = {
+  mul_no: string;
+  purpose: string | null;
+  provider_paid_at: string | null;
+  paid_at: string;
+};
+
+function pickFirstSubscriptionPaymentMulNo(
+  rows: SubscriptionPaymentLike[]
+): string | null {
+  const subs = rows.filter((r) => r.purpose === "subscription");
+  if (subs.length === 0) return null;
+  subs.sort((a, b) => {
+    const aKey = a.provider_paid_at ?? a.paid_at;
+    const bKey = b.provider_paid_at ?? b.paid_at;
+    return new Date(aKey).getTime() - new Date(bKey).getTime();
+  });
+  return subs[0].mul_no;
+}
 
 export interface PaymentHistoryItem {
   id: string;

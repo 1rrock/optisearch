@@ -4,11 +4,10 @@ import { useIsAuthenticated, useUserPlan } from "@/shared/hooks/use-user";
 import { useEffect, useState } from "react";
 import { CheckCircle2, X } from "lucide-react";
 import Link from "next/link";
-import { calcProRatedDiff } from "@/shared/lib/subscription-upgrade-rules";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { PLAN_PRICING, UPGRADE_DIFF, type PlanId } from "@/shared/config/constants";
+import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 
 type FeatureValue = string | boolean;
 
@@ -65,18 +64,6 @@ function formatAmount(amount: number): string {
   return `${amount.toLocaleString()}원`;
 }
 
-function getTodayKstDateString(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function isGracePeriodEligible(status: string | null | undefined, currentPeriodEnd: string | null | undefined): boolean {
-  return (
-    !!currentPeriodEnd &&
-    (status === "pending_cancel" || status === "stopped") &&
-    currentPeriodEnd >= getTodayKstDateString()
-  );
-}
-
 interface PlanCardProps {
   planId: PlanId;
   currentPlan: PlanId | null;
@@ -84,36 +71,34 @@ interface PlanCardProps {
   checkoutHref: string;
   currentStatus?: string;
   currentPeriodEnd?: string | null;
+  onUpgrade?: (targetPlan: "pro" | "basic") => void;
+  upgradeLoading?: boolean;
 }
 
-function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus, currentPeriodEnd }: PlanCardProps) {
+function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus, currentPeriodEnd, onUpgrade, upgradeLoading }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
-  const hasGracePeriod = isGracePeriodEligible(currentStatus, currentPeriodEnd);
-  const isGraceCurrentPlan = hasGracePeriod && currentPlan === planId;
-  const isGraceBasicToPro = hasGracePeriod && currentPlan === "basic" && planId === "pro";
+  const hasGracePeriod =
+    !!currentPeriodEnd &&
+    (currentStatus === "pending_cancel" || currentStatus === "stopped") &&
+    currentPeriodEnd >= new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const isPendingBilling = currentStatus === "pending_billing";
-  const graceUpgradeAmount = isGraceBasicToPro
-    ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, currentPeriodEnd ?? null)
-    : null;
   const isCurrent = currentStatus !== "stopped" && currentPlan === planId && !hasGracePeriod;
 
   const planRank: Record<PlanId, number> = { free: 0, basic: 1, pro: 2 };
   const currentRank = currentPlan ? planRank[currentPlan] : -1;
   const effectiveRank = currentStatus === "stopped" ? -1 : currentRank;
   const thisRank = planRank[planId];
+  const isGraceCurrentPlan = hasGracePeriod && currentPlan === planId;
   const isSubscribed = !isGraceCurrentPlan && effectiveRank >= thisRank && effectiveRank > 0;
-  const canUpgrade = !isCurrent && thisRank > effectiveRank;
 
-  // Determine button href and label
-  const isUpgradingFromBasic = currentPlan === "basic" && planId === "pro" && canUpgrade && currentStatus !== "stopped" && !hasGracePeriod && !isPendingBilling;
-  const buttonHref = isPendingBilling ? "/settings?pending=1" : isUpgradingFromBasic ? "/settings" : checkoutHref;
+  // Determine CTA
+  const isActiveBasic = currentPlan === "basic" && currentStatus === "active";
+  const isActivePro = currentPlan === "pro" && currentStatus === "active";
 
   const ctaLabel = isCurrent
     ? "현재 플랜"
     : isPendingBilling
     ? "설정에서 확인"
-    : isUpgradingFromBasic
-    ? "설정에서 업그레이드"
     : isGraceCurrentPlan
     ? currentStatus === "pending_cancel"
       ? "만료 후 계속 사용"
@@ -122,11 +107,17 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus,
     ? "현재 플랜"
     : planId === "free"
     ? "시작하기"
-    : isGraceBasicToPro
-    ? "즉시 업그레이드"
-    : currentStatus === "stopped" && currentPlan === planId
+    : isActiveBasic && planId === "pro"
+    ? "프로로 업그레이드"
+    : isActivePro && planId === "basic"
+    ? "베이직으로 변경"
+    : hasGracePeriod && currentStatus === "stopped" && currentPlan === planId
     ? "재구독"
     : "결제하기";
+
+  const isUpgradeButton = (isActiveBasic && planId === "pro") || (isActivePro && planId === "basic");
+
+  const buttonHref = isPendingBilling ? "/settings?pending=1" : checkoutHref;
 
   return (
     <Card
@@ -191,38 +182,39 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus,
         </ul>
 
         {/* CTA */}
-        <Button
-          asChild
-          size="lg"
-          variant={!canUpgrade && planId !== "free" ? "outline" : planId === "free" ? "outline" : "default"}
-          disabled={isCurrent || isSubscribed}
-          className={[
-            "w-full rounded-xl font-bold h-12",
-            isPopular && canUpgrade
-              ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
-              : "",
-          ].join(" ")}
-        >
-          <Link href={buttonHref}>{ctaLabel}</Link>
-        </Button>
+        {isUpgradeButton ? (
+          <Button
+            size="lg"
+            variant="default"
+            disabled={upgradeLoading}
+            onClick={() => onUpgrade?.(planId === "pro" ? "pro" : "basic")}
+            className={[
+              "w-full rounded-xl font-bold h-12",
+              isPopular ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform" : "",
+            ].join(" ")}
+          >
+            {upgradeLoading ? "처리 중..." : ctaLabel}
+          </Button>
+        ) : (
+          <Button
+            asChild
+            size="lg"
+            variant={!isCurrent && !isSubscribed && planId !== "free" ? "default" : "outline"}
+            disabled={isCurrent || isSubscribed}
+            className={[
+              "w-full rounded-xl font-bold h-12",
+              isPopular && !isCurrent && !isSubscribed
+                ? "bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform"
+                : "",
+            ].join(" ")}
+          >
+            <Link href={buttonHref}>{ctaLabel}</Link>
+          </Button>
+        )}
 
         {isGraceCurrentPlan && currentPeriodEnd && (
           <p className="text-xs text-muted-foreground leading-relaxed">
             {formatDate(currentPeriodEnd)}까지 현재 권한 유지 · 이후 {pricing.label} 월 {formatAmount(pricing.monthly)} 정기결제 재개
-          </p>
-        )}
-
-        {isGraceBasicToPro && currentPeriodEnd && (
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            {graceUpgradeAmount === 0
-              ? "오늘 추가 결제 없이 프로 권한이 바로 적용되고"
-              : `오늘 ${formatAmount(graceUpgradeAmount ?? 0)} 즉시 결제 후 프로 권한이 바로 적용되고`} 다음 정기결제는 {formatDate(currentPeriodEnd)}부터 월 {formatAmount(PLAN_PRICING.pro.monthly)}입니다.
-          </p>
-        )}
-
-        {isUpgradingFromBasic && (
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            현재 베이직 사용 중이라 프로 변경은 설정에서 차액 결제로 진행됩니다.
           </p>
         )}
 
@@ -247,6 +239,7 @@ function PricingContent() {
     status: null,
     currentPeriodEnd: null,
   });
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -262,11 +255,12 @@ function PricingContent() {
   }, [isAuthenticated]);
 
   const currentPlan: PlanId | null = isAuthenticated ? userPlan : null;
-  const hasGracePeriodEntitlement = isGracePeriodEligible(subInfo.status, subInfo.currentPeriodEnd) && !!currentPlan && currentPlan !== "free";
-  const graceUpgradeAmount =
-    currentPlan === "basic" && hasGracePeriodEntitlement
-      ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, subInfo.currentPeriodEnd)
-      : null;
+
+  const todayKst = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const hasGracePeriodEntitlement =
+    subInfo.status === "pending_cancel" ||
+    (subInfo.status === "stopped" && !!subInfo.currentPeriodEnd && subInfo.currentPeriodEnd > todayKst);
+
   const hasPendingBilling = subInfo.status === "pending_billing";
 
   const checkoutPathByPlan: Record<PlanId, string> = {
@@ -281,6 +275,29 @@ function PricingContent() {
       return targetPath;
     }
     return `/login?callbackUrl=${encodeURIComponent(targetPath)}`;
+  };
+
+  const handleUpgrade = async (targetPlan: "pro" | "basic") => {
+    setUpgradeLoading(true);
+    try {
+      const res = await fetch("/api/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: targetPlan }),
+      });
+      const result = await res.json() as { nextStep?: string; error?: string };
+      if (!res.ok) {
+        console.error(result.error ?? "업그레이드 요청 실패");
+        return;
+      }
+      if (result.nextStep) {
+        window.location.href = result.nextStep;
+      }
+    } catch {
+      console.error("네트워크 오류");
+    } finally {
+      setUpgradeLoading(false);
+    }
   };
 
   return (
@@ -320,12 +337,6 @@ function PricingContent() {
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
               같은 플랜을 계속 쓰면 {formatDate(subInfo.currentPeriodEnd)}부터 {PLAN_PRICING[currentPlan].label} 월 {formatAmount(PLAN_PRICING[currentPlan].monthly)} 정기결제가 다시 시작됩니다.
-              {currentPlan === "basic" && graceUpgradeAmount !== null && (
-                <>
-                  {" "}
-                  프로로 변경하면 {graceUpgradeAmount === 0 ? "오늘 추가 결제 없이" : `오늘 ${formatAmount(graceUpgradeAmount)} 즉시 결제 후`} 프로 권한이 바로 적용되고, 다음 정기결제는 {formatDate(subInfo.currentPeriodEnd)}부터 월 {formatAmount(PLAN_PRICING.pro.monthly)}입니다.
-                </>
-              )}
             </p>
           </div>
 
@@ -352,6 +363,8 @@ function PricingContent() {
           checkoutHref={getCheckoutHref("free")}
           currentStatus={subInfo.status ?? undefined}
           currentPeriodEnd={subInfo.currentPeriodEnd}
+          onUpgrade={handleUpgrade}
+          upgradeLoading={upgradeLoading}
         />
         <PlanCard
           planId="basic"
@@ -360,6 +373,8 @@ function PricingContent() {
           checkoutHref={getCheckoutHref("basic")}
           currentStatus={subInfo.status ?? undefined}
           currentPeriodEnd={subInfo.currentPeriodEnd}
+          onUpgrade={handleUpgrade}
+          upgradeLoading={upgradeLoading}
         />
         <PlanCard
           planId="pro"
@@ -367,6 +382,8 @@ function PricingContent() {
           checkoutHref={getCheckoutHref("pro")}
           currentStatus={subInfo.status ?? undefined}
           currentPeriodEnd={subInfo.currentPeriodEnd}
+          onUpgrade={handleUpgrade}
+          upgradeLoading={upgradeLoading}
         />
       </div>
 

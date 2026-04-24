@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useDashboardData } from "@/shared/hooks/use-user";
 import { useUserStore } from "@/shared/stores/user-store";
-import { calcProRatedDiff } from "@/shared/lib/subscription-upgrade-rules";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/ui/card";
 import { Button } from "@/shared/ui/button";
 import {
@@ -18,7 +17,7 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog";
-import { PLAN_LIMITS, PLAN_PRICING, UPGRADE_DIFF, type PlanId } from "@/shared/config/constants";
+import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, LogOut, ArrowUpCircle, ArrowDownCircle, XCircle, AlertTriangle } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
@@ -31,28 +30,12 @@ interface SubscriptionInfo {
   status: string | null;
   currentPeriodEnd: string | null;
   nextBillingDate: string | null;
-  pendingAction: string | null;
-  pendingPlan: string | null;
-  pendingStartDate: string | null;
-  failedChargeCount?: number;
 }
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
   return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-function getTodayKstDateString(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function isGracePeriodEligible(status: string | null, currentPeriodEnd: string | null): boolean {
-  return (
-    !!currentPeriodEnd &&
-    (status === "pending_cancel" || status === "stopped") &&
-    currentPeriodEnd >= getTodayKstDateString()
-  );
 }
 
 function UsageBar({ label, used, limit, icon }: { label: string; used: number; limit: number; icon: React.ReactNode }) {
@@ -104,7 +87,6 @@ function SkeletonCard() {
 }
 
 function SettingsPageContent() {
-  const router = useRouter();
   const [activeSection, setActiveSection] = useState<Section>("subscription");
   const [subInfo, setSubInfo] = useState<SubscriptionInfo | null>(null);
 
@@ -116,8 +98,6 @@ function SettingsPageContent() {
   // 모달 상태
   const [downgradeOpen, setDowngradeOpen] = useState(false);
   const [cancelStep, setCancelStep] = useState<0 | 1 | 2>(0); // 0=closed, 1=step1, 2=step2
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradePreview, setUpgradePreview] = useState<{ amount: number; nextBillingDate: string | null } | null>(null);
 
   const dashboardStore = useDashboardData();
   const refreshDashboard = useUserStore((s) => s.refresh);
@@ -137,20 +117,12 @@ function SettingsPageContent() {
         status?: string;
         currentPeriodEnd?: string;
         nextBillingDate?: string;
-        pendingAction?: string;
-        pendingPlan?: string;
-        pendingStartDate?: string;
-        failedChargeCount?: number;
       };
       setSubInfo({
         plan: (json.plan ?? "free") as PlanId,
         status: json.status ?? null,
         currentPeriodEnd: json.currentPeriodEnd ?? null,
         nextBillingDate: json.nextBillingDate ?? null,
-        pendingAction: json.pendingAction ?? null,
-        pendingPlan: json.pendingPlan ?? null,
-        pendingStartDate: json.pendingStartDate ?? null,
-        failedChargeCount: json.failedChargeCount ?? 0,
       });
     } catch {
       // 조회 실패 시 무시 (기본값으로 폴백)
@@ -173,64 +145,31 @@ function SettingsPageContent() {
     url.searchParams.delete("billing");
     window.history.replaceState({}, "", url.toString());
 
-    // sessionStorage에서 결제 정보 읽기
-    let pending: { plan: string; rebillNo: string | null; isBillKey?: boolean } | null = null;
-    try {
-      const raw = sessionStorage.getItem("payapp_pending");
-      if (raw) pending = JSON.parse(raw) as { plan: string; rebillNo: string | null; isBillKey?: boolean };
-    } catch {
-      // ignore
-    }
-
-    // billkey 흐름: 카드 등록 후 첫 결제/구독 상태는 webhook이 authoritative하게 반영
-    if (pending?.isBillKey) {
-      try { sessionStorage.removeItem("payapp_pending"); } catch { /* ignore */ }
-      void fetchSubInfo().then(() => {
-        void refreshDashboard();
-        toast.success("카드 등록 후 결제 확인이 진행 중입니다. 구독 상태가 자동으로 반영됩니다.", { duration: 6000 });
-      });
-      return;
-    }
-
-    if (!pending) {
-      // sessionStorage 없으면 (다른 브라우저/탭 등) fetchSubInfo만 재조회
-      void fetchSubInfo().then(() => {
-        void refreshDashboard();
-        toast.success("결제 확인이 진행 중입니다. 잠시 후 구독 상태를 다시 확인해 주세요.", { duration: 5000 });
-      });
-      return;
-    }
-
-    const { rebillNo } = pending;
-
-    // return-url만으로는 더 이상 유료 권한을 활성화하지 않음
-    if (!rebillNo) {
-      try { sessionStorage.removeItem("payapp_pending"); } catch { /* ignore */ }
-      void fetchSubInfo().then(() => void refreshDashboard());
-      return;
-    }
-
-    try { sessionStorage.removeItem("payapp_pending"); } catch { /* ignore */ }
     void fetchSubInfo().then(() => {
       void refreshDashboard();
-      toast.success("결제 상태는 PayApp 웹훅 확인 후 자동 반영됩니다.", { duration: 5000 });
+      toast.success("결제 확인이 진행 중입니다. 잠시 후 구독 상태를 다시 확인해 주세요.", { duration: 5000 });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const formatAmount = (n: number) => n.toLocaleString("ko-KR") + "원";
 
-  const handleUpgradeClick = async () => {
+  const handleUpgrade = async () => {
     setUpgradeLoading(true);
     try {
-      const res = await fetch("/api/subscription/upgrade", { method: "GET" });
-      const data = await res.json() as { previewAmount?: number; nextBillingDate?: string | null; error?: string };
+      const res = await fetch("/api/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro" }),
+      });
+      const data = await res.json() as { nextStep?: string; error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "금액 조회 실패");
+        toast.error(data.error ?? "업그레이드 요청 실패");
         return;
       }
-      setUpgradePreview({ amount: data.previewAmount ?? 0, nextBillingDate: data.nextBillingDate ?? null });
-      setUpgradeOpen(true);
+      if (data.nextStep) {
+        window.location.href = data.nextStep;
+      }
     } catch {
       toast.error("네트워크 오류");
     } finally {
@@ -238,25 +177,21 @@ function SettingsPageContent() {
     }
   };
 
-  const handleUpgrade = async () => {
+  const handleDowngradeToBasic = async () => {
     setUpgradeLoading(true);
     try {
-      const res = await fetch("/api/subscription/upgrade", { method: "POST" });
-      const data = await res.json() as { ok?: boolean; method?: string; mulNo?: string; checkoutUrl?: string; proRatedAmount?: number; error?: string };
+      const res = await fetch("/api/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "basic" }),
+      });
+      const data = await res.json() as { nextStep?: string; error?: string };
       if (!res.ok) {
-        toast.error(data.error ?? "업그레이드 요청 실패");
+        toast.error(data.error ?? "변경 요청 실패");
         return;
       }
-      setUpgradeOpen(false);
-      if (data.method === "free_upgrade") {
-        toast.success("오늘이 결제일로 무료 업그레이드 완료! 곧 Pro 혜택이 적용됩니다.");
-        setTimeout(() => router.refresh(), 2000);
-      } else if (data.method === "billpay_instant") {
-        const amount = data.proRatedAmount ?? upgradePreview?.amount ?? 0;
-        toast.success(`Pro 업그레이드 차액 ${formatAmount(amount)} 결제 요청이 접수되었습니다. 결제 확인 후 자동 반영됩니다.`);
-        setTimeout(() => router.refresh(), 2000);
-      } else {
-        toast.error("알 수 없는 응답 형식");
+      if (data.nextStep) {
+        window.location.href = data.nextStep;
       }
     } catch {
       toast.error("네트워크 오류");
@@ -308,7 +243,7 @@ function SettingsPageContent() {
         toast.success(`구독이 해지되어 다음 결제부터 자동 갱신이 중단됩니다.${refundLabel}`);
       }
       setCancelStep(0);
-      await fetchSubInfo();
+      window.location.reload();
     } catch {
       toast.error("구독 해지 중 오류가 발생했습니다.");
     } finally {
@@ -323,11 +258,9 @@ function SettingsPageContent() {
   const isStopped = subInfo?.status === "stopped";
   const isPendingCancel = subInfo?.status === "pending_cancel";
   const isPendingBilling = subInfo?.status === "pending_billing";
-  const hasGracePeriodEntitlement = isGracePeriodEligible(subInfo?.status ?? null, subInfo?.currentPeriodEnd ?? null);
-  const graceUpgradeAmount =
-    plan === "basic" && hasGracePeriodEntitlement
-      ? calcProRatedDiff(UPGRADE_DIFF.basicToPro, subInfo?.currentPeriodEnd ?? null)
-      : null;
+  const hasGracePeriodEntitlement =
+    subInfo?.status === "pending_cancel" ||
+    (subInfo?.status === "stopped" && !!subInfo.currentPeriodEnd && new Date(subInfo.currentPeriodEnd) > new Date());
   const wasRedirectedFromCheckout = searchParams.get("already") === "1";
   const hasPendingBillingRedirect = searchParams.get("pending") === "1";
   const cancelActionDescription = isPendingBilling
@@ -397,61 +330,11 @@ function SettingsPageContent() {
                     </div>
                   )}
 
-                  {/* Pending action 알림 배너 */}
-                  {subInfo?.pendingAction === "upgrade" && (
+                  {isPendingCancel && subInfo?.currentPeriodEnd && (
                     <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
                       <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                       <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                        업그레이드 예약됨: {formatDate(subInfo.pendingStartDate)}부터 프로 플랜이 적용됩니다.
-                      </p>
-                    </div>
-                  )}
-                  {subInfo?.pendingAction === "downgrade" && (
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
-                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                      <div className="flex-1 flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-                          다운그레이드 예약됨: {formatDate(subInfo.pendingStartDate)}부터 베이직 플랜이 적용됩니다.
-                        </p>
-                        <button
-                          onClick={async () => {
-                            try {
-                              const res = await fetch("/api/subscription/cancel-pending", { method: "POST" });
-                              const data = await res.json();
-                              if (!res.ok) {
-                                toast.error(data.error ?? "예약 취소 실패");
-                              } else {
-                                toast.success("다운그레이드 예약이 취소되었습니다. Pro 플랜이 유지됩니다.");
-                                router.refresh();
-                              }
-                            } catch {
-                              toast.error("네트워크 오류");
-                            }
-                          }}
-                          className="text-xs text-amber-700 dark:text-amber-300 underline hover:no-underline shrink-0"
-                        >
-                          예약 취소
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 결제 실패 경고 배너 */}
-                  {(subInfo?.failedChargeCount ?? 0) === 1 && (
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-800">
-                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-amber-700 dark:text-amber-300 font-medium">
-                        이번 달 자동결제에 실패했습니다. 결제 수단을 확인해주세요.
-                        <br />
-                        <span className="font-normal">(2회 더 실패 시 구독이 자동으로 중단됩니다)</span>
-                      </p>
-                    </div>
-                  )}
-                  {(subInfo?.failedChargeCount ?? 0) >= 2 && !isStopped && (
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-destructive/10 border border-destructive/30">
-                      <AlertTriangle className="size-4 text-destructive mt-0.5 shrink-0" />
-                      <p className="text-sm text-destructive font-medium">
-                        결제 실패 2회 누적. 다음 결제 실패 시 구독이 즉시 중단됩니다.
+                        다음 결제부터 해지 예정입니다. {formatDate(subInfo.currentPeriodEnd)}까지 현재 플랜을 계속 사용할 수 있습니다.
                       </p>
                     </div>
                   )}
@@ -482,15 +365,6 @@ function SettingsPageContent() {
                           진행 중인 결제 취소
                         </Button>
                       </div>
-                    </div>
-                  )}
-
-                  {isPendingCancel && subInfo?.currentPeriodEnd && (
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
-                      <AlertTriangle className="size-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                      <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                        다음 결제부터 해지 예정입니다. {formatDate(subInfo.currentPeriodEnd)}까지 현재 플랜을 계속 사용할 수 있습니다.
-                      </p>
                     </div>
                   )}
 
@@ -602,12 +476,6 @@ function SettingsPageContent() {
                           <span className="text-xs text-muted-foreground leading-relaxed">
                             현재 {pricing.label} 이용 권한은 {formatDate(subInfo.currentPeriodEnd)}까지 유지됩니다.
                             같은 플랜을 계속 쓰면 {formatDate(subInfo.currentPeriodEnd)}부터 {pricing.label} 월 {pricing.monthly.toLocaleString()}원 정기결제가 다시 시작됩니다.
-                            {plan === "basic" && graceUpgradeAmount !== null && (
-                              <>
-                                {" "}
-                                프로로 변경하면 {graceUpgradeAmount === 0 ? "오늘 추가 결제 없이" : `오늘 ${formatAmount(graceUpgradeAmount)}이 즉시 결제되고`} 결제 확인 후 프로 권한이 바로 적용되며, 다음 정기결제는 {formatDate(subInfo.currentPeriodEnd)}부터 월 {PLAN_PRICING.pro.monthly.toLocaleString()}원입니다.
-                              </>
-                            )}
                           </span>
                         </div>
 
@@ -627,7 +495,7 @@ function SettingsPageContent() {
                     )}
 
                     {/* basic 플랜: pro 업그레이드 */}
-                    {plan === "basic" && isActive && !isPendingCancel && !subInfo?.pendingAction && (
+                    {plan === "basic" && isActive && !isPendingCancel && (
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-blue-50/50 border border-blue-100 dark:bg-blue-950/20 dark:border-blue-900/50">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-sm font-bold text-foreground">프로 플랜으로 업그레이드</span>
@@ -635,27 +503,27 @@ function SettingsPageContent() {
                         </div>
                         <Button
                           className="rounded-xl font-bold shrink-0 w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={handleUpgradeClick}
+                          onClick={handleUpgrade}
                           disabled={upgradeLoading}
                         >
                           <ArrowUpCircle className="size-4 mr-1.5" />
-                          {upgradeLoading ? "금액 확인 중..." : `프로로 업그레이드 (+${UPGRADE_DIFF.basicToPro.toLocaleString()}원)`}
+                          {upgradeLoading ? "처리 중..." : "프로로 업그레이드"}
                         </Button>
                       </div>
                     )}
 
                     {/* pro 플랜: basic 다운그레이드 */}
-                    {plan === "pro" && isActive && !isPendingCancel && !subInfo?.pendingAction && (
+                    {plan === "pro" && isActive && !isPendingCancel && (
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-sm font-medium text-foreground">플랜 다운그레이드</span>
-                          <span className="text-xs text-muted-foreground">다음 결제일부터 베이직 플랜({PLAN_PRICING.basic.monthly.toLocaleString()}원/월)이 적용됩니다.</span>
+                          <span className="text-sm font-medium text-foreground">플랜 변경</span>
+                          <span className="text-xs text-muted-foreground">베이직 플랜({PLAN_PRICING.basic.monthly.toLocaleString()}원/월)으로 변경합니다.</span>
                         </div>
                         <Button
                           variant="outline"
                           className="rounded-xl font-bold shrink-0 ml-4"
-                          onClick={() => setDowngradeOpen(true)}
-                          disabled={downgradeLoading}
+                          onClick={handleDowngradeToBasic}
+                          disabled={upgradeLoading}
                         >
                           <ArrowDownCircle className="size-4 mr-1.5" />
                           베이직으로 변경
@@ -663,18 +531,8 @@ function SettingsPageContent() {
                       </div>
                     )}
 
-                    {/* pending_action이 있으면 해지 불가 안내 */}
-                    {plan !== "free" && isActive && !isStopped && !isPendingCancel && subInfo?.pendingAction && (
-                      <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-muted">
-                        <AlertTriangle className="size-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <p className="text-sm text-muted-foreground">
-                          예약된 변경이 있어 해지할 수 없습니다.
-                        </p>
-                      </div>
-                    )}
-
                     {/* active 구독이면 해지 버튼 */}
-                    {plan !== "free" && isActive && !isStopped && !isPendingCancel && !subInfo?.pendingAction && (
+                    {plan !== "free" && isActive && !isStopped && !isPendingCancel && (
                       <div className="flex items-center justify-between">
                         <div className="flex flex-col gap-0.5">
                           <span className="text-sm font-medium text-foreground">구독 해지</span>
@@ -710,7 +568,7 @@ function SettingsPageContent() {
                       <div className="flex items-start gap-3 p-3 rounded-xl bg-muted/40 border border-muted">
                         <AlertTriangle className="size-4 text-muted-foreground mt-0.5 shrink-0" />
                         <p className="text-sm text-muted-foreground">
-                          구독이 해지되었습니다{(subInfo.failedChargeCount ?? 0) >= 3 ? " (결제 실패로 인한 자동 중단)" : ""}. {formatDate(subInfo.currentPeriodEnd)}까지 서비스를 이용하실 수 있습니다.
+                          구독이 해지되었습니다. {formatDate(subInfo.currentPeriodEnd)}까지 서비스를 이용하실 수 있습니다.
                         </p>
                       </div>
                     )}
@@ -742,50 +600,7 @@ function SettingsPageContent() {
         </div>
       </div>
 
-      {/* Pro 업그레이드 금액 확인 모달 */}
-      <AlertDialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Pro로 업그레이드</AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="flex flex-col gap-3 text-sm text-muted-foreground">
-                <div className="flex items-center justify-between py-2 border-b border-muted">
-                  <span>지금 결제</span>
-                  <span className="font-semibold text-foreground">
-                    {upgradePreview?.amount === 0
-                      ? "무료 (오늘이 결제일)"
-                      : formatAmount(upgradePreview?.amount ?? 0) + " (남은 기간 비례)"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-2">
-                  <span>다음 결제</span>
-                  <span className="font-semibold text-foreground">
-                    {formatAmount(PLAN_PRICING.pro.monthly)}/월
-                    {upgradePreview?.nextBillingDate
-                      ? ` (${formatDate(upgradePreview.nextBillingDate)}부터)`
-                      : ""}
-                  </span>
-                </div>
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={upgradeLoading}>취소</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={(e) => {
-                e.preventDefault();
-                void handleUpgrade();
-              }}
-              disabled={upgradeLoading}
-            >
-              {upgradeLoading ? "처리 중..." : "업그레이드 확인"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 다운그레이드 확인 모달 */}
+      {/* 다운그레이드 확인 모달 (legacy, kept for safety) */}
       <AlertDialog open={downgradeOpen} onOpenChange={setDowngradeOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -830,8 +645,8 @@ function SettingsPageContent() {
                 setCancelStep(2);
               }}
             >
-                {isPendingBilling ? "결제 진행 취소" : "해지"}
-              </AlertDialogAction>
+              {isPendingBilling ? "결제 진행 취소" : "해지"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

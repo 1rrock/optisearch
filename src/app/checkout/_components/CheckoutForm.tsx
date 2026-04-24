@@ -4,14 +4,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
-import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { PLAN_PRICING } from "@/shared/config/constants";
 
 interface CheckoutFormProps {
   plan: "basic" | "pro";
-  nextBillingDate?: string | null;
-  currentEntitlementPlan?: PlanId | null;
-  isGracePeriodUpgrade?: boolean;
-  immediateChargeAmount?: number | null;
 }
 
 function normalizeDigits(raw: string): string {
@@ -32,15 +28,6 @@ function formatPhone(raw: string): string {
 
 function stripPhone(formatted: string): string {
   return normalizeDigits(formatted);
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
-}
-
-function formatAmount(amount: number): string {
-  return `${amount.toLocaleString()}원`;
 }
 
 interface CheckboxRowProps {
@@ -67,18 +54,8 @@ function CheckboxRow({ id, checked, onChange, children }: CheckboxRowProps) {
   );
 }
 
-export default function CheckoutForm({
-  plan,
-  nextBillingDate,
-  currentEntitlementPlan,
-  isGracePeriodUpgrade,
-  immediateChargeAmount,
-}: CheckoutFormProps) {
+export default function CheckoutForm({ plan }: CheckoutFormProps) {
   const pricing = PLAN_PRICING[plan];
-  const currentEntitlementLabel = currentEntitlementPlan
-    ? PLAN_PRICING[currentEntitlementPlan].label
-    : null;
-  const isSamePlanGraceResubscribe = !!nextBillingDate && currentEntitlementPlan === plan;
 
   const [phoneDisplay, setPhoneDisplay] = useState("");
   const [agreePrivacy, setAgreePrivacy] = useState(false);
@@ -100,18 +77,17 @@ export default function CheckoutForm({
 
     setLoading(true);
     try {
-      const res = await fetch("/api/payments/payapp/register-billkey", {
+      const res = await fetch("/api/payments/payapp/create-rebill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan, phone }),
       });
 
-        const data = await res.json() as {
-          ok?: boolean;
-          payurl?: string;
-          nextBillingDate?: string;
-          error?: string;
-        };
+      const data = await res.json() as {
+        ok?: boolean;
+        payurl?: string;
+        error?: string;
+      };
 
       if (!res.ok) {
         toast.error(data.error ?? "결제 처리 중 오류가 발생했습니다.");
@@ -120,24 +96,10 @@ export default function CheckoutForm({
       }
 
       if (data.ok && data.payurl) {
-        // billkey 흐름: isBillKey=true 플래그 저장 (activate-from-return 스킵용)
-        try {
-          sessionStorage.setItem(
-            "payapp_pending",
-            JSON.stringify({
-              plan,
-              rebillNo: null, // billkey 흐름에서는 없음
-              isBillKey: true,
-            })
-          );
-        } catch {
-          // sessionStorage 접근 불가 환경이면 무시
-        }
-        // 카드 등록 페이지로 이동
         window.location.href = data.payurl;
         // 리다이렉트 후에는 로딩 상태 유지 (이탈 예정)
       } else {
-        toast.error("카드 등록 링크 생성에 실패했습니다. 다시 시도해주세요.");
+        toast.error("결제 링크 생성에 실패했습니다. 다시 시도해주세요.");
         setLoading(false);
       }
     } catch {
@@ -148,39 +110,14 @@ export default function CheckoutForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      {/* 결제 일정 안내 (grace period 있을 때) */}
-      {isGracePeriodUpgrade && nextBillingDate ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-4 flex flex-col gap-1.5">
-          <p className="text-xs font-bold text-blue-700 dark:text-blue-400">⚡ 프로 권한이 바로 적용됩니다</p>
-          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-            {immediateChargeAmount === 0
-              ? "오늘은 추가 결제 없이"
-              : `오늘 ${formatAmount(immediateChargeAmount ?? 0)}이 즉시 결제되고`} 결제 확인 후 프로 권한이 바로 적용됩니다.
-            <br />
-            현재 {currentEntitlementLabel} 이용 권한은 <strong>{formatDate(nextBillingDate)}</strong>까지 유지되며,
-            다음 정기결제는 그날부터 <strong>{formatAmount(pricing.monthly)}</strong>으로 시작됩니다.
-          </p>
-        </div>
-      ) : nextBillingDate ? (
-        <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 p-4 flex flex-col gap-1">
-          <p className="text-xs font-bold text-blue-700 dark:text-blue-400">📅 결제 예정일 안내</p>
-          <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-            현재 {currentEntitlementLabel} 이용 권한은 <strong>{formatDate(nextBillingDate)}</strong>까지 유지됩니다.
-            <br />
-            {isSamePlanGraceResubscribe
-              ? "지금은 카드만 등록하며, 실제 결제는 이용 기간 종료일부터 같은 플랜으로 다시 시작됩니다."
-              : `${formatDate(nextBillingDate)}부터 ${pricing.label} 플랜으로 변경되어 자동 청구됩니다.`}
-          </p>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex flex-col gap-2">
-          <p className="text-xs font-bold text-primary">💳 웹에서 바로 카드 등록</p>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            카드 등록 버튼 클릭 시 PayApp 결제 페이지로 이동합니다.
-            카드 등록 후 첫 결제가 확인되면 구독이 활성화됩니다.
-          </p>
-        </div>
-      )}
+      {/* 안내 배너 */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex flex-col gap-2">
+        <p className="text-xs font-bold text-primary">💳 카드 등록하고 구독 시작</p>
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          버튼 클릭 시 PayApp 결제 페이지로 이동합니다.
+          결제 확인 후 구독이 활성화됩니다.
+        </p>
+      </div>
 
       {/* 휴대폰번호 입력 */}
       <div className="flex flex-col gap-2">
@@ -208,11 +145,7 @@ export default function CheckoutForm({
       {/* 정기결제 고지 배너 */}
       <div className="border-2 border-destructive rounded-xl p-4 bg-destructive/5">
         <p className="text-sm font-semibold text-destructive leading-relaxed">
-          {isGracePeriodUpgrade && nextBillingDate
-            ? `${immediateChargeAmount === 0 ? "오늘 추가 결제 없이" : `오늘 ${formatAmount(immediateChargeAmount ?? 0)} 즉시 결제 + `}${formatDate(nextBillingDate)}부터 매월 `
-            : nextBillingDate
-            ? `${formatDate(nextBillingDate)}부터 매월 `
-            : "첫 결제 확인 후 매월 "}
+          첫 결제 확인 후 매월{" "}
           <span className="font-black">{pricing.monthly.toLocaleString()}원</span>이 자동으로 결제됩니다.
           언제든{" "}
           <a href="/settings" className="underline hover:text-destructive/80">
@@ -297,33 +230,19 @@ export default function CheckoutForm({
         size="lg"
         disabled={!canSubmit}
         className="w-full h-14 rounded-xl font-black text-base shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform disabled:hover:scale-100"
-        >
-          {loading ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              {isGracePeriodUpgrade
-                ? "업그레이드 결제 페이지 이동 중..."
-                : nextBillingDate
-                ? "카드 등록 페이지 이동 중..."
-                : "결제 페이지 이동 중..."}
-            </span>
-          ) : isGracePeriodUpgrade ? (
-            immediateChargeAmount === 0
-              ? "지금 프로로 업그레이드"
-              : `지금 ${formatAmount(immediateChargeAmount ?? 0)} 결제하고 업그레이드`
-          ) : nextBillingDate ? (
-            isSamePlanGraceResubscribe ? "같은 플랜 계속 사용" : "카드 등록하고 변경 예약"
-          ) : (
-            `${pricing.monthly.toLocaleString()}원 구독 시작`
-          )}
+      >
+        {loading ? (
+          <span className="flex items-center gap-2">
+            <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+            결제 페이지 이동 중...
+          </span>
+        ) : (
+          `${pricing.monthly.toLocaleString()}원 구독 시작`
+        )}
       </Button>
 
       <p className="text-center text-xs text-muted-foreground">
-        {isGracePeriodUpgrade && nextBillingDate
-          ? "결제 확인 후 프로 권한이 바로 적용되며, 다음 정기결제는 현재 이용 기간 종료일부터 시작됩니다."
-          : nextBillingDate
-          ? "카드 등록 완료 후 이용 기간 만료일부터 자동 결제가 시작됩니다."
-          : "버튼 클릭 시 카드 등록 후 첫 결제 확인을 거쳐 구독이 활성화됩니다."}
+        버튼 클릭 시 카드 등록 후 첫 결제 확인을 거쳐 구독이 활성화됩니다.
       </p>
     </form>
   );

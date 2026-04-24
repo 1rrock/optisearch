@@ -3,8 +3,9 @@ import { createServerClient } from "@/shared/lib/supabase";
 import { getKstDateString } from "@/shared/lib/payapp-time";
 
 /**
- * GET /api/subscription — 현재 구독(플랜) 정보 조회
- * 반환: plan, status, currentPeriodEnd, nextBillingDate, pendingAction, pendingPlan, pendingStartDate
+ * GET /api/subscription
+ * pending_billing 상태(결제 미확정)는 entitlement=free로 내려준다.
+ * active 또는 이용기간 남은 pending_cancel/stopped만 유효 플랜으로 간주.
  */
 export async function GET() {
   const user = await getAuthenticatedUser();
@@ -14,17 +15,16 @@ export async function GET() {
 
   try {
     const supabase = await createServerClient();
-
-    // getAuthenticatedUser가 이미 subscriptions에서 plan을 읽어오므로
-    // 여기서는 추가 정보만 조회
-    // stopped 상태이더라도 current_period_end가 오늘 이후이면 유효 구독으로 간주
     const todayKST = getKstDateString();
+
     const { data: sub, error: subError } = await supabase
       .from("subscriptions")
-      .select("plan, status, current_period_end, next_billing_date, pending_action, pending_plan, pending_start_date, failed_charge_count")
+      .select("plan, status, current_period_end, next_billing_date, rebill_no")
       .eq("user_id", user.userId)
-      .or(`status.eq.active,status.eq.pending_billing,and(status.eq.pending_cancel,current_period_end.gte.${todayKST}),and(status.eq.stopped,current_period_end.gte.${todayKST})`)
-      .order("status", { ascending: true }) // 'active' sorts before 'stopped'
+      .or(
+        `status.eq.active,status.eq.pending_billing,and(status.eq.pending_cancel,current_period_end.gte.${todayKST}),and(status.eq.stopped,current_period_end.gte.${todayKST})`
+      )
+      .order("status", { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -33,18 +33,21 @@ export async function GET() {
       return Response.json({ error: "구독 정보 조회에 실패했습니다." }, { status: 500 });
     }
 
-    // 활성 구독(또는 기간 내 stopped)이 없으면 free
-    const plan = sub ? (sub.plan ?? "free") : "free";
+    // pending_billing은 아직 첫 결제가 확정되지 않았으므로 entitlement는 free
+    const isActiveEntitlement =
+      sub &&
+      (sub.status === "active" ||
+        (sub.status === "pending_cancel" && sub.current_period_end) ||
+        (sub.status === "stopped" && sub.current_period_end));
+
+    const plan = isActiveEntitlement ? sub.plan ?? "free" : "free";
 
     return Response.json({
       plan,
       status: sub?.status ?? null,
       currentPeriodEnd: sub?.current_period_end ?? null,
       nextBillingDate: sub?.next_billing_date ?? null,
-      pendingAction: sub?.pending_action ?? null,
-      pendingPlan: sub?.pending_plan ?? null,
-      pendingStartDate: sub?.pending_start_date ?? null,
-      failedChargeCount: sub?.failed_charge_count ?? 0,
+      hasPendingBilling: sub?.status === "pending_billing",
     });
   } catch (err) {
     console.error("[subscription] Fatal error:", err);

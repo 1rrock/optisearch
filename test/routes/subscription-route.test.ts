@@ -52,10 +52,11 @@ describe("subscription route", () => {
 
     expect(response.status).toBe(200);
     expect(payload).toMatchObject({
-      plan: "basic",
+      plan: "free", // pending_billing은 entitlement=free로 내려간다
       status: "pending_billing",
       currentPeriodEnd: null,
       nextBillingDate: "2026-05-19",
+      hasPendingBilling: true,
     });
   });
 });

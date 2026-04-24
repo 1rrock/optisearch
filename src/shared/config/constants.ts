@@ -161,10 +161,6 @@ export const PLAN_PRICING: Record<PlanId, { monthly: number; label: string }> = 
 // Plan upgrade pricing and refund policy
 // ---------------------------------------------------------------------------
 
-export const UPGRADE_DIFF = {
-  basicToPro: 20000, // 원 (VAT 포함)
-} as const;
-
 export const REFUND_POLICY = {
   maxDaysSincePayment: 7,
   maxKeywordSearches: 5,
