@@ -81,21 +81,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error: insertError } = await supabase.from("subscriptions").insert({
-    user_id: user.userId,
-    plan,
-    status: "pending_billing",
-    rebill_no: result.rebillNo,
-  });
-
-  if (insertError) {
-    console.error("[create-rebill] DB insert failed:", insertError.message);
-    return NextResponse.json(
-      { error: "구독 정보 저장에 실패했습니다." },
-      { status: 500 }
-    );
-  }
-
   return NextResponse.json({
     ok: true,
     payurl: result.payurl,

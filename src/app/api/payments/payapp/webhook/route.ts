@@ -105,12 +105,29 @@ async function handleSuccess(
     .eq("rebill_no", payload.rebillNo)
     .maybeSingle();
 
+  const todayKst = getKstDateString();
+
   if (!sub) {
-    console.warn("[payapp webhook] no subscription matched rebill_no=", payload.rebillNo);
+    // 결제 완료 전에 DB row가 없는 경우 (뒤로가기 후 재결제 등) — 여기서 생성
+    const plan = payload.planFromVar1;
+    if (!plan || !payload.userId) {
+      console.warn("[payapp webhook] cannot create subscription: missing plan/userId in var1");
+      return;
+    }
+    const nextPeriodEnd = addDaysToKstDate(todayKst, 30);
+    await supabase.from("subscriptions").insert({
+      user_id: payload.userId,
+      plan,
+      rebill_no: payload.rebillNo,
+      status: "active",
+      current_period_end: nextPeriodEnd,
+      next_billing_date: nextPeriodEnd,
+      last_charged_at: payload.payDateIso ?? new Date().toISOString(),
+    });
+    await recordPaymentHistory(supabase, payload, "success");
     return;
   }
 
-  const todayKst = getKstDateString();
   const periodBase =
     sub.current_period_end && sub.status === "active"
       ? String(sub.current_period_end).slice(0, 10)
