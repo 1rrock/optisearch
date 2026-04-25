@@ -6,6 +6,135 @@ import { sanitizeForPrompt } from "@/shared/lib/sanitize";
 const MODEL = "gpt-4o-mini";
 
 /**
+ * Refine an existing draft based on a user instruction (streaming).
+ */
+export async function refineDraftStream(
+  content: string,
+  instruction: string,
+  keyword: string
+): Promise<ReadableStream<Uint8Array>> {
+  const openai = getOpenAIClient();
+
+  const systemPrompt = `당신은 네이버 블로그 편집 전문가입니다. 사용자의 블로그 초안을 수정 지시사항에 따라 개선하세요.
+
+규칙:
+- 마크다운 형식 유지
+- 수정 지시사항만 반영하고 나머지 내용은 최대한 보존
+- 수정된 전체 본문만 출력 (설명이나 코멘트 없이)
+- 키워드를 자연스럽게 포함 유지`;
+
+  const safeKeyword = sanitizeForPrompt(keyword);
+  const safeInstruction = sanitizeForPrompt(instruction, 300);
+  const safeContent = sanitizeForPrompt(content, 8000);
+
+  const stream = await openai.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: `키워드: ${safeKeyword}\n수정 지시사항: ${safeInstruction}\n\n--- 현재 초안 ---\n${safeContent}`,
+      },
+    ],
+    temperature: 0.6,
+    max_tokens: 4000,
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content ?? "";
+          if (text) controller.enqueue(encoder.encode(text));
+        }
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.controller.abort();
+    },
+  });
+}
+
+/**
+ * Generate AI blog draft as a streaming response.
+ * Output format: first line is JSON metadata, subsequent lines are markdown content.
+ */
+export async function generateDraftStream(
+  keyword: string,
+  postType: "정보성" | "리뷰" | "리스트형" | "비교분석" = "정보성",
+  targetLength: number = 1500,
+  enrichment?: string,
+  hint?: string,
+  analysisContext?: Pick<AICompetitiveAnalysis, "uncoveredTopics" | "recommendedTitles" | "strategySummary">
+): Promise<ReadableStream<Uint8Array>> {
+  const openai = getOpenAIClient();
+
+  const hintInstruction = hint
+    ? `\n\n[중요] 키워드 맥락: "${sanitizeForPrompt(hint, 200)}"\n이 맥락으로 주제를 좁혀 작성하세요. 다른 의미로 해석하지 마세요.`
+    : "";
+
+  const analysisInstruction = analysisContext
+    ? `\n\n[경쟁 분석 결과 — 반드시 반영]\n- 공략해야 할 공백 각도: ${analysisContext.uncoveredTopics.map((t) => sanitizeForPrompt(t, 50)).join(", ")}\n- 추천 전략: ${sanitizeForPrompt(analysisContext.strategySummary, 200)}\n위 공백 각도를 본문에 반드시 포함하고 기존 상위글과 차별화된 시각으로 작성하세요.`
+    : "";
+
+  const enrichmentInstruction = enrichment
+    ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 경쟁 상황과 검색 의도에 맞는 콘텐츠를 작성하세요:\n\n${enrichment}`
+    : "";
+
+  const systemPrompt = `당신은 네이버 블로그 콘텐츠 전문 작성자입니다.
+
+규칙:
+- 포스팅 유형: ${postType}
+- 목표 글자 수: 약 ${targetLength}자
+- 네이버 SEO에 최적화된 구조 (서론-본론-결론)
+- H2 소제목 3-5개 포함
+- 키워드를 자연스럽게 포함 (과도한 키워드 스터핑 금지)
+- 마크다운 형식으로 작성
+
+출력 형식 (반드시 이 순서를 지키세요):
+1. 첫 번째 줄: 다음 형식의 JSON 한 줄 (줄바꿈 없이)
+{"suggestedTitle":"제목","outline":["소제목1","소제목2","소제목3"],"tags":["태그1","태그2","태그3"]}
+2. 두 번째 줄부터: 마크다운 본문 (빈 줄 하나 후 시작)${hintInstruction}${analysisInstruction}${enrichmentInstruction}`;
+
+  const safeKeyword = sanitizeForPrompt(keyword);
+  const userMessage = hint
+    ? `키워드: ${safeKeyword}\n맥락: ${sanitizeForPrompt(hint, 200)}`
+    : `키워드: ${safeKeyword}`;
+
+  const stream = await openai.chat.completions.create({
+    model: MODEL,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.7,
+    max_tokens: 4000,
+    stream: true,
+  });
+
+  const encoder = new TextEncoder();
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        for await (const chunk of stream) {
+          const text = chunk.choices[0]?.delta?.content ?? "";
+          if (text) controller.enqueue(encoder.encode(text));
+        }
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      stream.controller.abort();
+    },
+  });
+}
+
+/**
  * Generate AI blog draft for a keyword.
  */
 export async function generateDraft(
@@ -13,7 +142,8 @@ export async function generateDraft(
   postType: "정보성" | "리뷰" | "리스트형" | "비교분석" = "정보성",
   targetLength: number = 1500,
   enrichment?: string,
-  hint?: string
+  hint?: string,
+  analysisContext?: Pick<AICompetitiveAnalysis, "uncoveredTopics" | "recommendedTitles" | "strategySummary">
 ): Promise<AIDraftResult> {
   const openai = getOpenAIClient();
 
@@ -24,6 +154,10 @@ export async function generateDraft(
   // hint가 있으면 다의어·중의어 문제를 해결하기 위해 명시적으로 맥락을 지정
   const hintInstruction = hint
     ? `\n\n[중요] 이 키워드의 맥락: "${sanitizeForPrompt(hint, 200)}"\n위 맥락을 기준으로 콘텐츠 주제를 좁혀서 작성하세요. 다른 의미로 해석하지 마세요.`
+    : "";
+
+  const analysisInstruction = analysisContext
+    ? `\n\n[경쟁 분석 결과 — 반드시 반영]\n- 경쟁자가 이미 다루지 않는 공백 각도: ${analysisContext.uncoveredTopics.map((t) => sanitizeForPrompt(t, 50)).join(", ")}\n- 추천 전략: ${sanitizeForPrompt(analysisContext.strategySummary, 200)}\n위 공백 각도를 본문에 반드시 포함하고, 기존 상위글과 차별화된 시각으로 작성하세요. 추천 제목 후보: ${analysisContext.recommendedTitles.map((t) => sanitizeForPrompt(t, 60)).join(" / ")}`
     : "";
 
   const systemPrompt = `당신은 네이버 블로그 콘텐츠 전문 작성자입니다. 사용자가 제공한 키워드와 포스팅 유형에 맞는 블로그 초안을 작성합니다.
@@ -42,7 +176,7 @@ JSON으로 응답하세요:
   "content": "마크다운 본문",
   "outline": ["소제목1", "소제목2", ...],
   "tags": ["태그1", "태그2", ...]
-}${hintInstruction}${enrichmentInstruction}`;
+}${hintInstruction}${analysisInstruction}${enrichmentInstruction}`;
 
   const safeKeyword = sanitizeForPrompt(keyword);
   const userMessage = hint

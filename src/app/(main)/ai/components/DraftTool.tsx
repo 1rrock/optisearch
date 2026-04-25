@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -15,28 +14,20 @@ import {
 import { toast } from "sonner";
 import { Button } from "@/shared/ui/button";
 import { copyToClipboard } from "@/shared/lib/clipboard";
-import { UsageLimitError, parseUsageLimitError } from "@/shared/lib/errors";
+import { parseUsageLimitError } from "@/shared/lib/errors";
 import { UsageBar, PlanLockOverlay, type UpgradeModalState } from "./shared";
+import type { AICompetitiveAnalysis } from "@/entities/analysis/model/types";
 
-// ─── API response types ────────────────────────────────────────────────────────
-
-interface DraftContent {
-  keyword: string;
-  suggestedTitle: string;
-  content: string;
-  wordCount: number;
-  outline: string[];
-  tags: string[];
-}
-
-interface DraftResponse {
-  draft: DraftContent;
-}
-
-// ─── Local types ──────────────────────────────────────────────────────────────
+type AnalysisContext = Pick<AICompetitiveAnalysis, "uncoveredTopics" | "recommendedTitles" | "strategySummary">;
 
 type PostType = "정보성" | "리뷰" | "리스트형" | "비교분석";
 type DraftLength = "500" | "1000" | "1500" | "2500";
+
+interface StreamedMeta {
+  suggestedTitle: string;
+  outline: string[];
+  tags: string[];
+}
 
 // ─── DraftTool ────────────────────────────────────────────────────────────────
 
@@ -47,6 +38,7 @@ export function DraftTool({
   onMutationSuccess,
   initialKeyword,
   initialHint,
+  analysisContext,
 }: {
   onUsageLimitExceeded: (state: UpgradeModalState) => void;
   used: number;
@@ -55,6 +47,8 @@ export function DraftTool({
   initialKeyword?: string;
   /** URL ?hint= 파라미터로 전달된 키워드 맥락 힌트 */
   initialHint?: string;
+  /** 경쟁 분석 결과 — 공백 각도를 초안에 주입 */
+  analysisContext?: AnalysisContext;
 }) {
   const router = useRouter();
   const [keyword, setKeyword] = useState(initialKeyword || "");
@@ -64,11 +58,23 @@ export function DraftTool({
   const [length, setLength] = useState<DraftLength>("1500");
   const [copied, setCopied] = useState(false);
 
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [streamedContent, setStreamedContent] = useState("");
+  const [streamedMeta, setStreamedMeta] = useState<StreamedMeta | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [refineInstruction, setRefineInstruction] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineError, setRefineError] = useState<string | null>(null);
+
+  const abortRef = useRef<AbortController | null>(null);
+  const refineAbortRef = useRef<AbortController | null>(null);
+
   useEffect(() => {
     if (initialKeyword && initialKeyword !== keyword) {
       setKeyword(initialKeyword);
     }
-  // Note: intentionally omitting `keyword` from deps — we only want to sync when parent changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialKeyword]);
 
@@ -80,42 +86,91 @@ export function DraftTool({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialHint]);
 
-  const mutation = useMutation<DraftResponse, Error, { keyword: string; postType: PostType; length: DraftLength; hint?: string }>({
-    mutationFn: async (payload) => {
+  const handleGenerate = useCallback(async () => {
+    if (!keyword.trim()) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsStreaming(true);
+    setIsSuccess(false);
+    setStreamedContent("");
+    setStreamedMeta(null);
+    setError(null);
+
+    try {
       const res = await fetch("/api/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          postType,
+          length,
+          hint: hint.trim() || undefined,
+          analysisContext,
+        }),
+        signal: controller.signal,
       });
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         const limitErr = parseUsageLimitError(res.status, data);
-        if (limitErr) throw limitErr;
-        throw new Error(data.error ?? "초안 생성 요청에 실패했습니다.");
+        if (limitErr) {
+          onUsageLimitExceeded({ feature: "AI 글 초안", used: limitErr.used, limit: limitErr.limit });
+        } else {
+          setError(data.error ?? "초안 생성 요청에 실패했습니다.");
+        }
+        return;
       }
-      return res.json() as Promise<DraftResponse>;
-    },
-    onError: (err) => {
-      if (err instanceof UsageLimitError) {
-        onUsageLimitExceeded({ feature: "AI 글 초안", used: err.used, limit: err.limit });
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let metaEndIdx = -1;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        if (metaEndIdx === -1) {
+          const firstNewline = buffer.indexOf("\n");
+          if (firstNewline !== -1) {
+            try {
+              const meta = JSON.parse(buffer.slice(0, firstNewline));
+              setStreamedMeta({
+                suggestedTitle: meta.suggestedTitle ?? keyword,
+                outline: Array.isArray(meta.outline) ? meta.outline : [],
+                tags: Array.isArray(meta.tags) ? meta.tags : [],
+              });
+              metaEndIdx = firstNewline + 1;
+            } catch {
+              // JSON not yet complete — wait for more chunks
+            }
+          }
+        }
+
+        if (metaEndIdx !== -1) {
+          setStreamedContent(buffer.slice(metaEndIdx).trimStart());
+        }
       }
-    },
-    onSuccess: () => {
+
+      setIsSuccess(true);
       onMutationSuccess();
       toast.success("초안이 생성되었습니다");
-    },
-  });
-
-  const handleGenerate = () => {
-    if (!keyword.trim()) return;
-    mutation.mutate({ keyword: keyword.trim(), postType, length, hint: hint.trim() || undefined });
-  };
-
-  const draft = mutation.data?.draft;
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setError("초안 생성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsStreaming(false);
+    }
+  }, [keyword, postType, length, hint, analysisContext, onUsageLimitExceeded, onMutationSuccess]);
 
   const handleCopy = async () => {
-    if (!draft?.content) return;
-    const ok = await copyToClipboard(draft.content);
+    if (!streamedContent) return;
+    const ok = await copyToClipboard(streamedContent);
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -125,7 +180,7 @@ export function DraftTool({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      if (!mutation.isPending) handleGenerate();
+      if (!isStreaming) void handleGenerate();
     }
   };
 
@@ -145,6 +200,64 @@ export function DraftTool({
       .replace(/\n/g, "<br />");
   };
 
+  const handleRefine = useCallback(async () => {
+    if (!refineInstruction.trim() || !streamedContent || isRefining) return;
+
+    refineAbortRef.current?.abort();
+    const controller = new AbortController();
+    refineAbortRef.current = controller;
+
+    setIsRefining(true);
+    setRefineError(null);
+
+    try {
+      const res = await fetch("/api/ai/refine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          content: streamedContent,
+          instruction: refineInstruction.trim(),
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        const limitErr = parseUsageLimitError(res.status, data);
+        if (limitErr) {
+          onUsageLimitExceeded({ feature: "AI 글 초안", used: limitErr.used, limit: limitErr.limit });
+        } else {
+          setRefineError(data.error ?? "수정 요청에 실패했습니다.");
+        }
+        return;
+      }
+
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let refined = "";
+
+      setStreamedContent("");
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        refined += decoder.decode(value, { stream: true });
+        setStreamedContent(refined);
+      }
+
+      setRefineInstruction("");
+      toast.success("수정이 완료되었습니다");
+    } catch (err) {
+      if ((err as Error).name === "AbortError") return;
+      setRefineError("수정 요청에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsRefining(false);
+    }
+  }, [refineInstruction, streamedContent, keyword, isRefining, onUsageLimitExceeded]);
+
+  const wordCount = streamedContent.replace(/\s/g, "").length;
+
   return (
     <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 items-start animate-in slide-in-from-bottom-4 duration-500">
       {limit === 0 && (
@@ -159,6 +272,13 @@ export function DraftTool({
           </h2>
 
           <div className="space-y-5">
+            {analysisContext && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 rounded-xl border border-primary/20">
+                <span className="text-[10px] font-black text-primary uppercase tracking-wider">경쟁 분석 연동됨</span>
+                <span className="text-[10px] text-muted-foreground">공백 각도가 초안에 자동 반영됩니다</span>
+              </div>
+            )}
+
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest">메인 키워드</label>
               <input
@@ -234,16 +354,16 @@ export function DraftTool({
             <Button
               size="lg"
               className="w-full rounded-xl font-bold mt-2 shadow-lg hover:-translate-y-0.5 transition-all"
-              onClick={handleGenerate}
-              disabled={mutation.isPending || !keyword.trim()}
+              onClick={() => void handleGenerate()}
+              disabled={isStreaming || !keyword.trim()}
             >
               <Sparkles className="size-5 mr-2" />
-              {mutation.isPending ? "생성 중..." : "초안 생성"}
+              {isStreaming ? "생성 중..." : "초안 생성"}
             </Button>
             <p className="text-[10px] text-muted-foreground text-center mt-2">⌘ + Enter</p>
 
-            {mutation.isError && (
-              <p className="text-sm text-rose-500 font-semibold">{mutation.error.message}</p>
+            {error && (
+              <p className="text-sm text-rose-500 font-semibold">{error}</p>
             )}
 
             <UsageBar used={used} limit={limit} />
@@ -271,7 +391,7 @@ export function DraftTool({
             <h3 className="text-sm font-bold uppercase tracking-widest">생성된 초안 결과</h3>
           </div>
           <div className="flex items-center gap-3">
-            {mutation.isSuccess && (
+            {isSuccess && (
               <>
                 <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-black">고품질 초안 완료</span>
                 <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -279,32 +399,29 @@ export function DraftTool({
                 </span>
               </>
             )}
+            {isStreaming && (
+              <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-black animate-pulse">
+                작성 중...
+              </span>
+            )}
           </div>
         </div>
 
         {/* Editor Box */}
         <div className="flex-1 bg-card rounded-2xl shadow-sm border border-muted/50 flex flex-col overflow-hidden">
           <div className="flex-1 p-8 overflow-y-auto w-full">
-            {mutation.isPending && (
-              <div className="max-w-2xl mx-auto py-4 space-y-4 animate-pulse">
-                <div className="h-8 bg-muted/50 rounded w-3/4" />
-                <div className="h-4 bg-muted/50 rounded w-full" />
-                <div className="h-4 bg-muted/50 rounded w-5/6" />
-                <div className="h-4 bg-muted/50 rounded w-4/5" />
-                <div className="h-6 bg-muted/50 rounded w-1/2 mt-6" />
-                <div className="h-4 bg-muted/50 rounded w-full" />
-                <div className="h-4 bg-muted/50 rounded w-3/4" />
-              </div>
-            )}
-
-            {mutation.isSuccess && draft && (
+            {streamedContent ? (
               <div
                 className="max-w-2xl mx-auto py-4 prose dark:prose-invert prose-headings:font-extrabold prose-p:leading-relaxed prose-li:leading-relaxed max-w-none"
-                dangerouslySetInnerHTML={{ __html: renderContent(draft.content) }}
+                dangerouslySetInnerHTML={{ __html: renderContent(streamedContent) }}
               />
-            )}
-
-            {!mutation.isPending && !mutation.isSuccess && (
+            ) : isStreaming ? (
+              <div className="max-w-2xl mx-auto py-4 space-y-3">
+                <div className="h-6 bg-muted/40 rounded w-2/3 animate-pulse" />
+                <div className="h-4 bg-muted/30 rounded w-full animate-pulse" />
+                <div className="h-4 bg-muted/30 rounded w-5/6 animate-pulse" />
+              </div>
+            ) : (
               <div className="flex flex-col items-center justify-center h-full py-24">
                 <Edit3 className="size-10 text-muted-foreground/30 mb-4" />
                 <p className="text-sm font-bold text-muted-foreground mb-1">아직 생성된 초안이 없습니다</p>
@@ -313,15 +430,55 @@ export function DraftTool({
             )}
           </div>
 
-          {/* Editor Footer Actions */}
+          {/* Refine Panel */}
+          {streamedContent && !isStreaming && (
+            <div className="border-t border-muted/30 px-6 py-4 bg-muted/5 space-y-3">
+              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">AI 수정 요청</p>
+              <div className="flex flex-wrap gap-2">
+                {["더 친근하게", "더 전문적으로", "더 짧게", "도입부 다시 써줘", "결론 강조해줘"].map((preset) => (
+                  <button
+                    key={preset}
+                    onClick={() => setRefineInstruction(preset)}
+                    className="px-3 py-1 text-[11px] font-bold rounded-lg bg-muted/40 hover:bg-primary/10 hover:text-primary transition-colors"
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 bg-muted/20 border-transparent rounded-xl py-2.5 px-4 text-sm focus:ring-4 focus:ring-primary/10 transition-all"
+                  placeholder="수정 지시사항을 입력하세요 (예: 3번째 문단을 더 구체적으로)"
+                  value={refineInstruction}
+                  onChange={(e) => setRefineInstruction(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleRefine(); }
+                  }}
+                  maxLength={300}
+                />
+                <Button
+                  size="sm"
+                  className="rounded-xl font-bold shrink-0"
+                  onClick={() => void handleRefine()}
+                  disabled={isRefining || !refineInstruction.trim()}
+                >
+                  <Sparkles className="size-4 mr-1.5" />
+                  {isRefining ? "수정 중..." : "수정"}
+                </Button>
+              </div>
+              {refineError && <p className="text-xs text-rose-500 font-semibold">{refineError}</p>}
+            </div>
+          )}
+
+        {/* Editor Footer Actions */}
           <div className="h-16 border-t border-muted/30 px-6 flex items-center justify-between bg-muted/10">
             <div className="flex items-center gap-3">
               <Button
                 variant="outline"
                 size="sm"
                 className="rounded-lg font-bold"
-                onClick={handleCopy}
-                disabled={!draft?.content}
+                onClick={() => void handleCopy()}
+                disabled={!streamedContent}
               >
                 {copied ? <CheckCircle2 className="size-4 mr-2 text-emerald-500" /> : <Copy className="size-4 mr-2" />}
                 {copied ? "복사됨" : "텍스트 복사"}
@@ -330,15 +487,15 @@ export function DraftTool({
                 variant="ghost"
                 size="sm"
                 className="rounded-lg font-bold text-muted-foreground"
-                onClick={handleGenerate}
-                disabled={mutation.isPending || !keyword.trim()}
+                onClick={() => void handleGenerate()}
+                disabled={isStreaming || !keyword.trim()}
               >
                 <RefreshCcw className="size-4 mr-2" /> 재생성
               </Button>
             </div>
             <div className="text-xs font-bold text-muted-foreground">
-              {draft ? (
-                <>총 공백제외 <span className="text-foreground">{draft.wordCount.toLocaleString()}자</span></>
+              {streamedContent ? (
+                <>총 공백제외 <span className="text-foreground">{wordCount.toLocaleString()}자</span></>
               ) : (
                 <span>-</span>
               )}

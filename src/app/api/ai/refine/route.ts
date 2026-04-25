@@ -1,34 +1,14 @@
 import { z } from "zod";
-import { generateDraftStream } from "@/services/ai-service";
+import { refineDraftStream } from "@/services/ai-service";
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { recordAndEnforce } from "@/services/usage-service";
 import { checkRateLimit } from "@/shared/lib/rate-limit";
-import { resolveEnrichment } from "@/services/enrichment-service";
-
-const analysisContextSchema = z.object({
-  uncoveredTopics: z.array(z.string()).max(5),
-  recommendedTitles: z.array(z.string()).max(3),
-  strategySummary: z.string().max(500),
-}).optional();
 
 const bodySchema = z.object({
-  keyword: z.string().min(1),
-  postType: z.enum(["정보성", "리뷰", "리스트형", "비교분석"]).optional().default("정보성"),
-  // Frontend sends "length" as string ("500","1000","1500","2500"), backend expects "targetLength" as number
-  // Accept both field names and coerce string→number for compatibility
-  targetLength: z.coerce.number().min(500).max(5000).optional(),
-  length: z.coerce.number().min(500).max(5000).optional(),
-  /** 키워드 맥락 힌트 — 다의어 문제 해결용 (예: "마스터스 골프 대회") */
-  hint: z.string().max(300).optional(),
-  /** 경쟁 분석 결과 — 공백 각도를 초안에 주입하기 위해 사용 */
-  analysisContext: analysisContextSchema,
-}).transform((data) => ({
-  keyword: data.keyword,
-  postType: data.postType,
-  targetLength: data.targetLength ?? data.length ?? 1500,
-  hint: data.hint,
-  analysisContext: data.analysisContext,
-}));
+  keyword: z.string().min(1).max(100),
+  content: z.string().min(1).max(20000),
+  instruction: z.string().min(1).max(300),
+});
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -62,14 +42,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const enrichment = await resolveEnrichment(user.userId, parsed.data.keyword, "draft");
-    const stream = await generateDraftStream(
-      parsed.data.keyword,
-      parsed.data.postType,
-      parsed.data.targetLength,
-      enrichment,
-      parsed.data.hint,
-      parsed.data.analysisContext
+    const stream = await refineDraftStream(
+      parsed.data.content,
+      parsed.data.instruction,
+      parsed.data.keyword
     );
     return new Response(stream, {
       headers: {
@@ -79,7 +55,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    console.error("[api/ai/draft] Error:", err);
+    console.error("[api/ai/refine] Error:", err);
     return Response.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

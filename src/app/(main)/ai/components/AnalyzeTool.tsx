@@ -21,6 +21,8 @@ import { UsageBar, PlanLockOverlay, type UpgradeModalState } from "./shared";
 import { toast } from "sonner";
 import type { AICompetitiveAnalysis } from "@/entities/analysis/model/types";
 
+type AnalysisContext = Pick<AICompetitiveAnalysis, "uncoveredTopics" | "recommendedTitles" | "strategySummary">;
+
 // ─── API response types ────────────────────────────────────────────────────────
 
 type AnalysisResult = AICompetitiveAnalysis;
@@ -39,7 +41,7 @@ export function AnalyzeTool({
   onMutationSuccess,
   initialKeyword,
 }: {
-  onGoToDraft: (title?: string) => void;
+  onGoToDraft: (title?: string, analysisContext?: AnalysisContext) => void;
   onUsageLimitExceeded: (state: UpgradeModalState) => void;
   used: number;
   limit: number;
@@ -236,7 +238,11 @@ export function AnalyzeTool({
                     key={i}
                     rank={i + 1}
                     title={title}
-                    onUseTitleForDraft={onGoToDraft}
+                    onUseTitleForDraft={(t) => onGoToDraft(t, {
+                      uncoveredTopics: analysis.uncoveredTopics,
+                      recommendedTitles: analysis.recommendedTitles,
+                      strategySummary: analysis.strategySummary,
+                    })}
                   />
                 ))}
               </div>
@@ -287,7 +293,11 @@ export function AnalyzeTool({
           <Button
             variant="outline"
             className="relative z-10 shrink-0 bg-background text-foreground border-none font-bold rounded-xl hover:bg-background/90"
-            onClick={() => onGoToDraft()}
+            onClick={() => onGoToDraft(undefined, analysis ? {
+              uncoveredTopics: analysis.uncoveredTopics,
+              recommendedTitles: analysis.recommendedTitles,
+              strategySummary: analysis.strategySummary,
+            } : undefined)}
           >
             초안 작성하기 <ArrowRight className="size-4 ml-2" />
           </Button>

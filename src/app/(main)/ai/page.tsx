@@ -11,6 +11,9 @@ import { PLAN_LIMITS } from "@/shared/config/constants";
 import { TabButton, type UpgradeModalState } from "./components/shared";
 import { AnalyzeTool } from "./components/AnalyzeTool";
 import { DraftTool } from "./components/DraftTool";
+import type { AICompetitiveAnalysis } from "@/entities/analysis/model/types";
+
+type AnalysisContext = Pick<AICompetitiveAnalysis, "uncoveredTopics" | "recommendedTitles" | "strategySummary">;
 
 type TabId = "analyze" | "draft";
 
@@ -33,13 +36,15 @@ function AIToolsPageInner() {
   );
   const [upgradeModal, setUpgradeModal] = useState<UpgradeModalState>(null);
   const [draftKeyword, setDraftKeyword] = useState(urlKeyword);
+  const [analysisContext, setAnalysisContext] = useState<AnalysisContext | undefined>(undefined);
 
   const plan = useUserPlan();
   const { usage } = useUsage();
   const limits = PLAN_LIMITS[plan];
 
-  const handleGoToDraft = useCallback((title?: string) => {
+  const handleGoToDraft = useCallback((title?: string, context?: AnalysisContext) => {
     if (title) setDraftKeyword(title);
+    if (context) setAnalysisContext(context);
     setActiveTab("draft");
   }, []);
 
@@ -101,6 +106,7 @@ function AIToolsPageInner() {
             onMutationSuccess={invalidate}
             initialKeyword={draftKeyword}
             initialHint={urlHint}
+            analysisContext={analysisContext}
           />
         </div>
       </div>
