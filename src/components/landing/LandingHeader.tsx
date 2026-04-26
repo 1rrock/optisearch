@@ -28,9 +28,12 @@ function AnnouncementBar() {
 
 function AuthNav() {
   const { isAuthenticated, loading: sessionLoading } = useIsAuthenticated();
-  const isLoggedIn = isAuthenticated && !sessionLoading;
 
-  return isLoggedIn ? (
+  if (sessionLoading) {
+    return <div className="w-24 h-12 bg-muted/20 animate-pulse rounded-xl" />;
+  }
+
+  return isAuthenticated ? (
     <a href="/dashboard">
       <Button className="rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_20px_hsl(var(--primary)/0.4)] hover:scale-[1.02] transition-all px-6 h-12">
         대시보드

@@ -59,6 +59,38 @@ export default function DashboardPage() {
   const [trackedTargetId, setTrackedTargetId] = useState<string | undefined>();
   const router = useRouter();
   const { plan, isTrialExpired, usage, recentSearches, savedKeywordsCount, initialized } = useDashboardData();
+
+  if (!initialized) {
+    return (
+      <div className="space-y-8 animate-pulse">
+        {/* Top Section Skeleton */}
+        <div className="relative overflow-hidden rounded-[2rem] bg-card border border-muted/50 p-6 sm:p-8 lg:p-10 shadow-sm h-[300px] flex flex-col justify-between">
+          <div>
+            <div className="h-6 bg-muted/50 w-36 rounded-full mb-4" />
+            <div className="h-10 bg-muted/50 w-64 rounded-lg mb-2" />
+            <div className="h-4 bg-muted/50 w-96 rounded-lg" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-8">
+            <div className="h-16 bg-muted/30 rounded-xl" />
+            <div className="h-16 bg-muted/30 rounded-xl" />
+          </div>
+        </div>
+
+        {/* Search Box Skeleton */}
+        <div className="bg-card p-5 sm:p-10 rounded-xl shadow-sm border border-muted/50 flex flex-col items-center justify-center gap-4 h-[180px]">
+          <div className="h-6 bg-muted/50 w-48 rounded-lg" />
+          <div className="h-14 bg-muted/30 w-full max-w-2xl rounded-2xl" />
+        </div>
+
+        {/* Rank Tracking Skeleton */}
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8">
+          <div className="xl:col-span-4 h-[400px] bg-card/50 border border-muted/50 rounded-3xl" />
+          <div className="xl:col-span-8 h-[400px] bg-card/50 border border-muted/50 rounded-3xl" />
+        </div>
+      </div>
+    );
+  }
+
   const effectivePlan = plan;
   const limits = PLAN_LIMITS[effectivePlan];
   const searchLimit = limits.dailySearch;

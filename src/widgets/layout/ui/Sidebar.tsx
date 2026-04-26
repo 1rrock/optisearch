@@ -21,13 +21,13 @@ import {
 } from "lucide-react";
 import { cn } from "@/shared/lib/utils";
 import { PLAN_PRICING } from "@/shared/config/constants";
-import { useUserName, useUserPlan } from "@/shared/hooks/use-user";
+import { useUserName, useDashboardData } from "@/shared/hooks/use-user";
 
 export function Sidebar() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const userPlan = useUserPlan();
+  const { plan: userPlan, initialized } = useDashboardData();
 
   // Close menu on outside click
   useEffect(() => {
@@ -73,7 +73,7 @@ export function Sidebar() {
           <NavItem href="/ai" icon={<Sparkles className="size-4" />} label="AI 도구" active={pathname === "/ai"} />
         </nav>
 
-        {userPlan === "free" && (
+        {initialized && userPlan === "free" && (
           <div className="mt-10 rounded-xl bg-gradient-to-br from-primary/15 via-primary/5 to-background border border-primary/20 p-4 mx-1 mb-2 shadow-sm">
             <div className="flex items-center gap-2 mb-2">
               <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/20 text-primary">
@@ -118,17 +118,21 @@ export function Sidebar() {
           onClick={() => setMenuOpen(!menuOpen)}
           className="flex items-center gap-3 rounded-xl border bg-background/50 p-3 hover:bg-accent cursor-pointer transition-colors w-full"
         >
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shrink-0">
-            {userInitial}
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold shrink-0 animate-none">
+            {initialized ? userInitial : <div className="h-4 w-4 bg-primary/20 rounded-full animate-pulse" />}
           </div>
           <div className="flex flex-col overflow-hidden text-left">
-            <span className="text-sm font-semibold truncate">{userName}</span>
-            <span className={cn(
-              "text-xs font-medium truncate",
-              userPlan === "pro" ? "text-violet-500" : userPlan === "basic" ? "text-blue-500" : "text-emerald-500"
-            )}>
-              {PLAN_PRICING[userPlan].label} 플랜
-            </span>
+            <span className="text-sm font-semibold truncate">{initialized ? userName : "로딩 중..."}</span>
+            {initialized ? (
+              <span className={cn(
+                "text-xs font-medium truncate",
+                userPlan === "pro" ? "text-violet-500" : userPlan === "basic" ? "text-blue-500" : "text-emerald-500"
+              )}>
+                {PLAN_PRICING[userPlan].label} 플랜
+              </span>
+            ) : (
+              <div className="h-3 bg-muted/50 w-16 rounded animate-pulse mt-1" />
+            )}
           </div>
           <ChevronUp className={cn("size-4 ml-auto text-muted-foreground transition-transform shrink-0", menuOpen && "rotate-180")} />
         </button>
