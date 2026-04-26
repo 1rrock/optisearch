@@ -2,9 +2,19 @@ import type { Metadata } from "next"
 import { TrendCheckerTool } from "./TrendCheckerTool"
 
 export const metadata: Metadata = {
-  title: "무료 키워드 트렌드 분석기 | 옵티써치",
+  title: "무료 키워드 트렌드 분석기 — 검색량 추이 확인 | 옵티써치",
   description:
-    "키워드의 최근 3개월 검색 트렌드를 무료로 확인하세요. 로그인 없이 바로 사용 가능한 한국어 키워드 트렌드 분석 도구입니다.",
+    "키워드의 최근 3개월 검색 트렌드를 무료로 확인하세요. 시즌 키워드 타이밍을 잡고 상승 트렌드를 선점하는 콘텐츠 전략을 세울 수 있습니다. 로그인 없이 바로 사용.",
+  keywords: ["키워드 트렌드", "키워드 트렌드 분석", "검색량 추이", "네이버 트렌드", "시즌 키워드"],
+  openGraph: {
+    title: "무료 키워드 트렌드 분석기 | 옵티써치",
+    description: "키워드 검색량 추이를 차트로 확인하세요. 무료.",
+    url: "https://www.optisearch.kr/tools/trend-checker",
+    type: "website",
+  },
+  alternates: {
+    canonical: "https://www.optisearch.kr/tools/trend-checker",
+  },
 }
 
 export default function TrendCheckerPage() {

@@ -411,10 +411,20 @@ export function DraftTool({
         <div className="flex-1 bg-card rounded-2xl shadow-sm border border-muted/50 flex flex-col overflow-hidden">
           <div className="flex-1 p-8 overflow-y-auto w-full">
             {streamedContent ? (
-              <div
-                className="max-w-2xl mx-auto py-4 prose dark:prose-invert prose-headings:font-extrabold prose-p:leading-relaxed prose-li:leading-relaxed max-w-none"
-                dangerouslySetInnerHTML={{ __html: renderContent(streamedContent) }}
-              />
+              <>
+                <div
+                  className="max-w-2xl mx-auto py-4 prose dark:prose-invert prose-headings:font-extrabold prose-p:leading-relaxed prose-li:leading-relaxed max-w-none"
+                  dangerouslySetInnerHTML={{ __html: renderContent(streamedContent) }}
+                />
+                {isSuccess && (
+                  <div className="max-w-2xl mx-auto mt-6 px-4 py-3 bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 rounded-xl">
+                    <p className="text-[11px] text-blue-600 dark:text-blue-400 leading-relaxed">
+                      💡 <strong>AI 초안 활용 팁:</strong> 이 초안은 글의 구조와 흐름을 잡는 데 활용하세요.
+                      구체적인 장소명, 수치, 개인 경험담을 직접 추가하면 네이버 상위 노출에 훨씬 유리한 고품질 콘텐츠가 됩니다.
+                    </p>
+                  </div>
+                )}
+              </>
             ) : isStreaming ? (
               <div className="max-w-2xl mx-auto py-4 space-y-3">
                 <div className="h-6 bg-muted/40 rounded w-2/3 animate-pulse" />

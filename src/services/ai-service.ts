@@ -73,6 +73,9 @@ export async function generateDraftStream(
 ): Promise<ReadableStream<Uint8Array>> {
   const openai = getOpenAIClient();
 
+  // GPT-4o-mini tends to produce 65-85% of requested length; boost to compensate
+  const boostedLength = Math.round(targetLength * 1.5);
+
   const hintInstruction = hint
     ? `\n\n[중요] 키워드 맥락: "${sanitizeForPrompt(hint, 200)}"\n이 맥락으로 주제를 좁혀 작성하세요. 다른 의미로 해석하지 마세요.`
     : "";
@@ -92,13 +95,13 @@ export async function generateDraftStream(
 
 규칙:
 - 포스팅 유형: ${postType}
-- 목표 글자 수: 약 ${targetLength}자 (분량을 채워 풍성하게 작성)
+- 목표 글자 수: 최소 ${boostedLength}자 이상 (절대로 이 분량 미만으로 작성하지 마세요. 각 소제목당 4-5개 문단으로 풍성하게 채우세요.)
 - 어조: 독자에게 친근하게 말을 건네는 듯한 대화체 (~합니다, ~해보세요, ~더라고요)
 - 가독성: 모바일 가독성을 위해 2-3문장마다 줄바꿈을 하세요.
 - 감성: 문맥에 어울리는 이모지(✨, 🔥, 💡 등)를 적절히 활용하세요.
 - 구조: 네이버 SEO에 최적화된 구조 (도입부-본론-마무리)
 - 분량 통제: 각 H2 소제목 하단에는 최소 3개 이상의 풍성한 문단(Paragraph)을 작성하세요. 단순 정보 나열이 아닌 '구체적인 꿀팁', '주의사항', '실제 활용 예시'를 포함하여 내용을 꽉 채우세요.
-- 키워드: 본문 전체에 자연스럽게 5-7회 녹여내세요.
+- 키워드 밀도 [매우 중요]: 키워드를 본문 전체에 걸쳐 반드시 최소 5회 이상, 가능하면 7회까지 자연스럽게 녹여내세요. 제목, 소제목, 도입부, 본론, 마무리에 골고루 분포시키세요.
 - 마크다운 형식으로 작성
 
 출력 형식 (반드시 이 순서를 지키세요):
@@ -153,6 +156,9 @@ export async function generateDraft(
 ): Promise<AIDraftResult> {
   const openai = getOpenAIClient();
 
+  // GPT-4o-mini tends to produce 65-85% of requested length; boost to compensate
+  const boostedLength = Math.round(targetLength * 1.5);
+
   const enrichmentInstruction = enrichment
     ? `\n\n아래 키워드 분석 데이터를 참고하여 실제 경쟁 상황과 검색 의도에 맞는 콘텐츠를 작성하세요. 지식iN 질문에서 파악된 사용자의 실제 궁금증을 반영하고, 상위 인기글 대비 차별화된 내용을 포함하세요.\n\n${enrichment}`
     : "";
@@ -173,13 +179,13 @@ export async function generateDraft(
 
 규칙:
 - 포스팅 유형: ${postType}
-- 목표 글자 수: 약 ${targetLength}자 (분량을 채워 풍성하게 작성)
+- 목표 글자 수: 최소 ${boostedLength}자 이상 (절대로 이 분량 미만으로 작성하지 마세요. 각 소제목당 4-5개 문단으로 풍성하게 채우세요.)
 - 어조: 독자에게 친근하게 말을 건네는 듯한 대화체 (~합니다, ~해보세요, ~더라고요)
 - 가독성: 모바일 가독성을 위해 2-3문장마다 줄바꿈을 하세요.
 - 감성: 문맥에 어울리는 이모지(✨, 🔥, 💡 등)를 적절히 활용하세요.
 - 구조: 네이버 SEO에 최적화된 구조 (도입부-본론-마무리)
 - 분량 통제: 각 H2 소제목 하단에는 최소 3개 이상의 풍성한 문단(Paragraph)을 작성하세요. 단순 정보 나열이 아닌 '구체적인 꿀팁', '주의사항', '실제 활용 예시'를 포함하여 내용을 꽉 채우세요.
-- 키워드: 본문 전체에 자연스럽게 5-7회 녹여내세요.
+- 키워드 밀도 [매우 중요]: 키워드를 본문 전체에 걸쳐 반드시 최소 5회 이상, 가능하면 7회까지 자연스럽게 녹여내세요. 제목, 소제목, 도입부, 본론, 마무리에 골고루 분포시키세요.
 - 마크다운 형식으로 작성
 
 JSON으로 응답하세요:
