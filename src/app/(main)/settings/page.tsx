@@ -30,6 +30,10 @@ interface SubscriptionInfo {
   status: string | null;
   currentPeriodEnd: string | null;
   nextBillingDate: string | null;
+  isTrial: boolean;
+  isTrialExpired: boolean;
+  trialEndsAt: string | null;
+  trialDaysLeft: number;
 }
 
 function formatDate(dateStr: string | null): string {
@@ -115,12 +119,20 @@ function SettingsPageContent() {
         status?: string;
         currentPeriodEnd?: string;
         nextBillingDate?: string;
+        isTrial?: boolean;
+        isTrialExpired?: boolean;
+        trialEndsAt?: string | null;
+        trialDaysLeft?: number;
       };
       setSubInfo({
         plan: (json.plan ?? "free") as PlanId,
         status: json.status ?? null,
         currentPeriodEnd: json.currentPeriodEnd ?? null,
         nextBillingDate: json.nextBillingDate ?? null,
+        isTrial: json.isTrial ?? false,
+        isTrialExpired: json.isTrialExpired ?? false,
+        trialEndsAt: json.trialEndsAt ?? null,
+        trialDaysLeft: json.trialDaysLeft ?? 0,
       });
     } catch {
       // 조회 실패 시 무시 (기본값으로 폴백)
@@ -346,13 +358,52 @@ function SettingsPageContent() {
                     </div>
                   )}
 
+                  {/* 체험 만료 배너 */}
+                  {subInfo?.isTrialExpired && !subInfo.isTrial && (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-bold text-foreground">
+                          14일 무료 체험이 종료되었습니다
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          체험 기간 동안 이용하셨던 프로 기능을 계속 사용하려면 구독을 시작하세요. 지금 바로 끊김 없이 이어갈 수 있습니다.
+                        </span>
+                      </div>
+                      <Button asChild className="rounded-xl font-bold shrink-0 w-full sm:w-auto bg-primary hover:bg-primary/90">
+                        <a href="/pricing">구독 시작하기</a>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* 가입 체험 배너 */}
+                  {subInfo?.isTrial && (
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl bg-primary/10 border border-primary/30">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-bold text-foreground">
+                          무료 체험 {subInfo.trialDaysLeft}일 남음
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDate(subInfo.trialEndsAt)}까지 프로 플랜의 모든 기능을 이용할 수 있어요. 종료 전 결제하면 끊김 없이 사용 가능합니다.
+                        </span>
+                      </div>
+                      <Button asChild className="rounded-xl font-bold shrink-0 w-full sm:w-auto">
+                        <a href="/pricing">결제하고 계속 사용</a>
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Plan badge */}
                   <div className="flex items-center justify-between p-4 rounded-xl bg-muted/40 border border-muted">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">현재 플랜</span>
                       <div className="flex items-center gap-2">
                         <span className="text-xl font-bold text-foreground">{pricing.label}</span>
-                        {plan !== "free" && !isStopped && !isPendingCancel && !isPendingBilling && (
+                        {subInfo?.isTrial && (
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary">
+                            체험
+                          </span>
+                        )}
+                        {plan !== "free" && !subInfo?.isTrial && !isStopped && !isPendingCancel && !isPendingBilling && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
                             활성
                           </span>

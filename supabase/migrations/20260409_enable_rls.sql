@@ -27,13 +27,33 @@ END $$;
 
 -- 기본 정책: anon key로는 모든 접근 차단
 -- service_role key는 RLS를 우회하므로 별도 정책 불필요
-CREATE POLICY "Deny anon access" ON users FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON user_profiles FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON subscriptions FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON keyword_searches FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON ai_usage FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON saved_keywords FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON keyword_corpus FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON keyword_trend_daily FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON rank_track_targets FOR ALL USING (false);
-CREATE POLICY "Deny anon access" ON rank_snapshots FOR ALL USING (false);
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON users FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON user_profiles FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON subscriptions FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON keyword_searches FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON ai_usage FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON saved_keywords FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON keyword_corpus FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON keyword_trend_daily FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON rank_track_targets FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Deny anon access" ON rank_snapshots FOR ALL USING (false);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

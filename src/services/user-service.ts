@@ -43,8 +43,10 @@ export async function getCurrentUserProfileId(): Promise<string | null> {
     console.log("[user-service] users table insert skipped (id type mismatch)");
   }
 
-  // Create profile if doesn't exist (auto-registration on first login)
-  // Use upsert to prevent race condition when concurrent requests arrive for a new user
+  // Create profile if doesn't exist (auto-registration on first login).
+  // Use upsert to prevent race condition when concurrent requests arrive for a new user.
+  // 14일 무료 체험은 user_profiles의 trial_started_at / trial_ends_at 컬럼 DEFAULT가
+  // INSERT 시점에 한 번만 채운다 (migration 20260425_signup_trial.sql). UPDATE 시엔 적용되지 않음.
   const { data: created, error } = await supabase
     .from("user_profiles")
     .upsert(

@@ -13,6 +13,19 @@ import {
 } from "@/shared/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 
+function AnnouncementBar() {
+  const { isAuthenticated, loading } = useIsAuthenticated();
+  if (loading || isAuthenticated) return null;
+  return (
+    <div className="w-full bg-primary text-primary-foreground text-center py-2 px-4 text-xs sm:text-sm font-bold tracking-wide">
+      🎉 신규 가입 시 프로 플랜 <span className="underline underline-offset-2">14일 무료 체험</span> — 카드 등록 불필요
+      <a href="/login" className="ml-3 inline-flex items-center gap-1 bg-primary-foreground/20 hover:bg-primary-foreground/30 rounded-full px-3 py-0.5 text-xs font-black transition-colors">
+        지금 시작 →
+      </a>
+    </div>
+  );
+}
+
 function AuthNav() {
   const { isAuthenticated, loading: sessionLoading } = useIsAuthenticated();
   const isLoggedIn = isAuthenticated && !sessionLoading;
@@ -51,7 +64,9 @@ export function LandingHeader() {
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-border transition-all duration-300">
+    <nav className="fixed top-0 w-full z-50 transition-all duration-300">
+      <AnnouncementBar />
+      <div className="bg-background/80 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2">
@@ -110,6 +125,8 @@ export function LandingHeader() {
             <span className={`block w-5 h-0.5 bg-foreground transition-all duration-200 ${mobileOpen ? "-rotate-45 -translate-y-2" : ""}`} />
           </button>
         </div>
+      </div>
+
       </div>
 
       {/* Mobile Menu */}

@@ -310,6 +310,25 @@ function PricingContent() {
         </p>
       </div>
 
+      {/* Trial banner — show to unauthenticated or free users without active sub */}
+      {(!isAuthenticated || currentPlan === "free") && !hasPendingBilling && (
+        <div className="max-w-5xl mx-auto w-full rounded-2xl border border-emerald-500/30 bg-emerald-500/5 px-6 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-black text-foreground flex items-center gap-2">
+              🎉 신규 가입 시 프로 플랜 14일 무료 체험
+            </span>
+            <span className="text-xs text-muted-foreground">
+              카드 등록 없이 시작 · 체험 후 자동 결제 없음 · 언제든 무료 플랜으로 유지
+            </span>
+          </div>
+          {!isAuthenticated && (
+            <Button asChild className="rounded-xl font-bold shrink-0 w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Link href="/login">무료로 시작하기</Link>
+            </Button>
+          )}
+        </div>
+      )}
+
       {hasPendingBilling && (
         <div className="max-w-5xl mx-auto w-full rounded-2xl border border-blue-200 bg-blue-50 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex flex-col gap-1">

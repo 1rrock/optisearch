@@ -48,8 +48,13 @@ export async function GET() {
 
     const limits = PLAN_LIMITS[plan];
 
+    const trialEndsAt = user.trialEndsAt;
+    const isTrialExpired = plan === "free" && !!trialEndsAt && new Date(trialEndsAt) <= new Date();
+
     return Response.json({
       plan,
+      isTrialExpired,
+      trialEndsAt,
       usage,
       limits: {
         dailySearch: limits.dailySearch,

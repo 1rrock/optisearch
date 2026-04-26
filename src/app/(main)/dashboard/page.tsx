@@ -58,7 +58,7 @@ export default function DashboardPage() {
   const [query, setQuery] = useState("");
   const [trackedTargetId, setTrackedTargetId] = useState<string | undefined>();
   const router = useRouter();
-  const { plan, usage, recentSearches, savedKeywordsCount, initialized } = useDashboardData();
+  const { plan, isTrialExpired, usage, recentSearches, savedKeywordsCount, initialized } = useDashboardData();
   const effectivePlan = plan;
   const limits = PLAN_LIMITS[effectivePlan];
   const searchLimit = limits.dailySearch;
@@ -182,6 +182,29 @@ export default function DashboardPage() {
             >
               <Sparkles className="size-4" />
               무료 체험하기
+              <ArrowRight className="size-4" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* 체험 만료 넛지 배너 */}
+      {initialized && isTrialExpired && plan === "free" && (
+        <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-accent/5 p-5 sm:p-6 shadow-sm">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Sparkles className="size-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-foreground mb-0.5">14일 무료 체험이 종료되었습니다</p>
+              <p className="text-sm text-muted-foreground">체험 기간 동안 사용하셨던 프로 기능(무제한 검색, AI 분석, 순위 추적)을 계속 이용하려면 구독을 시작하세요.</p>
+            </div>
+            <a
+              href="/pricing"
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 shrink-0 text-sm"
+            >
+              구독 시작하기
               <ArrowRight className="size-4" />
             </a>
           </div>

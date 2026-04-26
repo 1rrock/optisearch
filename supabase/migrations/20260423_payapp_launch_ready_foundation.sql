@@ -250,58 +250,59 @@ BEGIN
      WHERE table_schema = 'public'
        AND table_name = 'payapp_webhook_events'
   ) THEN
-    INSERT INTO public.webhook_events (
-      provider,
-      event_key,
-      lifecycle_key,
-      mul_no,
-      pay_state,
-      purpose,
-      user_id,
-      rebill_no,
-      provider_paid_at,
-      provider_cancelled_at,
-      received_at,
-      last_received_at,
-      processed_at,
-      processing_status,
-      duplicate_count,
-      failure_reason,
-      raw,
-      created_at,
-      updated_at
-    )
-    SELECT
-      COALESCE(provider, 'payapp'),
-      COALESCE(
-        event_key,
-        public.payapp_webhook_event_key(COALESCE(provider, 'payapp'), mul_no, pay_state, purpose, user_id, rebill_no)
-      ),
-      COALESCE(
-        lifecycle_key,
-        public.payapp_webhook_lifecycle_key(COALESCE(provider, 'payapp'), mul_no, purpose, user_id, rebill_no)
-      ),
-      mul_no,
-      pay_state,
-      purpose,
-      user_id,
-      rebill_no,
-      provider_paid_at,
-      provider_cancelled_at,
-      COALESCE(received_at, NOW()),
-      COALESCE(last_received_at, received_at, NOW()),
-      processed_at,
-      COALESCE(processing_status, 'processed'),
-      COALESCE(duplicate_count, 0),
-      failure_reason,
-      COALESCE(raw, '{}'::jsonb),
-      COALESCE(created_at, received_at, NOW()),
-      COALESCE(updated_at, NOW())
-    FROM public.payapp_webhook_events
-    ON CONFLICT (event_key) DO UPDATE
-       SET duplicate_count = GREATEST(public.webhook_events.duplicate_count, EXCLUDED.duplicate_count),
-           processed_at = COALESCE(public.webhook_events.processed_at, EXCLUDED.processed_at),
-           updated_at = NOW();
+    -- 구 테이블의 스키마가 불명확하므로 EXCEPTION으로 방어. 데이터 이관 실패 시 NOTICE만 남기고 계속 진행.
+    BEGIN
+      EXECUTE $sql$
+        INSERT INTO public.webhook_events (
+          provider,
+          event_key,
+          lifecycle_key,
+          mul_no,
+          pay_state,
+          purpose,
+          user_id,
+          rebill_no,
+          provider_paid_at,
+          provider_cancelled_at,
+          received_at,
+          last_received_at,
+          processed_at,
+          processing_status,
+          duplicate_count,
+          failure_reason,
+          raw,
+          created_at,
+          updated_at
+        )
+        SELECT
+          'payapp',
+          public.payapp_webhook_event_key('payapp', mul_no, pay_state, purpose, user_id, rebill_no),
+          public.payapp_webhook_lifecycle_key('payapp', mul_no, purpose, user_id, rebill_no),
+          mul_no,
+          pay_state,
+          purpose,
+          user_id,
+          rebill_no,
+          provider_paid_at,
+          provider_cancelled_at,
+          COALESCE(received_at, NOW()),
+          COALESCE(received_at, NOW()),
+          processed_at,
+          COALESCE(processing_status, 'processed'),
+          0,
+          failure_reason,
+          COALESCE(raw, '{}'::jsonb),
+          COALESCE(created_at, received_at, NOW()),
+          COALESCE(updated_at, NOW())
+        FROM public.payapp_webhook_events
+        ON CONFLICT (event_key) DO UPDATE
+           SET duplicate_count = GREATEST(public.webhook_events.duplicate_count, EXCLUDED.duplicate_count),
+               processed_at = COALESCE(public.webhook_events.processed_at, EXCLUDED.processed_at),
+               updated_at = NOW()
+      $sql$;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE 'payapp_webhook_events 데이터 이관 건너뜀 (스키마 불일치): %', SQLERRM;
+    END;
   END IF;
 END $$;
 

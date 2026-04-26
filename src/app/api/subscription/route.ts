@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from "@/shared/lib/api-helpers";
 import { createServerClient } from "@/shared/lib/supabase";
 import { getKstDateString } from "@/shared/lib/payapp-time";
+import { TRIAL_PLAN } from "@/shared/config/constants";
 
 /**
  * GET /api/subscription
@@ -40,7 +41,22 @@ export async function GET() {
         (sub.status === "pending_cancel" && sub.current_period_end) ||
         (sub.status === "stopped" && sub.current_period_end));
 
-    const plan = isActiveEntitlement ? sub.plan ?? "free" : "free";
+    const trialEndsAt = user.trialEndsAt;
+    const trialEndsMs = trialEndsAt ? new Date(trialEndsAt).getTime() : 0;
+    const nowMs = Date.now();
+    const isTrialActive = !isActiveEntitlement && !!trialEndsAt && trialEndsMs > nowMs;
+    // 클라이언트 시계 편차로 잔여일 계산이 흔들리지 않도록 서버 기준으로 내려준다.
+    const trialDaysLeft = isTrialActive
+      ? Math.max(0, Math.ceil((trialEndsMs - nowMs) / 86_400_000))
+      : 0;
+
+    const plan = isActiveEntitlement
+      ? sub.plan ?? "free"
+      : isTrialActive
+        ? TRIAL_PLAN
+        : "free";
+
+    const isTrialExpired = !isTrialActive && !isActiveEntitlement && !!trialEndsAt && trialEndsMs < nowMs;
 
     return Response.json({
       plan,
@@ -48,6 +64,10 @@ export async function GET() {
       currentPeriodEnd: sub?.current_period_end ?? null,
       nextBillingDate: sub?.next_billing_date ?? null,
       hasPendingBilling: sub?.status === "pending_billing",
+      trialEndsAt,
+      isTrial: isTrialActive,
+      trialDaysLeft,
+      isTrialExpired,
     });
   } catch (err) {
     console.error("[subscription] Fatal error:", err);

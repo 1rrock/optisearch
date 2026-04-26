@@ -11,6 +11,8 @@ interface UserState {
 
   // Plan & usage
   plan: PlanId;
+  isTrialExpired: boolean;
+  trialEndsAt: string | null;
   usage: { search: number; analyze: number; draft: number };
   limits: { dailySearch: number; dailyAnalyze: number; dailyDraft: number };
 
@@ -50,6 +52,8 @@ export const useUserStore = create<UserState>((set, get) => ({
 
   // Plan defaults
   plan: "free",
+  isTrialExpired: false,
+  trialEndsAt: null,
   usage: { search: 0, analyze: 0, draft: 0 },
   limits: {
     dailySearch: FREE_LIMITS.dailySearch,
@@ -84,9 +88,13 @@ export const useUserStore = create<UserState>((set, get) => ({
     const recentSearches = (data.recentSearches as UserState["recentSearches"]) ?? [];
     const savedKeywordsCount = (data.savedKeywordsCount as number) ?? 0;
     const totalSearches = (data.totalSearches as number) ?? 0;
+    const isTrialExpired = (data.isTrialExpired as boolean) ?? false;
+    const trialEndsAt = (data.trialEndsAt as string | null) ?? null;
 
     set({
       plan,
+      isTrialExpired,
+      trialEndsAt,
       usage,
       limits: {
         dailySearch: planLimits.dailySearch,

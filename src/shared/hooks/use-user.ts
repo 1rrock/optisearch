@@ -20,6 +20,8 @@ export function useIsAuthenticated() {
 export function useDashboardData() {
   return useUserStore(useShallow((s) => ({
     plan: s.plan,
+    isTrialExpired: s.isTrialExpired,
+    trialEndsAt: s.trialEndsAt,
     usage: s.usage,
     limits: s.limits,
     recentSearches: s.recentSearches,

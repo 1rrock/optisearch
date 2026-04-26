@@ -17,9 +17,14 @@ export function Hero() {
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center relative z-10 w-full">
 
         <div className="lg:col-span-7 space-y-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 border border-primary/20 text-primary text-xs font-mono tracking-widest shadow-[0_0_15px_hsl(var(--primary)/0.2)] animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-            검색 데이터 분석 플랫폼
+          <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 border border-primary/20 text-primary text-xs font-mono tracking-widest shadow-[0_0_15px_hsl(var(--primary)/0.2)]">
+              <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+              검색 데이터 분석 플랫폼
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black tracking-wide shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+              🎉 프로 14일 무료 체험
+            </div>
           </div>
 
           <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 text-foreground">

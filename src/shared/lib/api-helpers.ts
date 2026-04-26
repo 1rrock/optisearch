@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { checkUsageLimit, recordUsage } from "@/services/usage-service";
-import type { PlanId } from "@/shared/config/constants";
+import { TRIAL_PLAN, type PlanId } from "@/shared/config/constants";
 import { getKstDateString } from "@/shared/lib/payapp-time";
 
 export { recordUsage };
@@ -9,7 +9,7 @@ export { recordUsage };
  * Get the authenticated user's ID and plan. Returns null if not authenticated.
  * Always returns the profile UUID — never the raw auth provider string.
  */
-export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId } | null> {
+export async function getAuthenticatedUser(): Promise<{ userId: string; plan: PlanId; trialEndsAt: string | null } | null> {
   // Dev bypass — use pre-created dev profile from DB (production에서는 절대 활성화 금지)
   if (process.env.DEV_AUTH_BYPASS === "true" && process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const { DEV_USER } = await import("@/shared/lib/dev-auth");
@@ -50,7 +50,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
     } catch {
       // DB setup failed — still return the profile ID
     }
-    return { userId: DEV_USER.profileId, plan: "pro" as PlanId };
+    return { userId: DEV_USER.profileId, plan: "pro" as PlanId, trialEndsAt: null };
   }
 
   const session = await auth();
@@ -64,7 +64,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
     // Try to find existing profile
     let { data: profile } = await supabase
       .from("user_profiles")
-      .select("id")
+      .select("id, trial_ends_at")
       .eq("auth_user_id", authUserId)
       .single();
 
@@ -75,7 +75,7 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
       if (profileId) {
         const { data: newProfile } = await supabase
           .from("user_profiles")
-          .select("id")
+          .select("id, trial_ends_at")
           .eq("id", profileId)
           .single();
         profile = newProfile;
@@ -96,9 +96,15 @@ export async function getAuthenticatedUser(): Promise<{ userId: string; plan: Pl
       .limit(1)
       .maybeSingle();
 
-    const plan = (activeSub?.plan as PlanId) ?? "free";
+    // 우선순위: 유효 구독 > 진행 중인 가입 체험 > free
+    let plan: PlanId = "free";
+    if (activeSub?.plan) {
+      plan = activeSub.plan as PlanId;
+    } else if (profile.trial_ends_at && new Date(profile.trial_ends_at) > new Date()) {
+      plan = TRIAL_PLAN;
+    }
 
-    return { userId: profile.id, plan };
+    return { userId: profile.id, plan, trialEndsAt: profile.trial_ends_at ?? null };
   } catch (err) {
     console.error("[getAuthenticatedUser] Error:", err instanceof Error ? err.message : err);
     return null;
