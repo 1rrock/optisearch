@@ -83,7 +83,7 @@ export function LandingHeader() {
         {/* Desktop Nav */}
         <div className="hidden md:flex items-center gap-8">
           {/* 무료 도구 드롭다운 */}
-          <DropdownMenu>
+          <DropdownMenu modal={false}>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center gap-1 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors tracking-wide outline-none">
                 무료 도구

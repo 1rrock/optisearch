@@ -241,10 +241,12 @@ function SettingsPageContent() {
     }
   };
 
+  // isTrial 유저는 실제 구독이 없으므로 status == null 이어도 isActive로 취급하지 않음
+  const isTrial = subInfo?.isTrial ?? false;
   const isActive =
     subInfo?.status === "active" ||
     subInfo?.status === "pending_cancel" ||
-    (subInfo !== null && plan !== "free" && subInfo?.status == null);
+    (subInfo !== null && plan !== "free" && subInfo?.status == null && !isTrial);
   const isStopped = subInfo?.status === "stopped";
   const isPendingCancel = subInfo?.status === "pending_cancel";
   const isPendingBilling = subInfo?.status === "pending_billing";
