@@ -25,6 +25,7 @@ export function RankHistoryChart({ targetId }: RankHistoryChartProps) {
     return [...data.snapshots].reverse().map((item) => ({
       ...item,
       displayDate: format(parseISO(item.checkedAt), "MM/dd"),
+      rank: item.rank === 0 ? null : item.rank,
     }));
   }, [data]);
 

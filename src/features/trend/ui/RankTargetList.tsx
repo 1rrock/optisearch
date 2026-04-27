@@ -52,8 +52,9 @@ export function RankTargetList({ selectedId, onSelect }: RankTargetListProps) {
     <div className="flex flex-col gap-2 p-3 sm:p-4">
       {targets.map(({ target, latestSnapshot }) => {
         const isSelected = selectedId === target.id;
-        const rank = latestSnapshot?.rank ?? 0;
-        const hasRank = rank > 0;
+        const rank = latestSnapshot?.rank;
+        const hasRank = rank !== undefined && rank > 0;
+        const isOutOfTop100 = latestSnapshot !== null && rank === 0;
 
         return (
           <div
@@ -79,6 +80,10 @@ export function RankTargetList({ selectedId, onSelect }: RankTargetListProps) {
                     <span className="text-lg sm:text-xl font-bold text-emerald-600">{rank}</span>
                     <span className="text-[10px] text-muted-foreground font-medium">위</span>
                   </div>
+                ) : isOutOfTop100 ? (
+                  <span className="text-[10px] font-medium text-orange-500 bg-orange-50 px-2 py-0.5 rounded-sm">
+                    TOP100 밖
+                  </span>
                 ) : (
                   <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-sm">
                     조회중
