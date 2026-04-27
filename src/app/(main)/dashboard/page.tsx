@@ -13,6 +13,7 @@ import { RankTrackerForm } from "@/features/trend/ui/RankTrackerForm";
 import { RankHistoryChart } from "@/features/trend/ui/RankHistoryChart";
 import { RankTargetList } from "@/features/trend/ui/RankTargetList";
 import { useRankTrackTargets } from "@/features/trend/api/use-rank";
+import { NotificationPanel } from "@/features/notification/ui/NotificationPanel";
 
 
 function SkeletonBlock({ className }: { className?: string }) {
@@ -59,6 +60,8 @@ export default function DashboardPage() {
   const [trackedTargetId, setTrackedTargetId] = useState<string | undefined>();
   const router = useRouter();
   const { plan, isTrialExpired, usage, recentSearches, savedKeywordsCount, initialized } = useDashboardData();
+  const { data: rankData, isPending: rankLoading } = useRankTrackTargets();
+  const trackUsed = rankData?.targets?.length ?? 0;
 
   if (!initialized) {
     return (
@@ -96,9 +99,7 @@ export default function DashboardPage() {
   const searchLimit = limits.dailySearch;
   const analyzeLimit = limits.dailyAnalyze;
   const draftLimit = limits.dailyDraft;
-  const { data: rankData, isPending: rankLoading } = useRankTrackTargets();
   const trackLimit = limits.maxTrackTargets;
-  const trackUsed = rankData?.targets?.length ?? 0;
 
   function handleSearch() {
     const q = query.trim();
@@ -347,6 +348,10 @@ export default function DashboardPage() {
 
       {/* 3. Bottom Section: Full Width */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+        <section className="lg:col-span-12">
+          <NotificationPanel />
+        </section>
 
         {/* Recent Searches List */}
         <section className="lg:col-span-12 bg-card rounded-xl shadow-sm overflow-hidden border border-muted/50">

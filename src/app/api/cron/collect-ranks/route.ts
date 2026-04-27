@@ -2,6 +2,8 @@ import { createServerClient } from "@/shared/lib/supabase";
 import { searchShopping } from "@/shared/lib/naver-search";
 import { toKstMidnight } from "@/shared/lib/date-utils";
 import { verifyCronAuth } from "@/shared/lib/cron-auth";
+import { createNotification } from "@/services/notification-service";
+import { sendRankChangeEmail } from "@/shared/lib/email";
 
 /**
  * Vercel Cron job — runs daily to collect shopping rank for all active targets.
@@ -22,6 +24,7 @@ const TIMEOUT_THRESHOLD_MS = 50_000; // graceful stop at 50s
 
 interface ActiveTarget {
   id: string;
+  user_id: string;
   keyword: string;
   store_id: string;
   source: string;
@@ -39,7 +42,7 @@ export async function GET(request: Request) {
     // 1. Fetch all active targets
     const { data: targets, error: targetsError } = await supabase
       .from("rank_track_targets")
-      .select("id, keyword, store_id, source")
+      .select("id, user_id, keyword, store_id, source")
       .eq("is_active", true)
       .eq("source", "naver");
 
@@ -54,7 +57,23 @@ export async function GET(request: Request) {
 
     console.log(`[collect-ranks] Found ${targets.length} active targets`);
 
-    // 2. Deduplicate by keyword (multiple targets may share same keyword)
+    // 2. Prepare user email map for notifications
+    const uniqueUserIds = Array.from(new Set((targets as ActiveTarget[]).map((t) => t.user_id)));
+    const userEmailMap = new Map<string, string>();
+    if (uniqueUserIds.length > 0) {
+      const { data: userProfiles } = await supabase
+        .from("user_profiles")
+        .select("id, email")
+        .in("id", uniqueUserIds);
+
+      for (const row of userProfiles ?? []) {
+        if (row.email) {
+          userEmailMap.set(row.id, row.email);
+        }
+      }
+    }
+
+    // 3. Deduplicate by keyword (multiple targets may share same keyword)
     const keywordMap = new Map<string, ActiveTarget[]>();
     for (const t of targets as ActiveTarget[]) {
       const key = t.keyword.trim().toLowerCase();
@@ -65,7 +84,7 @@ export async function GET(request: Request) {
     const uniqueKeywords = Array.from(keywordMap.keys());
     console.log(`[collect-ranks] ${uniqueKeywords.length} unique keywords to search`);
 
-    // 3. Batch search Naver Shopping API
+    // 4. Batch search Naver Shopping API
     const checkedAt = toKstMidnight();
     let searched = 0;
     let snapshots = 0;
@@ -111,6 +130,15 @@ export async function GET(request: Request) {
             );
             const rank = rankIndex >= 0 ? rankIndex + 1 : 0;
 
+            const { data: previousSnapshot } = await supabase
+              .from("rank_snapshots")
+              .select("rank, checked_at")
+              .eq("target_id", target.id)
+              .neq("checked_at", checkedAt)
+              .order("checked_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
             const { error: upsertError } = await supabase
               .from("rank_snapshots")
               .upsert(
@@ -127,6 +155,52 @@ export async function GET(request: Request) {
               console.error(`[collect-ranks] Snapshot upsert failed for target ${target.id}:`, upsertError.message);
             } else {
               snapshots++;
+
+              if (previousSnapshot && previousSnapshot.rank !== rank) {
+                const direction = rank === 0
+                  ? "out"
+                  : previousSnapshot.rank === 0
+                    ? "in"
+                    : rank < previousSnapshot.rank
+                      ? "up"
+                      : "down";
+
+                const title = "내 상품 순위 변동 알림";
+                const message = direction === "out"
+                  ? `'${target.keyword}' 키워드에서 내 상품이 TOP100 밖으로 이탈했습니다. (이전 ${previousSnapshot.rank}위)`
+                  : direction === "in"
+                    ? `'${target.keyword}' 키워드에서 내 상품이 TOP100에 진입했습니다. (현재 ${rank}위)`
+                    : `'${target.keyword}' 순위가 ${previousSnapshot.rank}위 → ${rank}위로 ${direction === "up" ? "상승" : "하락"}했습니다.`;
+
+                await createNotification({
+                  userId: target.user_id,
+                  type: "rank_change",
+                  title,
+                  message,
+                  payload: {
+                    targetId: target.id,
+                    keyword: target.keyword,
+                    storeId: target.store_id,
+                    previousRank: previousSnapshot.rank,
+                    currentRank: rank,
+                    checkedAt,
+                    direction,
+                  },
+                  dedupeKey: `rank-change:${target.id}:${checkedAt}`,
+                });
+
+                const email = userEmailMap.get(target.user_id);
+                if (email) {
+                  await sendRankChangeEmail({
+                    to: email,
+                    keyword: target.keyword,
+                    storeId: target.store_id,
+                    previousRank: previousSnapshot.rank,
+                    currentRank: rank,
+                    checkedAt,
+                  });
+                }
+              }
             }
           } catch (err) {
             errors++;
