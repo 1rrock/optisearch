@@ -1,17 +1,9 @@
 
 "use client";
 
-import { ArrowRight, Play, Search, TrendingUp } from "lucide-react";
-import { Button } from "@/shared/ui/button";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Input } from "@/shared/ui/input";
+import { ArrowRight, Search, TrendingUp } from "lucide-react";
 
 export function Hero() {
-  const [storeUrl, setStoreUrl] = useState("");
-  const router = useRouter();
-
   return (
     <div className="relative bg-background pt-32 pb-40 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-12 gap-12 items-center relative z-10 w-full">
@@ -20,22 +12,22 @@ export function Hero() {
           <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-sm bg-primary/10 border border-primary/20 text-primary text-xs font-mono tracking-widest shadow-[0_0_15px_hsl(var(--primary)/0.2)]">
               <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-              검색 데이터 분석 플랫폼
+              블로그 입문 1년차를 위한 키워드 도구
             </div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-sm bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-black tracking-wide shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-              🎉 프로 14일 무료 체험
+              🎉 가입 즉시 Pro 2주 무료
             </div>
           </div>
 
           <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-black tracking-tighter leading-[1.05] animate-in fade-in slide-in-from-bottom-8 duration-700 delay-100 text-foreground">
-            감으로 하지 마세요.<br />
+            키워드 발굴부터 글 초안까지,<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent drop-shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
-              데이터로 결정하세요.
+              한 곳에서 끝나요.
             </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground leading-relaxed max-w-2xl font-medium animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-            검색 데이터 기반의 키워드 분석 소프트웨어. 검색량, 경쟁 강도, 순위 변동을 하나의 대시보드에서 조회하고 의사결정에 활용하세요.
+            검색량부터 글 초안까지, 한 번의 입력으로 정리해드려요. 블로그 시작 1년 이하 부업러를 위해 만들었습니다.
           </p>
         </div>
 
@@ -49,8 +41,8 @@ export function Hero() {
                   <Search className="size-5 text-primary" />
                 </div>
                 <div>
-                  <div className="text-xs text-muted-foreground font-mono mb-1">타겟 키워드</div>
-                  <div className="text-foreground font-bold tracking-tight">&quot;남자 트레일 러닝화&quot;</div>
+                  <div className="text-xs text-muted-foreground font-mono mb-1">분석 중인 키워드</div>
+                  <div className="text-foreground font-bold tracking-tight">&quot;강아지 사료 추천&quot;</div>
                 </div>
               </div>
               <div className="px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-sm text-xs font-black tracking-widest">
@@ -62,7 +54,7 @@ export function Hero() {
               <div>
                 <div className="flex justify-between text-xs text-muted-foreground mb-2 font-mono">
                   <span>현재 순위</span>
-                  <span>시뮬레이션 순위</span>
+                  <span>최적화 후 예상</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex-1 bg-muted rounded-lg p-3 border border-border text-center relative overflow-hidden">
@@ -77,11 +69,11 @@ export function Hero() {
 
               <div className="bg-muted/50 rounded-xl p-4 border border-border/50">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-muted-foreground">예상 클릭수 변동</span>
+                  <span className="text-sm font-medium text-muted-foreground">월 예상 유입 변화</span>
                   <span className="text-primary text-xs font-bold bg-primary/10 px-2 py-0.5 rounded">데이터 기반 추산</span>
                 </div>
                 <div className="flex items-end gap-3">
-                  <span className="text-3xl font-black text-foreground">+1,245건</span>
+                  <span className="text-3xl font-black text-foreground">+1,245회</span>
                   <span className="text-sm text-muted-foreground font-mono mb-1">/ 월 예상</span>
                 </div>
 
@@ -102,8 +94,8 @@ export function Hero() {
                 <TrendingUp className="size-4" />
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground font-mono">순위 변동 감지</p>
-                <p className="text-sm font-bold text-foreground">시장 동향 분석</p>
+                <p className="text-[10px] text-muted-foreground font-mono">순위 변동 알림</p>
+                <p className="text-sm font-bold text-foreground">매일 자동 추적</p>
               </div>
             </div>
           </div>

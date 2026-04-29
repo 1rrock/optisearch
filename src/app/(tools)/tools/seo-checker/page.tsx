@@ -17,9 +17,33 @@ export const metadata: Metadata = {
   },
 }
 
+const seoCheckerSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "블로그 SEO 점수 체커",
+  description:
+    "블로그 글의 SEO 점수를 0~100점으로 즉시 분석합니다. 제목 길이, 키워드 포함 여부, 본문 분량을 자동 체크하여 A~D 등급과 개선 방법을 제공합니다. 로그인 없이 무료.",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "KRW",
+  },
+  url: "https://www.optisearch.kr/tools/seo-checker",
+  publisher: {
+    "@type": "Organization",
+    name: "옵티써치",
+  },
+}
+
 export default function SeoCheckerPage() {
   return (
     <div className="space-y-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(seoCheckerSchema) }}
+      />
       <header className="space-y-4 text-center">
         <h1 className="text-4xl font-bold">무료 SEO 점수 분석기</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

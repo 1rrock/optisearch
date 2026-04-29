@@ -42,7 +42,6 @@ export const metadata: Metadata = {
     "키워드 경쟁도",
     "키워드 트렌드",
     "블로그 수익화",
-    "블랙키위 대안",
   ],
   openGraph: {
     title: "옵티써치 — 무료 키워드 분석 + AI 블로그 최적화",
@@ -181,14 +180,6 @@ export default function RootLayout({
                     acceptedAnswer: {
                       "@type": "Answer",
                       text: "AI 경쟁 분석(상위 글 공백 각도 발견), AI 블로그 초안 자동 생성(정보성/리뷰/리스트형/비교분석), AI 검색의도 분류, AI 콘텐츠 전략 제안 기능을 제공합니다.",
-                    },
-                  },
-                  {
-                    "@type": "Question",
-                    name: "블랙키위와 어떤 차이가 있나요?",
-                    acceptedAnswer: {
-                      "@type": "Answer",
-                      text: "블랙키위는 키워드 데이터만 제공하지만, 옵티써치는 AI 경쟁 분석, AI 초안 생성, 검색의도 분류까지 제공하여 '무엇을 어떻게 쓸지'까지 가이드합니다.",
                     },
                   },
                 ],

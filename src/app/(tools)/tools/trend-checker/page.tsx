@@ -17,9 +17,33 @@ export const metadata: Metadata = {
   },
 }
 
+const trendCheckerSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "키워드 트렌드 분석기",
+  description:
+    "키워드의 최근 3개월 검색 트렌드를 무료로 확인하세요. 시즌 키워드 타이밍을 잡고 상승 트렌드를 선점하는 콘텐츠 전략을 세울 수 있습니다. 로그인 없이 바로 사용.",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "KRW",
+  },
+  url: "https://www.optisearch.kr/tools/trend-checker",
+  publisher: {
+    "@type": "Organization",
+    name: "옵티써치",
+  },
+}
+
 export default function TrendCheckerPage() {
   return (
     <div className="space-y-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(trendCheckerSchema) }}
+      />
       <header className="space-y-4 text-center">
         <h1 className="text-4xl font-bold">무료 키워드 트렌드 분석기</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">

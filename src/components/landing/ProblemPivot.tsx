@@ -3,17 +3,17 @@ import { XCircle, CheckCircle2 } from "lucide-react";
 
 export function ProblemPivot() {
   const oldWay = [
-    "매일 아침 엑셀로 키워드 순위 수작업 정리",
-    "순위 하락을 매출이 떨어진 뒤에야 뒤늦게 인지",
-    "여기저기 흩어진 데이터 취합에 매일 2시간 낭비",
-    "정확한 원인도 모른 채 어제와 똑같은 업무 반복"
+    "키워드 데이터를 봐도 뭘 골라야 할지 모르겠어요",
+    "키워드는 찾았는데 글로 어떻게 풀지 막막해요",
+    "글 한 편 쓰는 데 시간이 너무 오래 걸려요",
+    "순위 떨어진 글을 한참 뒤에야 발견해요"
   ];
 
   const newWay = [
-    "매일 아침 자동화된 키워드 리포트 확인",
-    "순위 변동 및 이상 징후 실시간 알림",
-    "대시보드 하나로 모든 데이터 1분 만에 파악",
-    "정확한 지표 기반으로 오늘 해야 할 일에 집중"
+    "검색량·경쟁도를 자연어로 풀어줘서 바로 결정해요",
+    "추천 제목 3개와 글 뼈대를 자동으로 받아요",
+    "한 화면에서 분석부터 초안까지 끝내요",
+    "순위 변동을 매일 알림으로 받아 즉시 대응해요"
   ];
 
   return (
@@ -21,10 +21,10 @@ export function ProblemPivot() {
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-20">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight text-foreground mb-6">
-            엑셀 복사 붙여넣기에 <span className="text-destructive">시간을 낭비하지 마세요.</span>
+            블로그 부업, <span className="text-destructive">이런 적 있으시죠?</span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
-            반복되는 수작업과 뒤늦은 대응에서 벗어나, 키워드 조회부터 순위 모니터링까지 하나의 소프트웨어로 처리하세요.
+            키워드 고르기부터 글 쓰기까지, 1인 블로거가 자주 막히는 지점을 한 화면에서 풀어드려요.
           </p>
         </div>
 
@@ -35,7 +35,7 @@ export function ProblemPivot() {
               <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center border border-destructive/20">
                 <XCircle className="size-6 text-destructive" />
               </div>
-              <h3 className="text-2xl font-bold text-muted-foreground">기존 방식</h3>
+              <h3 className="text-2xl font-bold text-muted-foreground">이런 상황</h3>
             </div>
             <ul className="space-y-6 relative z-10">
               {oldWay.map((item, i) => (
@@ -50,12 +50,12 @@ export function ProblemPivot() {
           <div className="p-10 rounded-3xl bg-gradient-to-b from-primary/10 to-background border border-primary/30 shadow-[0_0_50px_hsl(var(--primary)/0.1)] relative overflow-hidden">
             <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-[0.03] pointer-events-none"></div>
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/20 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
-            
+
             <div className="flex items-center gap-4 mb-8 relative z-10">
               <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center border border-primary/40 shadow-[0_0_15px_hsl(var(--primary)/0.3)]">
                 <CheckCircle2 className="size-6 text-primary drop-shadow-[0_0_5px_hsl(var(--primary)/0.8)]" />
               </div>
-              <h3 className="text-2xl font-black text-foreground drop-shadow-md">OptiSearch 솔루션</h3>
+              <h3 className="text-2xl font-black text-foreground drop-shadow-md">OptiSearch와 함께</h3>
             </div>
             <ul className="space-y-6 relative z-10">
               {newWay.map((item, i) => (

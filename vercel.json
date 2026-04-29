@@ -20,6 +20,10 @@
     {
       "path": "/api/cron/collect-new-keywords",
       "schedule": "30 19 * * *"
+    },
+    {
+      "path": "/api/internal/index-ping",
+      "schedule": "0 23 * * *"
     }
   ]
 }

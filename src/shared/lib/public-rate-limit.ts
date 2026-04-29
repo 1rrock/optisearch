@@ -102,7 +102,7 @@ async function checkRedis(
  */
 export async function checkPublicRateLimit(
   ip: string,
-  feature: "analyze" | "title" | "seo-check" | "trend",
+  feature: "analyze" | "title" | "seo-check" | "trend" | "demo",
   dailyLimit: number
 ): Promise<{ allowed: boolean; remaining: number; limit: number }> {
   const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD

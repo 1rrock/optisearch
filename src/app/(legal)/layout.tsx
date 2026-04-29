@@ -1,10 +1,8 @@
-import type { Metadata } from "next";
 import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
-export const metadata: Metadata = {
-  robots: { index: false, follow: true },
-};
+// robots metadata 제거 — 각 페이지(about/terms/privacy 등)의 metadata.robots를 따름
+// (이전: layout이 noindex로 상속되어 about 등 색인 원하는 페이지까지 차단됨)
 
 export default function LegalLayout({ children }: { children: React.ReactNode }) {
   return (

@@ -17,9 +17,33 @@ export const metadata: Metadata = {
   },
 }
 
+const titleGeneratorSchema = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "AI 블로그 제목 생성기",
+  description:
+    "키워드와 글 유형을 입력하면 클릭률 높은 SEO 최적화 블로그 제목 3개를 즉시 생성합니다. 정보성·리뷰·리스트형·비교분석 유형 지원. 무료 제공.",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "KRW",
+  },
+  url: "https://www.optisearch.kr/tools/title-generator",
+  publisher: {
+    "@type": "Organization",
+    name: "옵티써치",
+  },
+}
+
 export default function TitleGeneratorPage() {
   return (
     <div className="space-y-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(titleGeneratorSchema) }}
+      />
       {/* 헤더 */}
       <div className="space-y-3">
         <h1 className="text-3xl font-bold tracking-tight">AI 블로그 제목 생성기</h1>

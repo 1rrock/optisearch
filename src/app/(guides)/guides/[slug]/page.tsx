@@ -37,8 +37,34 @@ export default async function GuidePage({ params }: { params: Promise<{ slug: st
     .filter(g => g.category === guide.category && g.slug !== slug)
     .slice(0, 3)
 
+  const articleSchema = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: guide.title,
+    description: guide.description,
+    datePublished: guide.date,
+    dateModified: guide.date,
+    author: {
+      "@type": "Organization",
+      name: guide.author,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "옵티써치",
+      url: "https://www.optisearch.kr",
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `https://www.optisearch.kr/guides/${slug}`,
+    },
+  }
+
   return (
     <article className="space-y-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
+      />
       <Link href="/guides" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
         <ChevronLeft className="w-4 h-4 mr-1" />
         가이드 목록으로

@@ -31,6 +31,7 @@ export const guides: GuideMeta[] = [
   { slug: "keyword-to-publish", title: "키워드 분석부터 글 발행까지: 실전 워크플로우", description: "키워드 발굴, 글쓰기, 발행까지 이어지는 블로그 운영 전체 흐름.", category: "실전 활용", date: "2026-04-16", author: "옵티써치 팀", readingMinutes: 7 },
   { slug: "competitor-analysis", title: "경쟁 블로그 분석하고 차별화하는 방법", description: "상위 노출 블로그를 분석하고 차별화 포인트를 찾는 방법.", category: "실전 활용", date: "2026-04-16", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "first-blog-post", title: "블로그 첫 글 쓰기: 주제 선정부터 발행까지", description: "블로그를 막 시작한 사람을 위한 첫 포스팅 가이드.", category: "실전 활용", date: "2026-04-16", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-side-job-guide", title: "직장인 블로그 부업 시작 가이드: 첫 6개월 로드맵", description: "직장인이 퇴근 후 1시간으로 블로그 부업을 시작해 6개월 안에 토대를 만드는 단계별 실전 가이드입니다.", category: "실전 활용", date: "2026-04-29", author: "옵티써치 팀", readingMinutes: 7 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))
