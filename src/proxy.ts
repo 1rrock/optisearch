@@ -5,7 +5,7 @@ import type { NextRequest } from "next/server"
 const PUBLIC_PATHS = new Set(["/", "/login", "/privacy", "/terms", "/support", "/pricing"])
 
 // API route prefixes that handle their own auth (webhooks, cron, etc.)
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/", "/api/webhooks/", "/api/payments/payapp/webhook"]
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/api/cron/", "/api/webhooks/", "/api/payments/payapp/webhook", "/api/ig-image"]
 
 // Path prefixes that do not require authentication (e.g., /tools/*, /guides/*, /api/public/*)
 const PUBLIC_PATH_PREFIXES = ["/tools", "/guides", "/api/public/"]

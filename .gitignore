@@ -56,3 +56,5 @@ naver-content-optimizer.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+marketing/instagram-log.md
+marketing/generate_instagram_card.py
