@@ -12,9 +12,26 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params
   const guide = getGuideBySlug(slug)
   if (!guide) return {}
+  const url = `https://www.optisearch.kr/guides/${slug}`
   return {
     title: `${guide.title} | 옵티써치 가이드`,
     description: guide.description,
+    alternates: {
+      canonical: url,
+    },
+    openGraph: {
+      title: guide.title,
+      description: guide.description,
+      url,
+      type: "article",
+      publishedTime: guide.date,
+      authors: [guide.author],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: guide.title,
+      description: guide.description,
+    },
   }
 }
 
