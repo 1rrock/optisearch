@@ -33,6 +33,9 @@ export const guides: GuideMeta[] = [
   { slug: "first-blog-post", title: "블로그 첫 글 쓰기: 주제 선정부터 발행까지", description: "블로그를 막 시작한 사람을 위한 첫 포스팅 가이드.", category: "실전 활용", date: "2026-04-16", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-side-job-guide", title: "직장인 블로그 부업 시작 가이드: 첫 6개월 로드맵", description: "직장인이 퇴근 후 1시간으로 블로그 부업을 시작해 6개월 안에 토대를 만드는 단계별 실전 가이드입니다.", category: "실전 활용", date: "2026-04-29", author: "옵티써치 팀", readingMinutes: 7 },
   { slug: "find-blog-keywords-free", title: "블로그 키워드 찾는 법: 무료 도구로 시작하는 3단계 발굴법", description: "네이버 자동완성, 광고 시스템, 데이터랩을 활용해 비용 없이 블로그 키워드를 발굴하는 3단계 방법과 실전 키워드 선정 기준을 정리합니다.", category: "키워드 분석", date: "2026-04-30", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-seo-score-check", title: "블로그 SEO 점수 측정하는 법: 지금 당장 내 블로그를 진단하는 방법", description: "내 블로그의 SEO 상태를 스스로 진단하는 방법을 단계별로 정리합니다. 서치어드바이저, 구글 서치콘솔, 수동 체크리스트까지 지금 바로 점검할 수 있는 실전 가이드입니다.", category: "블로그 SEO", date: "2026-05-01", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-write-faster", title: "블로그 글 빨리 쓰는 법: 1시간 안에 완성하는 5단계 루틴", description: "바쁜 직장인도 퇴근 후 1시간 안에 블로그 글을 완성할 수 있습니다. 기획부터 발행까지 글쓰기 속도를 높이는 5단계 실전 루틴과 반복 사용 가능한 템플릿 전략을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-05-02", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-adsense-approval", title: "블로그 애드센스 승인 받는 법: 첫 신청부터 통과까지 실전 체크리스트", description: "블로그 애드센스 승인을 처음 신청하는 초보자를 위해 콘텐츠 기준, 탈락 원인 5가지, 재신청 주의사항, 최종 체크리스트까지 실전 중심으로 단계별 정리합니다.", category: "실전 활용", date: "2026-05-04", author: "옵티써치 팀", readingMinutes: 6 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))
