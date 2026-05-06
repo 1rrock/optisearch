@@ -36,6 +36,8 @@ export const guides: GuideMeta[] = [
   { slug: "blog-seo-score-check", title: "블로그 SEO 점수 측정하는 법: 지금 당장 내 블로그를 진단하는 방법", description: "내 블로그의 SEO 상태를 스스로 진단하는 방법을 단계별로 정리합니다. 서치어드바이저, 구글 서치콘솔, 수동 체크리스트까지 지금 바로 점검할 수 있는 실전 가이드입니다.", category: "블로그 SEO", date: "2026-05-01", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-write-faster", title: "블로그 글 빨리 쓰는 법: 1시간 안에 완성하는 5단계 루틴", description: "바쁜 직장인도 퇴근 후 1시간 안에 블로그 글을 완성할 수 있습니다. 기획부터 발행까지 글쓰기 속도를 높이는 5단계 실전 루틴과 반복 사용 가능한 템플릿 전략을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-05-02", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-adsense-approval", title: "블로그 애드센스 승인 받는 법: 첫 신청부터 통과까지 실전 체크리스트", description: "블로그 애드센스 승인을 처음 신청하는 초보자를 위해 콘텐츠 기준, 탈락 원인 5가지, 재신청 주의사항, 최종 체크리스트까지 실전 중심으로 단계별 정리합니다.", category: "실전 활용", date: "2026-05-04", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-keyword-extraction-sites", title: "블로그 키워드 추출 사이트 비교: 무료와 유료의 차이는?", description: "블로그 키워드 추출에 활용할 수 있는 도구들을 기능별로 비교하고, 무료 도구와 유료 도구를 단계별로 선택하는 기준을 정리합니다.", category: "키워드 분석", date: "2026-05-05", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "naver-blog-top-exposure", title: "네이버 블로그 상위 노출 방법: 검색 1페이지에 오르는 7가지 핵심 전략", description: "네이버 블로그 상위 노출에 영향을 주는 C-RANK, 키워드 제목, 본문 구조, 이미지, 발행 주기 등 7가지 핵심 전략을 초보 블로거 기준으로 정리합니다.", category: "블로그 SEO", date: "2026-05-06", author: "옵티써치 팀", readingMinutes: 6 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

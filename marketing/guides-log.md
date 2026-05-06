@@ -39,3 +39,17 @@
 - 카테고리: 실전 활용
 - 제목: 블로그 애드센스 승인 받는 법: 첫 신청부터 통과까지 실전 체크리스트
 - guides URL: https://www.optisearch.kr/guides/blog-adsense-approval (배포 후)
+
+## 2026-05-05
+- 키워드: 블로그 키워드 추출 사이트 비교
+- slug: blog-keyword-extraction-sites
+- 카테고리: 키워드 분석
+- 제목: 블로그 키워드 추출 사이트 비교: 무료와 유료의 차이는?
+- guides URL: https://www.optisearch.kr/guides/blog-keyword-extraction-sites (배포 후)
+
+## 2026-05-06
+- 키워드: 네이버 블로그 상위 노출 방법
+- slug: naver-blog-top-exposure
+- 카테고리: 블로그 SEO
+- 제목: 네이버 블로그 상위 노출 방법: 검색 1페이지에 오르는 7가지 핵심 전략
+- guides URL: https://www.optisearch.kr/guides/naver-blog-top-exposure (배포 후)

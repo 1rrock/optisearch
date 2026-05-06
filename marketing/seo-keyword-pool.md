@@ -8,9 +8,7 @@
 ## 사용 가능 (60개)
 
 ### 카테고리: 키워드/SEO 탐색
-- 블로그 키워드 추출 사이트 비교
 - 블로그 키워드 검색량 조회 방법
-- 네이버 블로그 상위 노출 방법
 - 블로그 순위 확인 사이트 추천
 - 블로그 검색 노출 안 되는 이유
 - 블로그 유입 늘리는 현실적인 방법
@@ -85,3 +83,5 @@
 - [2026-05-01] 블로그 SEO 점수 측정하는 법 → /guides/blog-seo-score-check
 - [2026-05-02] 블로그 글 빨리 쓰는 법 → /guides/blog-write-faster
 - [2026-05-04] 블로그 애드센스 승인 받는 법 → /guides/blog-adsense-approval
+- [2026-05-05] 블로그 키워드 추출 사이트 비교 → /guides/blog-keyword-extraction-sites
+- [2026-05-06] 네이버 블로그 상위 노출 방법 → /guides/naver-blog-top-exposure
