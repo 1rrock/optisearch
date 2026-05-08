@@ -38,6 +38,8 @@ export const guides: GuideMeta[] = [
   { slug: "blog-adsense-approval", title: "블로그 애드센스 승인 받는 법: 첫 신청부터 통과까지 실전 체크리스트", description: "블로그 애드센스 승인을 처음 신청하는 초보자를 위해 콘텐츠 기준, 탈락 원인 5가지, 재신청 주의사항, 최종 체크리스트까지 실전 중심으로 단계별 정리합니다.", category: "실전 활용", date: "2026-05-04", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-keyword-extraction-sites", title: "블로그 키워드 추출 사이트 비교: 무료와 유료의 차이는?", description: "블로그 키워드 추출에 활용할 수 있는 도구들을 기능별로 비교하고, 무료 도구와 유료 도구를 단계별로 선택하는 기준을 정리합니다.", category: "키워드 분석", date: "2026-05-05", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "naver-blog-top-exposure", title: "네이버 블로그 상위 노출 방법: 검색 1페이지에 오르는 7가지 핵심 전략", description: "네이버 블로그 상위 노출에 영향을 주는 C-RANK, 키워드 제목, 본문 구조, 이미지, 발행 주기 등 7가지 핵심 전략을 초보 블로거 기준으로 정리합니다.", category: "블로그 SEO", date: "2026-05-06", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-fill-1000-characters", title: "블로그 글 1000자 채우는 법: 내용 없어도 분량 늘리는 5가지 실전 방법", description: "블로그 글 1000자가 막막할 때 쓸 수 있는 5가지 방법을 소개합니다. 소제목 분리, 예시 추가, Q&A 섹션 등 초보도 바로 적용 가능한 분량 확장 전략을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-05-07", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-keyword-search-volume-check", title: "블로그 키워드 검색량 조회 방법: 네이버에서 무료로 확인하는 4단계", description: "네이버 광고 시스템을 활용해 블로그 키워드 검색량을 직접 조회하는 방법을 4단계로 정리합니다. 계정 생성부터 데이터 해석까지 초보도 따라할 수 있는 실전 가이드입니다.", category: "키워드 분석", date: "2026-05-08", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

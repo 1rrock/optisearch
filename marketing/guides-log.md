@@ -53,3 +53,17 @@
 - 카테고리: 블로그 SEO
 - 제목: 네이버 블로그 상위 노출 방법: 검색 1페이지에 오르는 7가지 핵심 전략
 - guides URL: https://www.optisearch.kr/guides/naver-blog-top-exposure (배포 후)
+
+## 2026-05-07
+- 키워드: 블로그 글 1000자 채우는 법
+- slug: blog-fill-1000-characters
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 글 1000자 채우는 법: 내용 없어도 분량 늘리는 5가지 실전 방법
+- guides URL: https://www.optisearch.kr/guides/blog-fill-1000-characters (배포 후)
+
+## 2026-05-08
+- 키워드: 블로그 키워드 검색량 조회 방법
+- slug: blog-keyword-search-volume-check
+- 카테고리: 키워드 분석
+- 제목: 블로그 키워드 검색량 조회 방법: 네이버에서 무료로 확인하는 4단계
+- guides URL: https://www.optisearch.kr/guides/blog-keyword-search-volume-check (배포 후)
