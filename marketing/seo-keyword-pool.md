@@ -11,7 +11,6 @@
 - 블로그 순위 확인 사이트 추천
 - 블로그 검색 노출 안 되는 이유
 - 블로그 유입 늘리는 현실적인 방법
-- 블로그 SEO 체크리스트
 - 키워드 경쟁도 보는 법
 - 키워드 포화도 의미와 활용
 - 블로그 메타태그 설정 가이드
@@ -86,3 +85,4 @@
 - [2026-05-06] 네이버 블로그 상위 노출 방법 → /guides/naver-blog-top-exposure
 - [2026-05-07] 블로그 글 1000자 채우는 법 → /guides/blog-fill-1000-characters
 - [2026-05-08] 블로그 키워드 검색량 조회 방법 → /guides/blog-keyword-search-volume-check
+- [2026-05-09] 블로그 SEO 체크리스트 → /guides/blog-seo-checklist

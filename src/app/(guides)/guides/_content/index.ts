@@ -40,6 +40,7 @@ export const guides: GuideMeta[] = [
   { slug: "naver-blog-top-exposure", title: "네이버 블로그 상위 노출 방법: 검색 1페이지에 오르는 7가지 핵심 전략", description: "네이버 블로그 상위 노출에 영향을 주는 C-RANK, 키워드 제목, 본문 구조, 이미지, 발행 주기 등 7가지 핵심 전략을 초보 블로거 기준으로 정리합니다.", category: "블로그 SEO", date: "2026-05-06", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-fill-1000-characters", title: "블로그 글 1000자 채우는 법: 내용 없어도 분량 늘리는 5가지 실전 방법", description: "블로그 글 1000자가 막막할 때 쓸 수 있는 5가지 방법을 소개합니다. 소제목 분리, 예시 추가, Q&A 섹션 등 초보도 바로 적용 가능한 분량 확장 전략을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-05-07", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-keyword-search-volume-check", title: "블로그 키워드 검색량 조회 방법: 네이버에서 무료로 확인하는 4단계", description: "네이버 광고 시스템을 활용해 블로그 키워드 검색량을 직접 조회하는 방법을 4단계로 정리합니다. 계정 생성부터 데이터 해석까지 초보도 따라할 수 있는 실전 가이드입니다.", category: "키워드 분석", date: "2026-05-08", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-seo-checklist", title: "블로그 SEO 체크리스트: 발행 전 반드시 확인할 10가지 항목", description: "블로그 글 발행 전 확인해야 할 SEO 체크리스트를 정리합니다. 제목 키워드, 메타 디스크립션, 이미지 alt 텍스트, 내부 링크까지 초보 블로거도 바로 적용할 수 있는 실전 점검 목록입니다.", category: "블로그 SEO", date: "2026-05-09", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

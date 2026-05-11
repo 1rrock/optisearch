@@ -67,3 +67,10 @@
 - 카테고리: 키워드 분석
 - 제목: 블로그 키워드 검색량 조회 방법: 네이버에서 무료로 확인하는 4단계
 - guides URL: https://www.optisearch.kr/guides/blog-keyword-search-volume-check (배포 후)
+
+## 2026-05-09
+- 키워드: 블로그 SEO 체크리스트
+- slug: blog-seo-checklist
+- 카테고리: 블로그 SEO
+- 제목: 블로그 SEO 체크리스트: 발행 전 반드시 확인할 10가지 항목
+- guides URL: https://www.optisearch.kr/guides/blog-seo-checklist (배포 후)
