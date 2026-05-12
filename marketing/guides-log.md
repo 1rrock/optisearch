@@ -74,3 +74,17 @@
 - 카테고리: 블로그 SEO
 - 제목: 블로그 SEO 체크리스트: 발행 전 반드시 확인할 10가지 항목
 - guides URL: https://www.optisearch.kr/guides/blog-seo-checklist (배포 후)
+
+## 2026-05-11
+- 키워드: 블로그 체험단 신청 가이드
+- slug: blog-experience-group-guide
+- 카테고리: 실전 활용
+- 제목: 블로그 체험단 신청 가이드: 초보도 선정되는 5가지 핵심 전략
+- guides URL: https://www.optisearch.kr/guides/blog-experience-group-guide (배포 후)
+
+## 2026-05-12
+- 키워드: 블로그 글감 떠올리는 법
+- slug: blog-content-ideas
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 글감 떠올리는 법: 아이디어가 떨어졌을 때 쓰는 5가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-content-ideas (배포 후)
