@@ -43,6 +43,7 @@ export const guides: GuideMeta[] = [
   { slug: "blog-seo-checklist", title: "블로그 SEO 체크리스트: 발행 전 반드시 확인할 10가지 항목", description: "블로그 글 발행 전 확인해야 할 SEO 체크리스트를 정리합니다. 제목 키워드, 메타 디스크립션, 이미지 alt 텍스트, 내부 링크까지 초보 블로거도 바로 적용할 수 있는 실전 점검 목록입니다.", category: "블로그 SEO", date: "2026-05-09", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-experience-group-guide", title: "블로그 체험단 신청 가이드: 초보도 선정되는 5가지 핵심 전략", description: "블로그 체험단을 처음 신청하는 초보 블로거를 위해 신청 조건, 선정 확률을 높이는 신청서 작성법, 발행 시 주의사항까지 단계별로 정리합니다.", category: "실전 활용", date: "2026-05-11", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-content-ideas", title: "블로그 글감 떠올리는 법: 아이디어가 떨어졌을 때 쓰는 5가지 방법", description: "블로그 글감이 떨어졌을 때 바로 쓸 수 있는 5가지 아이디어 발굴법을 정리합니다. 검색어 자동완성, 커뮤니티 질문, 메모 습관까지 초보도 적용 가능한 방법을 소개합니다.", category: "콘텐츠 마케팅", date: "2026-05-12", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "naver-datalab-guide", title: "네이버 데이터랩 활용법: 블로그 콘텐츠 기획에 바로 쓰는 실전 가이드", description: "네이버 데이터랩에서 키워드 추이와 계절성을 확인하는 방법을 정리합니다. 검색어 트렌드, 시즌 키워드 발굴, 발행 타이밍 최적화까지 블로그 콘텐츠 기획에 바로 적용할 수 있는 실전 활용법을 소개합니다.", category: "키워드 분석", date: "2026-05-13", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

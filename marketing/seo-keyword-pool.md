@@ -55,7 +55,6 @@
 - 블로그 이탈률 줄이는 법
 - 블로그 체류시간 늘리는 법
 - 블로그 키워드 트렌드 보는 법
-- 네이버 데이터랩 활용법
 - 블로그 통계 보는 법
 - 구글 서치콘솔 블로그 활용
 - 블로그 유입 키워드 분석
@@ -88,3 +87,4 @@
 - [2026-05-09] 블로그 SEO 체크리스트 → /guides/blog-seo-checklist
 - [2026-05-11] 블로그 체험단 신청 가이드 → /guides/blog-experience-group-guide
 - [2026-05-12] 블로그 글감 떠올리는 법 → /guides/blog-content-ideas
+- [2026-05-13] 네이버 데이터랩 활용법 → /guides/naver-datalab-guide
