@@ -95,3 +95,10 @@
 - 카테고리: 키워드 분석
 - 제목: 네이버 데이터랩 활용법: 블로그 콘텐츠 기획에 바로 쓰는 실전 가이드
 - guides URL: https://www.optisearch.kr/guides/naver-datalab-guide (배포 후)
+
+## 2026-05-14
+- 키워드: 블로그 메타태그 설정 가이드
+- slug: blog-meta-tag-guide
+- 카테고리: 블로그 SEO
+- 제목: 블로그 메타태그 설정 가이드: SEO를 결정하는 핵심 태그 5가지
+- guides URL: https://www.optisearch.kr/guides/blog-meta-tag-guide (배포 후)

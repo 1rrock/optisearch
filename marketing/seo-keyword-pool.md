@@ -13,7 +13,6 @@
 - 블로그 유입 늘리는 현실적인 방법
 - 키워드 경쟁도 보는 법
 - 키워드 포화도 의미와 활용
-- 블로그 메타태그 설정 가이드
 - 네이버 SEO 가이드 2026
 - 블로그 인덱싱 안 될 때
 
@@ -88,3 +87,4 @@
 - [2026-05-11] 블로그 체험단 신청 가이드 → /guides/blog-experience-group-guide
 - [2026-05-12] 블로그 글감 떠올리는 법 → /guides/blog-content-ideas
 - [2026-05-13] 네이버 데이터랩 활용법 → /guides/naver-datalab-guide
+- [2026-05-14] 블로그 메타태그 설정 가이드 → /guides/blog-meta-tag-guide
