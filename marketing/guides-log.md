@@ -102,3 +102,10 @@
 - 카테고리: 블로그 SEO
 - 제목: 블로그 메타태그 설정 가이드: SEO를 결정하는 핵심 태그 5가지
 - guides URL: https://www.optisearch.kr/guides/blog-meta-tag-guide (배포 후)
+
+## 2026-05-15
+- 키워드: AI로 블로그 글쓰기 실전
+- slug: blog-writing-with-ai
+- 카테고리: 콘텐츠 마케팅
+- 제목: AI로 블로그 글쓰기 실전: 처음부터 발행까지 한 번에 끝내는 4단계 방법
+- guides URL: https://www.optisearch.kr/guides/blog-writing-with-ai (배포 후)

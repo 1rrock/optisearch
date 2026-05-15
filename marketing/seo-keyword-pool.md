@@ -29,7 +29,6 @@
 
 ### 카테고리: 글쓰기 (시간 단축, AI 활용)
 
-- AI로 블로그 글쓰기 실전
 - ChatGPT 블로그 활용 노하우
 
 - 블로그 본문 구조 잡는 법
@@ -88,3 +87,4 @@
 - [2026-05-12] 블로그 글감 떠올리는 법 → /guides/blog-content-ideas
 - [2026-05-13] 네이버 데이터랩 활용법 → /guides/naver-datalab-guide
 - [2026-05-14] 블로그 메타태그 설정 가이드 → /guides/blog-meta-tag-guide
+- [2026-05-15] AI로 블로그 글쓰기 실전 → /guides/blog-writing-with-ai
