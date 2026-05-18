@@ -46,6 +46,9 @@ export const guides: GuideMeta[] = [
   { slug: "naver-datalab-guide", title: "네이버 데이터랩 활용법: 블로그 콘텐츠 기획에 바로 쓰는 실전 가이드", description: "네이버 데이터랩에서 키워드 추이와 계절성을 확인하는 방법을 정리합니다. 검색어 트렌드, 시즌 키워드 발굴, 발행 타이밍 최적화까지 블로그 콘텐츠 기획에 바로 적용할 수 있는 실전 활용법을 소개합니다.", category: "키워드 분석", date: "2026-05-13", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-meta-tag-guide", title: "블로그 메타태그 설정 가이드: SEO를 결정하는 핵심 태그 5가지", description: "블로그 SEO에서 빠질 수 없는 메타태그의 종류와 각각 올바르게 설정하는 방법을 초보 블로거 기준으로 정리합니다.", category: "블로그 SEO", date: "2026-05-14", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-writing-with-ai", title: "AI로 블로그 글쓰기 실전: 처음부터 발행까지 한 번에 끝내는 4단계 방법", description: "AI를 활용해 블로그 글을 처음부터 발행까지 완성하는 실전 방법을 4단계로 정리합니다. 키워드 선정, 개요 작성, 섹션별 생성, 퇴고까지 초보도 따라할 수 있는 구체적인 전략을 소개합니다.", category: "콘텐츠 마케팅", date: "2026-05-15", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-traffic-growth-tips", title: "블로그 유입 늘리는 현실적인 방법: 오늘 바로 적용하는 5가지 전략", description: "블로그 방문자가 늘지 않는 이유와 해결책을 정리합니다. 키워드 선정, 발행 주기, 내부 링크, 외부 채널까지 초보 블로거가 바로 실천할 수 있는 유입 증가 전략 5가지를 소개합니다.", category: "실전 활용", date: "2026-05-16", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-inflow-keyword-analysis", title: "블로그 유입 키워드 분석 방법: 어떤 검색어로 방문자가 들어오는지 파악하는 3가지 방법", description: "블로그에 어떤 키워드로 방문자가 유입되는지 파악하는 방법을 정리합니다. 네이버 서치어드바이저, 구글 서치콘솔, 블로그 통계를 활용한 실전 분석법을 소개합니다.", category: "키워드 분석", date: "2026-05-17", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-search-not-showing", title: "블로그 검색 노출 안 되는 이유 7가지: 원인별 해결법 정리", description: "블로그 글을 써도 검색에 노출되지 않는 이유 7가지를 정리합니다. 인덱싱 누락부터 경쟁도 오판까지 초보 블로거가 자주 겪는 원인과 단계별 해결 방법을 안내합니다.", category: "블로그 SEO", date: "2026-05-18", author: "옵티써치 팀", readingMinutes: 6 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

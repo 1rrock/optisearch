@@ -109,3 +109,24 @@
 - 카테고리: 콘텐츠 마케팅
 - 제목: AI로 블로그 글쓰기 실전: 처음부터 발행까지 한 번에 끝내는 4단계 방법
 - guides URL: https://www.optisearch.kr/guides/blog-writing-with-ai (배포 후)
+
+## 2026-05-16
+- 키워드: 블로그 유입 늘리는 현실적인 방법
+- slug: blog-traffic-growth-tips
+- 카테고리: 실전 활용
+- 제목: 블로그 유입 늘리는 현실적인 방법: 오늘 바로 적용하는 5가지 전략
+- guides URL: https://www.optisearch.kr/guides/blog-traffic-growth-tips (배포 후)
+
+## 2026-05-17
+- 키워드: 블로그 유입 키워드 분석
+- slug: blog-inflow-keyword-analysis
+- 카테고리: 키워드 분석
+- 제목: 블로그 유입 키워드 분석 방법: 어떤 검색어로 방문자가 들어오는지 파악하는 3가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-inflow-keyword-analysis (배포 후)
+
+## 2026-05-18
+- 키워드: 블로그 검색 노출 안 되는 이유
+- slug: blog-search-not-showing
+- 카테고리: 블로그 SEO
+- 제목: 블로그 검색 노출 안 되는 이유 7가지: 원인별 해결법 정리
+- guides URL: https://www.optisearch.kr/guides/blog-search-not-showing (배포 후)
