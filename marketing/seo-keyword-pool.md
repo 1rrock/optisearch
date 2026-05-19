@@ -33,7 +33,6 @@
 - 블로그 본문 구조 잡는 법
 - 블로그 사진 출처 표기 가이드
 - 블로그 인용 표기 방법
-- 블로그 글 안 써질 때 해결법
 - 블로그 글쓰기 템플릿
 
 ### 카테고리: 수익화 (부업러 관심사)
@@ -89,3 +88,4 @@
 - [2026-05-16] 블로그 유입 늘리는 현실적인 방법 → /guides/blog-traffic-growth-tips
 - [2026-05-17] 블로그 유입 키워드 분석 → /guides/blog-inflow-keyword-analysis
 - [2026-05-18] 블로그 검색 노출 안 되는 이유 → /guides/blog-search-not-showing
+- [2026-05-19] 블로그 글 안 써질 때 해결법 → /guides/blog-writing-block-solutions

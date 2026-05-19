@@ -130,3 +130,10 @@
 - 카테고리: 블로그 SEO
 - 제목: 블로그 검색 노출 안 되는 이유 7가지: 원인별 해결법 정리
 - guides URL: https://www.optisearch.kr/guides/blog-search-not-showing (배포 후)
+
+## 2026-05-19
+- 키워드: 블로그 글 안 써질 때 해결법
+- slug: blog-writing-block-solutions
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 글 안 써질 때 쓰는 5가지 실전 해결법
+- guides URL: https://www.optisearch.kr/guides/blog-writing-block-solutions (배포 후)

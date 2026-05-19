@@ -49,6 +49,7 @@ export const guides: GuideMeta[] = [
   { slug: "blog-traffic-growth-tips", title: "블로그 유입 늘리는 현실적인 방법: 오늘 바로 적용하는 5가지 전략", description: "블로그 방문자가 늘지 않는 이유와 해결책을 정리합니다. 키워드 선정, 발행 주기, 내부 링크, 외부 채널까지 초보 블로거가 바로 실천할 수 있는 유입 증가 전략 5가지를 소개합니다.", category: "실전 활용", date: "2026-05-16", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-inflow-keyword-analysis", title: "블로그 유입 키워드 분석 방법: 어떤 검색어로 방문자가 들어오는지 파악하는 3가지 방법", description: "블로그에 어떤 키워드로 방문자가 유입되는지 파악하는 방법을 정리합니다. 네이버 서치어드바이저, 구글 서치콘솔, 블로그 통계를 활용한 실전 분석법을 소개합니다.", category: "키워드 분석", date: "2026-05-17", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-search-not-showing", title: "블로그 검색 노출 안 되는 이유 7가지: 원인별 해결법 정리", description: "블로그 글을 써도 검색에 노출되지 않는 이유 7가지를 정리합니다. 인덱싱 누락부터 경쟁도 오판까지 초보 블로거가 자주 겪는 원인과 단계별 해결 방법을 안내합니다.", category: "블로그 SEO", date: "2026-05-18", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-writing-block-solutions", title: "블로그 글 안 써질 때 쓰는 5가지 실전 해결법", description: "블로그 글이 안 써지는 이유 3가지를 파악하고 즉시 적용할 수 있는 해결법 5가지를 정리합니다. 완벽주의, 글감 부재, 의욕 저하별 맞춤 전략으로 꾸준한 발행을 이어가는 방법을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-05-19", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))
