@@ -50,6 +50,8 @@ export const guides: GuideMeta[] = [
   { slug: "blog-inflow-keyword-analysis", title: "블로그 유입 키워드 분석 방법: 어떤 검색어로 방문자가 들어오는지 파악하는 3가지 방법", description: "블로그에 어떤 키워드로 방문자가 유입되는지 파악하는 방법을 정리합니다. 네이버 서치어드바이저, 구글 서치콘솔, 블로그 통계를 활용한 실전 분석법을 소개합니다.", category: "키워드 분석", date: "2026-05-17", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-search-not-showing", title: "블로그 검색 노출 안 되는 이유 7가지: 원인별 해결법 정리", description: "블로그 글을 써도 검색에 노출되지 않는 이유 7가지를 정리합니다. 인덱싱 누락부터 경쟁도 오판까지 초보 블로거가 자주 겪는 원인과 단계별 해결 방법을 안내합니다.", category: "블로그 SEO", date: "2026-05-18", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-writing-block-solutions", title: "블로그 글 안 써질 때 쓰는 5가지 실전 해결법", description: "블로그 글이 안 써지는 이유 3가지를 파악하고 즉시 적용할 수 있는 해결법 5가지를 정리합니다. 완벽주의, 글감 부재, 의욕 저하별 맞춤 전략으로 꾸준한 발행을 이어가는 방법을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-05-19", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-monetization-roadmap", title: "블로그 수익화 단계별 로드맵: 초보도 따라갈 수 있는 5단계 현실 전략", description: "블로그로 처음 수익을 내고 싶지만 어디서부터 시작해야 할지 모르는 초보 블로거를 위해 애드센스, 체험단, 협찬까지 수익화 단계를 순서대로 정리합니다.", category: "실전 활용", date: "2026-05-20", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "keyword-saturation-guide", title: "키워드 포화도란 무엇인가: 의미부터 블로그 실전 활용까지", description: "키워드 포화도의 개념과 포화지수 활용법을 이해하고 내 블로그 수준에 맞는 키워드를 선정하는 방법을 정리합니다.", category: "키워드 분석", date: "2026-05-21", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

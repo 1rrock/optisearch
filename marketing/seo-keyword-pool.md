@@ -11,7 +11,7 @@
 - 블로그 순위 확인 사이트 추천
 
 - 키워드 경쟁도 보는 법
-- 키워드 포화도 의미와 활용
+
 - 네이버 SEO 가이드 2026
 - 블로그 인덱싱 안 될 때
 
@@ -44,7 +44,6 @@
 - 직장인 블로그 부업 시간 관리
 - 블로그 부업 세금 정리
 - 블로그 vs 유튜브 부업 비교
-- 블로그 수익화 단계별 로드맵
 
 ### 카테고리: 분석 / 데이터
 - 블로그 방문자 수 분석 방법
@@ -89,3 +88,5 @@
 - [2026-05-17] 블로그 유입 키워드 분석 → /guides/blog-inflow-keyword-analysis
 - [2026-05-18] 블로그 검색 노출 안 되는 이유 → /guides/blog-search-not-showing
 - [2026-05-19] 블로그 글 안 써질 때 해결법 → /guides/blog-writing-block-solutions
+- [2026-05-20] 블로그 수익화 단계별 로드맵 → /guides/blog-monetization-roadmap
+- [2026-05-21] 키워드 포화도 의미와 활용 → /guides/keyword-saturation-guide

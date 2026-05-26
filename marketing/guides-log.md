@@ -137,3 +137,17 @@
 - 카테고리: 콘텐츠 마케팅
 - 제목: 블로그 글 안 써질 때 쓰는 5가지 실전 해결법
 - guides URL: https://www.optisearch.kr/guides/blog-writing-block-solutions (배포 후)
+
+## 2026-05-20
+- 키워드: 블로그 수익화 단계별 로드맵
+- slug: blog-monetization-roadmap
+- 카테고리: 실전 활용
+- 제목: 블로그 수익화 단계별 로드맵: 초보도 따라갈 수 있는 5단계 현실 전략
+- guides URL: https://www.optisearch.kr/guides/blog-monetization-roadmap (배포 후)
+
+## 2026-05-21
+- 키워드: 키워드 포화도 의미와 활용
+- slug: keyword-saturation-guide
+- 카테고리: 키워드 분석
+- 제목: 키워드 포화도란 무엇인가: 의미부터 블로그 실전 활용까지
+- guides URL: https://www.optisearch.kr/guides/keyword-saturation-guide (배포 후)
