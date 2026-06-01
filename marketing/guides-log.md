@@ -151,3 +151,45 @@
 - 카테고리: 키워드 분석
 - 제목: 키워드 포화도란 무엇인가: 의미부터 블로그 실전 활용까지
 - guides URL: https://www.optisearch.kr/guides/keyword-saturation-guide (배포 후)
+
+## 2026-05-27
+- 키워드: 블로그 이탈률 줄이는 법
+- slug: blog-bounce-rate-reduce
+- 카테고리: 블로그 SEO
+- 제목: 블로그 이탈률 줄이는 법: 방문자를 붙잡는 5가지 실전 전략
+- guides URL: https://www.optisearch.kr/guides/blog-bounce-rate-reduce (배포 후)
+
+## 2026-05-28
+- 키워드: 블로그 순위 확인 사이트 추천
+- slug: blog-ranking-check-sites
+- 카테고리: 실전 활용
+- 제목: 블로그 순위 확인 사이트 추천: 내 글이 몇 위인지 확인하는 4가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-ranking-check-sites (배포 후)
+
+## 2026-05-29
+- 키워드: 블로그 글쓰기 템플릿
+- slug: blog-writing-template
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 글쓰기 템플릿 모음: 초보도 바로 쓰는 5가지 구성 패턴
+- guides URL: https://www.optisearch.kr/guides/blog-writing-template (배포 후)
+
+## 2026-05-30
+- 키워드: 블로그 키워드 트렌드 보는 법
+- slug: blog-keyword-trend-analysis
+- 카테고리: 키워드 분석
+- 제목: 블로그 키워드 트렌드 보는 법: 상승 키워드를 미리 잡는 4가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-keyword-trend-analysis (배포 후)
+
+## 2026-05-31
+- 키워드: 구글 서치콘솔 블로그 활용
+- slug: google-search-console-blog-guide
+- 카테고리: 블로그 SEO
+- 제목: 구글 서치콘솔 블로그 활용법: 검색 성과를 데이터로 파악하는 4가지 방법
+- guides URL: https://www.optisearch.kr/guides/google-search-console-blog-guide (배포 후)
+
+## 2026-06-01
+- 키워드: 직장인 블로그 부업 시간 관리
+- slug: blog-side-job-time-management
+- 카테고리: 실전 활용
+- 제목: 직장인 블로그 부업 시간 관리법: 퇴근 후 1시간으로 꾸준히 쓰는 5단계 전략
+- guides URL: https://www.optisearch.kr/guides/blog-side-job-time-management (배포 후)

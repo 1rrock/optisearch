@@ -52,6 +52,12 @@ export const guides: GuideMeta[] = [
   { slug: "blog-writing-block-solutions", title: "블로그 글 안 써질 때 쓰는 5가지 실전 해결법", description: "블로그 글이 안 써지는 이유 3가지를 파악하고 즉시 적용할 수 있는 해결법 5가지를 정리합니다. 완벽주의, 글감 부재, 의욕 저하별 맞춤 전략으로 꾸준한 발행을 이어가는 방법을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-05-19", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-monetization-roadmap", title: "블로그 수익화 단계별 로드맵: 초보도 따라갈 수 있는 5단계 현실 전략", description: "블로그로 처음 수익을 내고 싶지만 어디서부터 시작해야 할지 모르는 초보 블로거를 위해 애드센스, 체험단, 협찬까지 수익화 단계를 순서대로 정리합니다.", category: "실전 활용", date: "2026-05-20", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "keyword-saturation-guide", title: "키워드 포화도란 무엇인가: 의미부터 블로그 실전 활용까지", description: "키워드 포화도의 개념과 포화지수 활용법을 이해하고 내 블로그 수준에 맞는 키워드를 선정하는 방법을 정리합니다.", category: "키워드 분석", date: "2026-05-21", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-bounce-rate-reduce", title: "블로그 이탈률 줄이는 법: 방문자를 붙잡는 5가지 실전 전략", description: "블로그 이탈률의 의미와 높은 이탈률이 검색 노출에 미치는 영향을 설명하고, 방문자가 글을 읽고 페이지를 떠나지 않도록 붙잡는 5가지 실전 전략을 정리합니다.", category: "블로그 SEO", date: "2026-05-27", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-ranking-check-sites", title: "블로그 순위 확인 사이트 추천: 내 글이 몇 위인지 확인하는 4가지 방법", description: "블로그 글이 검색 결과 몇 위에 있는지 확인하는 방법과 무료로 사용할 수 있는 순위 확인 사이트를 정리합니다. 네이버 서치어드바이저, 구글 서치콘솔 활용법까지 단계별로 안내합니다.", category: "실전 활용", date: "2026-05-28", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-writing-template", title: "블로그 글쓰기 템플릿 모음: 초보도 바로 쓰는 5가지 구성 패턴", description: "블로그 글을 쓸 때 구조가 없어서 막히는 초보 블로거를 위해 정보 나열형, 문제-해결형, 경험 후기형 등 바로 적용 가능한 5가지 글쓰기 템플릿과 상황별 활용 기준을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-05-29", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-keyword-trend-analysis", title: "블로그 키워드 트렌드 보는 법: 상승 키워드를 미리 잡는 4가지 방법", description: "블로그 키워드 트렌드를 분석해 검색 수요가 늘어나기 전에 미리 글을 발행하는 방법을 정리합니다. 네이버 데이터랩, 자동완성 활용, 계절성 패턴까지 실전 위주로 안내합니다.", category: "키워드 분석", date: "2026-05-30", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "google-search-console-blog-guide", title: "구글 서치콘솔 블로그 활용법: 검색 성과를 데이터로 파악하는 4가지 방법", description: "구글 서치콘솔을 블로그에 연동하고 검색 성과를 분석하는 방법을 정리합니다. 클릭 수, 노출 수, 순위 데이터 해석부터 개선 우선순위 결정까지 실전 위주로 안내합니다.", category: "블로그 SEO", date: "2026-05-31", author: "옵티써치 팀", readingMinutes: 6 },
+  { slug: "blog-side-job-time-management", title: "직장인 블로그 부업 시간 관리법: 퇴근 후 1시간으로 꾸준히 쓰는 5단계 전략", description: "직장인 블로거가 퇴근 후 제한된 시간 안에 블로그를 꾸준히 운영하는 시간 관리법을 정리합니다. 루틴화, 배치 작업, 현실적 목표 설정까지 실전 전략 5가지를 소개합니다.", category: "실전 활용", date: "2026-06-01", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))
