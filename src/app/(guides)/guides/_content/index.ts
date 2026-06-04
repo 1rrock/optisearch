@@ -58,6 +58,9 @@ export const guides: GuideMeta[] = [
   { slug: "blog-keyword-trend-analysis", title: "블로그 키워드 트렌드 보는 법: 상승 키워드를 미리 잡는 4가지 방법", description: "블로그 키워드 트렌드를 분석해 검색 수요가 늘어나기 전에 미리 글을 발행하는 방법을 정리합니다. 네이버 데이터랩, 자동완성 활용, 계절성 패턴까지 실전 위주로 안내합니다.", category: "키워드 분석", date: "2026-05-30", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "google-search-console-blog-guide", title: "구글 서치콘솔 블로그 활용법: 검색 성과를 데이터로 파악하는 4가지 방법", description: "구글 서치콘솔을 블로그에 연동하고 검색 성과를 분석하는 방법을 정리합니다. 클릭 수, 노출 수, 순위 데이터 해석부터 개선 우선순위 결정까지 실전 위주로 안내합니다.", category: "블로그 SEO", date: "2026-05-31", author: "옵티써치 팀", readingMinutes: 6 },
   { slug: "blog-side-job-time-management", title: "직장인 블로그 부업 시간 관리법: 퇴근 후 1시간으로 꾸준히 쓰는 5단계 전략", description: "직장인 블로거가 퇴근 후 제한된 시간 안에 블로그를 꾸준히 운영하는 시간 관리법을 정리합니다. 루틴화, 배치 작업, 현실적 목표 설정까지 실전 전략 5가지를 소개합니다.", category: "실전 활용", date: "2026-06-01", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-stats-guide", title: "블로그 통계 보는 법: 방문자·유입·체류시간을 읽는 3가지 기준", description: "블로그 통계에서 방문자 수, 유입 키워드, 체류시간 데이터를 올바르게 읽는 방법을 정리합니다. 주 1회 확인 루틴부터 통계를 콘텐츠 전략으로 연결하는 방법까지 실전 위주로 안내합니다.", category: "키워드 분석", date: "2026-06-02", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-indexing-not-working", title: "블로그 인덱싱 안 될 때: 원인 5가지와 즉시 적용하는 해결법", description: "블로그 글을 발행했는데 검색에 잡히지 않는 인덱싱 문제의 원인 5가지와 서치어드바이저·수동 크롤링 요청 등 바로 적용할 수 있는 해결법을 정리합니다.", category: "블로그 SEO", date: "2026-06-03", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "chatgpt-blog-tips", title: "ChatGPT 블로그 활용 노하우: 글쓰기 시간을 절반으로 줄이는 5가지 방법", description: "ChatGPT를 블로그 글쓰기에 활용해 시간을 절약하는 5가지 실전 방법을 정리합니다. 주제 발굴, 개요 작성, 본문 생성, 퇴고까지 초보도 바로 적용할 수 있는 프롬프트 활용법과 주의사항을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-06-04", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

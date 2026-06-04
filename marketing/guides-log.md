@@ -193,3 +193,24 @@
 - 카테고리: 실전 활용
 - 제목: 직장인 블로그 부업 시간 관리법: 퇴근 후 1시간으로 꾸준히 쓰는 5단계 전략
 - guides URL: https://www.optisearch.kr/guides/blog-side-job-time-management (배포 후)
+
+## 2026-06-02
+- 키워드: 블로그 통계 보는 법
+- slug: blog-stats-guide
+- 카테고리: 키워드 분석
+- 제목: 블로그 통계 보는 법: 방문자·유입·체류시간을 읽는 3가지 기준
+- guides URL: https://www.optisearch.kr/guides/blog-stats-guide (배포 후)
+
+## 2026-06-03
+- 키워드: 블로그 인덱싱 안 될 때
+- slug: blog-indexing-not-working
+- 카테고리: 블로그 SEO
+- 제목: 블로그 인덱싱 안 될 때: 원인 5가지와 즉시 적용하는 해결법
+- guides URL: https://www.optisearch.kr/guides/blog-indexing-not-working (배포 후)
+
+## 2026-06-04
+- 키워드: ChatGPT 블로그 활용 노하우
+- slug: chatgpt-blog-tips
+- 카테고리: 콘텐츠 마케팅
+- 제목: ChatGPT 블로그 활용 노하우: 글쓰기 시간을 절반으로 줄이는 5가지 방법
+- guides URL: https://www.optisearch.kr/guides/chatgpt-blog-tips (배포 후)
