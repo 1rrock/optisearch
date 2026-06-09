@@ -61,6 +61,11 @@ export const guides: GuideMeta[] = [
   { slug: "blog-stats-guide", title: "블로그 통계 보는 법: 방문자·유입·체류시간을 읽는 3가지 기준", description: "블로그 통계에서 방문자 수, 유입 키워드, 체류시간 데이터를 올바르게 읽는 방법을 정리합니다. 주 1회 확인 루틴부터 통계를 콘텐츠 전략으로 연결하는 방법까지 실전 위주로 안내합니다.", category: "키워드 분석", date: "2026-06-02", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-indexing-not-working", title: "블로그 인덱싱 안 될 때: 원인 5가지와 즉시 적용하는 해결법", description: "블로그 글을 발행했는데 검색에 잡히지 않는 인덱싱 문제의 원인 5가지와 서치어드바이저·수동 크롤링 요청 등 바로 적용할 수 있는 해결법을 정리합니다.", category: "블로그 SEO", date: "2026-06-03", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "chatgpt-blog-tips", title: "ChatGPT 블로그 활용 노하우: 글쓰기 시간을 절반으로 줄이는 5가지 방법", description: "ChatGPT를 블로그 글쓰기에 활용해 시간을 절약하는 5가지 실전 방법을 정리합니다. 주제 발굴, 개요 작성, 본문 생성, 퇴고까지 초보도 바로 적용할 수 있는 프롬프트 활용법과 주의사항을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-06-04", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-how-to-start", title: "블로그 처음 시작하는 법: 첫날 결정해야 할 5가지 핵심", description: "블로그를 처음 시작하는 초보자를 위해 플랫폼 선택, 주제 설정, 이름 결정, 첫 글 주제, 발행 주기까지 첫날 반드시 정해야 할 5가지 결정을 단계별로 정리합니다.", category: "실전 활용", date: "2026-06-05", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "keyword-competition-check", title: "블로그 키워드 경쟁도 보는 법: 내 수준에 맞는 키워드를 고르는 4가지 기준", description: "블로그 키워드를 선택할 때 경쟁도를 올바르게 판단하는 방법을 정리합니다. 경쟁도 지표, 상위 노출 글 분석, 포화지수 활용까지 초보 블로거 기준으로 안내합니다.", category: "키워드 분석", date: "2026-06-06", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-dwell-time-tips", title: "블로그 체류시간 늘리는 법: 방문자가 더 오래 머무르는 5가지 실전 전략", description: "블로그 체류시간이 낮으면 검색 노출에도 영향을 줍니다. 방문자가 페이지를 떠나지 않고 글을 끝까지 읽도록 유도하는 5가지 실전 전략을 정리합니다.", category: "블로그 SEO", date: "2026-06-07", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-body-structure-tips", title: "블로그 본문 구조 잡는 법: 읽기 쉬운 글을 만드는 5단계 구성 전략", description: "블로그 본문을 체계적으로 구성하는 방법을 정리합니다. 도입-본문-마무리 흐름과 소제목 배치, 단락 분리까지 초보 블로거도 바로 적용할 수 있는 5단계 구성 전략을 안내합니다.", category: "콘텐츠 마케팅", date: "2026-06-08", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-first-100-visitors", title: "블로그 첫 100명 방문자 모으기: 초보도 한 달 안에 달성하는 5가지 방법", description: "블로그를 시작하고 첫 방문자 100명을 만드는 것이 가장 막막한 단계입니다. 롱테일 키워드 공략, 커뮤니티 공유, 발행 주기 유지까지 초보 블로거가 한 달 안에 첫 100명을 달성하는 실전 방법 5가지를 정리합니다.", category: "실전 활용", date: "2026-06-09", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

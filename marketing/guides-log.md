@@ -214,3 +214,38 @@
 - 카테고리: 콘텐츠 마케팅
 - 제목: ChatGPT 블로그 활용 노하우: 글쓰기 시간을 절반으로 줄이는 5가지 방법
 - guides URL: https://www.optisearch.kr/guides/chatgpt-blog-tips (배포 후)
+
+## 2026-06-05
+- 키워드: 블로그 처음 시작하는 법
+- slug: blog-how-to-start
+- 카테고리: 실전 활용
+- 제목: 블로그 처음 시작하는 법: 첫날 결정해야 할 5가지 핵심
+- guides URL: https://www.optisearch.kr/guides/blog-how-to-start (배포 후)
+
+## 2026-06-06
+- 키워드: 키워드 경쟁도 보는 법
+- slug: keyword-competition-check
+- 카테고리: 키워드 분석
+- 제목: 블로그 키워드 경쟁도 보는 법: 내 수준에 맞는 키워드를 고르는 4가지 기준
+- guides URL: https://www.optisearch.kr/guides/keyword-competition-check (배포 후)
+
+## 2026-06-07
+- 키워드: 블로그 체류시간 늘리는 법
+- slug: blog-dwell-time-tips
+- 카테고리: 블로그 SEO
+- 제목: 블로그 체류시간 늘리는 법: 방문자가 더 오래 머무르는 5가지 실전 전략
+- guides URL: https://www.optisearch.kr/guides/blog-dwell-time-tips (배포 후)
+
+## 2026-06-08
+- 키워드: 블로그 본문 구조 잡는 법
+- slug: blog-body-structure-tips
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 본문 구조 잡는 법: 읽기 쉬운 글을 만드는 5단계 구성 전략
+- guides URL: https://www.optisearch.kr/guides/blog-body-structure-tips (배포 후)
+
+## 2026-06-09
+- 키워드: 블로그 첫 100명 방문자 모으기
+- slug: blog-first-100-visitors
+- 카테고리: 실전 활용
+- 제목: 블로그 첫 100명 방문자 모으기: 초보도 한 달 안에 달성하는 5가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-first-100-visitors (배포 후)
