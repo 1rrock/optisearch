@@ -7,6 +7,7 @@ import {
 } from "@/shared/lib/public-rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { getOpenAIClient, AI_MODEL } from "@/shared/lib/openai";
+import { parseAiJson } from "@/shared/lib/ai-json";
 
 const bodySchema = z.object({
   keyword: z.string().min(1).max(50),
@@ -56,6 +57,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         error: "체험은 1회만 가능합니다. 무료 가입하면 일 3회까지 사용할 수 있어요.",
+        code: "ALREADY_USED",
         remaining: 0,
         limit: DAILY_LIMIT,
       },
@@ -69,7 +71,7 @@ export async function POST(request: Request) {
   const globalLimit = await checkGlobalPublicAiLimit();
   if (!globalLimit.allowed) {
     return Response.json(
-      { error: "오늘의 무료 체험 한도가 모두 소진되었습니다. 내일 다시 시도해주세요.", remaining: 0, limit: DAILY_LIMIT },
+      { error: "오늘의 무료 체험 한도가 모두 소진되었습니다. 내일 다시 시도해주세요.", code: "GLOBAL_LIMIT", remaining: 0, limit: DAILY_LIMIT },
       { status: 429 }
     );
   }
@@ -123,7 +125,7 @@ PC 검색량: ${pcSearchVolume.toLocaleString()}회/월
     const raw = completion.choices[0]?.message?.content ?? "{}";
     let gpt: DemoGptResponse;
     try {
-      gpt = JSON.parse(raw) as DemoGptResponse;
+      gpt = parseAiJson<DemoGptResponse>(raw);
     } catch {
       gpt = { interpretation: "", titles: [] };
     }

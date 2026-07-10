@@ -7,6 +7,7 @@ import {
 } from "@/shared/lib/public-rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { sanitizeForPrompt } from "@/shared/lib/sanitize";
+import { parseAiJson } from "@/shared/lib/ai-json";
 
 const MODEL = AI_MODEL;
 
@@ -43,7 +44,7 @@ JSON 객체 형식으로만 응답: {"titles": ["제목1", "제목2", "제목3"]
   const content = response.choices[0]?.message?.content ?? "{}";
   let parsed: unknown;
   try {
-    parsed = JSON.parse(content);
+    parsed = parseAiJson(content);
   } catch {
     console.error("[api/public/title] Failed to parse AI response:", content.slice(0, 200));
     throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");

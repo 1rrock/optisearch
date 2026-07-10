@@ -54,7 +54,14 @@ export function LiveDemoSection() {
       });
 
       if (res.status === 429) {
-        setRateLimited(true);
+        // 429는 두 가지다. 이 방문자가 이미 써서 막힌 것과, 사이트 전체의 하루
+        // 무료 쿼터가 소진된 것. 후자에게 "이미 체험하셨어요"를 보여주면 거짓말이다.
+        const data = (await res.json().catch(() => ({}))) as { code?: string; error?: string };
+        if (data.code === "GLOBAL_LIMIT") {
+          setError(data.error ?? "오늘의 무료 체험 한도가 모두 소진되었습니다. 내일 다시 시도해주세요.");
+        } else {
+          setRateLimited(true);
+        }
         setLoading(false);
         return;
       }
