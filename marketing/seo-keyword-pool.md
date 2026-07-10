@@ -8,52 +8,24 @@
 ## 사용 가능 (60개)
 
 ### 카테고리: 키워드/SEO 탐색
-- 네이버 SEO 가이드 2026
 
 ### 카테고리: 블로그 운영 시작
-- 블로그 첫 글 쓰는 법
-- 블로그 주제 정하는 법
-- 블로그 카테고리 구성 예시
-- 블로그 닉네임 정하는 팁
-
-- 블로그 일주일에 몇 개 써야 할까
-- 블로그 1년 운영 후기
-- 블로그 무료로 시작하기
 
 ### 카테고리: 글쓰기 (시간 단축, AI 활용)
 
-- 블로그 사진 출처 표기 가이드
-- 블로그 인용 표기 방법
-
 
 ### 카테고리: 수익화 (부업러 관심사)
-- 블로그 부업 월 100만원 가능할까
 
-- 블로그 협찬 받는 법
-- 블로그 광고 수익 구조 이해
-- 블로그 수익 신고 방법
-- 블로그 부업 세금 정리
-- 블로그 vs 유튜브 부업 비교
 
 ### 카테고리: 분석 / 데이터
-- 블로그 방문자 수 분석 방법
 
 ### 카테고리: 트러블슈팅
-- 블로그 노출 갑자기 줄었을 때
-- 블로그 저품질 의심 체크리스트
-- 블로그 신뢰도 회복 방법
-- 블로그 글 삭제가 미치는 영향
-- 블로그 백업 방법
-- 블로그 글 수정 시 주의점
-- 블로그 검색 누락 해결
-- 네이버 블로그 인덱싱 가속
-- 블로그 글 복사 의심 회피
-- 블로그 첫 페이지 진입 안 될 때
 
 ---
 
 ## 사용 완료
 
+- [2026-07-10] 블로그 키워드 넣는 위치 → /guides/blog-keyword-placement-tips
 - [2026-04-29] 블로그 부업 시작 가이드 → /guides/blog-side-job-guide
 - [2026-04-30] 블로그 키워드 찾는 법 무료 → /guides/find-blog-keywords-free
 - [2026-05-01] 블로그 SEO 점수 측정하는 법 → /guides/blog-seo-score-check
@@ -88,3 +60,30 @@
 - [2026-06-07] 블로그 체류시간 늘리는 법 → /guides/blog-dwell-time-tips
 - [2026-06-08] 블로그 본문 구조 잡는 법 → /guides/blog-body-structure-tips
 - [2026-06-09] 블로그 첫 100명 방문자 모으기 → /guides/blog-first-100-visitors
+- [2026-06-10] 네이버 SEO 가이드 2026 → /guides/naver-seo-guide-2026
+- [2026-06-11] 블로그 방문자 수 분석 방법 → /guides/blog-visitor-analysis
+- [2026-06-12] 블로그 협찬 받는 법 → /guides/blog-sponsored-review-tips
+- [2026-06-15] 블로그 vs 유튜브 부업 비교 → /guides/blog-vs-youtube-side-job
+- [2026-06-15] 블로그 노출 갑자기 줄었을 때 → /guides/blog-sudden-traffic-drop
+- [2026-06-16] 블로그 부업 세금 정리 → /guides/blog-side-job-tax-guide
+- [2026-06-17] 블로그 일주일에 몇 개 써야 할까 → /guides/blog-posting-frequency
+- [2026-06-18] 블로그 광고 수익 구조 이해 → /guides/blog-ad-revenue-structure
+- [2026-06-19] 블로그 주제 정하는 법 → /guides/blog-topic-selection
+- [2026-06-20] 블로그 저품질 의심 체크리스트 → /guides/blog-low-quality-checklist
+- [2026-06-21] 블로그 부업 월 100만원 가능할까 → /guides/blog-side-job-100-monthly
+- [2026-06-23] 블로그 닉네임 정하는 팁 → /guides/blog-nickname-tips
+- [2026-06-24] 블로그 사진 출처 표기 가이드 → /guides/blog-photo-source-guide
+- [2026-06-25] 블로그 신뢰도 회복 방법 → /guides/blog-trust-recovery
+- [2026-06-26] 블로그 인용 표기 방법 → /guides/blog-citation-guide
+- [2026-06-27] 블로그 글 복사 의심 회피 → /guides/blog-duplicate-content-avoidance
+- [2026-06-28] 블로그 1년 운영 후기 → /guides/blog-one-year-review
+- [2026-06-29] 블로그 글 삭제가 미치는 영향 → /guides/blog-post-deletion-effects
+- [2026-06-30] 블로그 백업 방법 → /guides/blog-backup-guide
+- [2026-07-01] 블로그 글 수정 시 주의점 → /guides/blog-post-editing-tips
+- [2026-07-02] 블로그 무료로 시작하기 → /guides/start-blog-for-free
+- [2026-07-03] 블로그 첫 페이지 진입 안 될 때 → /guides/blog-first-page-entry-tips
+- [2026-07-04] 블로그 카테고리 구성 예시 → /guides/blog-category-examples
+- [2026-07-05] 블로그 검색 누락 해결 → /guides/blog-search-exclusion-fix
+- [2026-07-06] 블로그 수익 신고 방법 → /guides/blog-income-reporting-guide
+- [2026-07-07] 네이버 블로그 인덱싱 가속 → /guides/naver-blog-indexing-acceleration
+- [2026-07-08] 블로그 첫 글 쓰는 법 → /guides/blog-first-post-writing

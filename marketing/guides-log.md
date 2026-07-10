@@ -249,3 +249,199 @@
 - 카테고리: 실전 활용
 - 제목: 블로그 첫 100명 방문자 모으기: 초보도 한 달 안에 달성하는 5가지 방법
 - guides URL: https://www.optisearch.kr/guides/blog-first-100-visitors (배포 후)
+
+## 2026-06-10
+- 키워드: 네이버 SEO 가이드 2026
+- slug: naver-seo-guide-2026
+- 카테고리: 블로그 SEO
+- 제목: 네이버 SEO 가이드 2026: 블로그 상위 노출을 위한 핵심 전략 총정리
+- guides URL: https://www.optisearch.kr/guides/naver-seo-guide-2026 (배포 후)
+
+## 2026-06-11
+- 키워드: 블로그 방문자 수 분석 방법
+- slug: blog-visitor-analysis
+- 카테고리: 키워드 분석
+- 제목: 블로그 방문자 수 분석 방법: 데이터로 성장 전략을 세우는 4가지 기준
+- guides URL: https://www.optisearch.kr/guides/blog-visitor-analysis (배포 후)
+
+## 2026-06-12
+- 키워드: 블로그 협찬 받는 법
+- slug: blog-sponsored-review-tips
+- 카테고리: 실전 활용
+- 제목: 블로그 협찬 받는 법: 초보 블로거도 신청 가능한 5가지 실전 방법
+- guides URL: https://www.optisearch.kr/guides/blog-sponsored-review-tips (배포 후)
+
+## 2026-06-15
+- 키워드: 블로그 vs 유튜브 부업 비교
+- slug: blog-vs-youtube-side-job
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 vs 유튜브 부업 비교: 직장인에게 더 맞는 선택은?
+- guides URL: https://www.optisearch.kr/guides/blog-vs-youtube-side-job (배포 후)
+
+## 2026-06-15
+- 키워드: 블로그 노출 갑자기 줄었을 때
+- slug: blog-sudden-traffic-drop
+- 카테고리: 블로그 SEO
+- 제목: 블로그 노출 갑자기 줄었을 때: 원인 5가지와 빠른 회복 방법
+- guides URL: https://www.optisearch.kr/guides/blog-sudden-traffic-drop (배포 후)
+
+## 2026-06-16
+- 키워드: 블로그 부업 세금 정리
+- slug: blog-side-job-tax-guide
+- 카테고리: 실전 활용
+- 제목: 블로그 부업 세금 정리: 직장인이 꼭 알아야 할 소득 신고 기본 가이드
+- guides URL: https://www.optisearch.kr/guides/blog-side-job-tax-guide (배포 후)
+
+## 2026-06-17
+- 키워드: 블로그 일주일에 몇 개 써야 할까
+- slug: blog-posting-frequency
+- 카테고리: 블로그 SEO
+- 제목: 블로그 일주일에 몇 개 써야 할까: 발행 빈도와 상위 노출의 관계
+- guides URL: https://www.optisearch.kr/guides/blog-posting-frequency (배포 후)
+
+## 2026-06-18
+- 키워드: 블로그 광고 수익 구조 이해
+- slug: blog-ad-revenue-structure
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 광고 수익 구조 이해: 애드센스·체험단·협찬 수익이 만들어지는 원리
+- guides URL: https://www.optisearch.kr/guides/blog-ad-revenue-structure (배포 후)
+
+## 2026-06-19
+- 키워드: 블로그 주제 정하는 법
+- slug: blog-topic-selection
+- 카테고리: 실전 활용
+- 제목: 블로그 주제 정하는 법: 오래 쓸 수 있는 주제를 고르는 4가지 기준
+- guides URL: https://www.optisearch.kr/guides/blog-topic-selection (배포 후)
+
+## 2026-06-20
+- 키워드: 블로그 저품질 의심 체크리스트
+- slug: blog-low-quality-checklist
+- 카테고리: 블로그 SEO
+- 제목: 블로그 저품질 의심 체크리스트: 지금 당장 확인해야 할 10가지 신호
+- guides URL: https://www.optisearch.kr/guides/blog-low-quality-checklist (배포 후)
+
+## 2026-06-21
+- 키워드: 블로그 부업 월 100만원 가능할까
+- slug: blog-side-job-100-monthly
+- 카테고리: 실전 활용
+- 제목: 블로그 부업 월 100만원 가능할까: 현실적인 수익 단계와 달성 조건
+- guides URL: https://www.optisearch.kr/guides/blog-side-job-100-monthly (배포 후)
+
+## 2026-06-23
+- 키워드: 블로그 닉네임 정하는 팁
+- slug: blog-nickname-tips
+- 카테고리: 실전 활용
+- 제목: 블로그 닉네임 정하는 법: 검색과 신뢰를 동시에 잡는 5가지 기준
+- guides URL: https://www.optisearch.kr/guides/blog-nickname-tips (배포 후)
+
+## 2026-06-24
+- 키워드: 블로그 사진 출처 표기 가이드
+- slug: blog-photo-source-guide
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 사진 출처 표기 가이드: 저작권 위반 없이 이미지를 쓰는 4가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-photo-source-guide (배포 후)
+
+## 2026-06-25
+- 키워드: 블로그 신뢰도 회복 방법
+- slug: blog-trust-recovery
+- 카테고리: 블로그 SEO
+- 제목: 블로그 신뢰도 회복 방법: 떨어진 검색 신뢰도를 되살리는 5가지 전략
+- guides URL: https://www.optisearch.kr/guides/blog-trust-recovery (배포 후)
+
+## 2026-06-26
+- 키워드: 블로그 인용 표기 방법
+- slug: blog-citation-guide
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 인용 표기 방법: 저작권 걱정 없이 출처를 다는 4가지 원칙
+- guides URL: https://www.optisearch.kr/guides/blog-citation-guide (배포 후)
+
+## 2026-06-27
+- 키워드: 블로그 글 복사 의심 회피
+- slug: blog-duplicate-content-avoidance
+- 카테고리: 블로그 SEO
+- 제목: 블로그 글 복사 의심 받을 때 대처법: 중복 콘텐츠 문제를 피하는 5가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-duplicate-content-avoidance (배포 후)
+
+## 2026-06-28
+- 키워드: 블로그 1년 운영 후기
+- slug: blog-one-year-review
+- 카테고리: 실전 활용
+- 제목: 블로그 1년 운영 후기: 직장인 부업러가 배운 5가지 현실 교훈
+- guides URL: https://www.optisearch.kr/guides/blog-one-year-review (배포 후)
+
+## 2026-06-29
+- 키워드: 블로그 글 삭제가 미치는 영향
+- slug: blog-post-deletion-effects
+- 카테고리: 블로그 SEO
+- 제목: 블로그 글 삭제하면 어떻게 될까: SEO에 미치는 영향과 올바른 대처법
+- guides URL: https://www.optisearch.kr/guides/blog-post-deletion-effects (배포 후)
+
+## 2026-06-30
+- 키워드: 블로그 백업 방법
+- slug: blog-backup-guide
+- 카테고리: 실전 활용
+- 제목: 블로그 백업 방법: 글·이미지·설정을 잃지 않는 4가지 실전 전략
+- guides URL: https://www.optisearch.kr/guides/blog-backup-guide (배포 후)
+
+## 2026-07-01
+- 키워드: 블로그 글 수정 시 주의점
+- slug: blog-post-editing-tips
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 글 수정 시 주의점: SEO를 지키면서 글을 고치는 4가지 원칙
+- guides URL: https://www.optisearch.kr/guides/blog-post-editing-tips (배포 후)
+
+## 2026-07-02
+- 키워드: 블로그 무료로 시작하기
+- slug: start-blog-for-free
+- 카테고리: 실전 활용
+- 제목: 블로그 무료로 시작하기: 초기 비용 없이 첫 글까지 완성하는 5단계 가이드
+- guides URL: https://www.optisearch.kr/guides/start-blog-for-free (배포 후)
+
+## 2026-07-03
+- 키워드: 블로그 첫 페이지 진입 안 될 때
+- slug: blog-first-page-entry-tips
+- 카테고리: 블로그 SEO
+- 제목: 블로그 첫 페이지 진입 안 될 때: 검색 1페이지를 막는 5가지 원인과 해결법
+- guides URL: https://www.optisearch.kr/guides/blog-first-page-entry-tips (배포 후)
+
+## 2026-07-04
+- 키워드: 블로그 카테고리 구성 예시
+- slug: blog-category-examples
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 카테고리 구성 예시: 주제별 실전 설계법과 흔한 실수 3가지
+- guides URL: https://www.optisearch.kr/guides/blog-category-examples (배포 후)
+
+## 2026-07-05
+- 키워드: 블로그 검색 누락 해결
+- slug: blog-search-exclusion-fix
+- 카테고리: 블로그 SEO
+- 제목: 블로그 검색 누락 해결: 내 글이 검색에서 사라졌을 때 확인하는 5가지 체크포인트
+- guides URL: https://www.optisearch.kr/guides/blog-search-exclusion-fix (배포 후)
+
+## 2026-07-06
+- 키워드: 블로그 수익 신고 방법
+- slug: blog-income-reporting-guide
+- 카테고리: 실전 활용
+- 제목: 블로그 수익 신고 방법: 홈택스로 직접 하는 종합소득세 신고 5단계
+- guides URL: https://www.optisearch.kr/guides/blog-income-reporting-guide (배포 후)
+
+## 2026-07-07
+- 키워드: 네이버 블로그 인덱싱 가속
+- slug: naver-blog-indexing-acceleration
+- 카테고리: 블로그 SEO
+- 제목: 네이버 블로그 인덱싱 빠르게 하는 법: 새 글을 검색에 빨리 잡히게 하는 4가지 방법
+- guides URL: https://www.optisearch.kr/guides/naver-blog-indexing-acceleration (배포 후)
+
+## 2026-07-08
+- 키워드: 블로그 첫 글 쓰는 법
+- slug: blog-first-post-writing
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 첫 글 쓰는 법: 처음 발행하는 사람이 알아야 할 5가지 원칙
+- guides URL: https://www.optisearch.kr/guides/blog-first-post-writing (배포 후)
+
+## 2026-07-10
+- 키워드: 블로그 키워드 넣는 위치
+- slug: blog-keyword-placement-tips
+- 카테고리: 키워드 분석
+- 제목: 블로그 키워드 넣는 위치: 제목·본문·태그까지 SEO 효과를 높이는 5가지 원칙
+- guides URL: https://www.optisearch.kr/guides/blog-keyword-placement-tips (배포 후)
