@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { MessageCircle, Mail, Phone } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "문의하기 | 옵티써치",
+  title: "문의하기",
   description: "옵티써치 고객센터 문의 안내 - 카카오톡, 이메일, 전화로 문의하세요.",
 };
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 
 export const metadata: Metadata = {
-  title: "소개 | 옵티써치",
+  title: "소개",
   description: "옵티써치는 키워드 분석과 AI 콘텐츠 최적화를 하나로 제공하는 콘텐츠 마케팅 도구입니다.",
   robots: { index: true, follow: true },
 };

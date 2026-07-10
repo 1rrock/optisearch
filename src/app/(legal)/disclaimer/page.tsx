@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "면책조항 | 옵티써치",
+  title: "면책조항",
   description: "옵티써치 서비스 이용에 관한 면책조항 안내",
 };
 

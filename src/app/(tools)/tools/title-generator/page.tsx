@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { TitleGeneratorTool } from "./TitleGeneratorTool"
 
 export const metadata: Metadata = {
-  title: "AI 블로그 제목 생성기 — SEO 최적화 제목 추천 | 옵티써치",
+  title: "AI 블로그 제목 생성기 — SEO 최적화 제목 추천",
   description:
     "키워드와 글 유형을 입력하면 클릭률 높은 SEO 최적화 블로그 제목 3개를 즉시 생성합니다. 정보성·리뷰·리스트형·비교분석 유형 지원. 무료 제공.",
   keywords: ["블로그 제목 추천", "블로그 제목 생성기", "AI 블로그 제목", "블로그 제목 만들기", "SEO 제목"],

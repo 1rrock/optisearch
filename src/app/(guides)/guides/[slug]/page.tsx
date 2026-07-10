@@ -14,7 +14,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!guide) return {}
   const url = `https://www.optisearch.kr/guides/${slug}`
   return {
-    title: `${guide.title} | 옵티써치 가이드`,
+    // 루트 레이아웃의 `template: "%s | 옵티써치"`가 브랜드를 붙인다.
+    // 여기서 또 붙이면 "… | 옵티써치 가이드 | 옵티써치"가 되어 제목이 잘린다.
+    title: guide.title,
     description: guide.description,
     alternates: {
       canonical: url,

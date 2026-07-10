@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { KeywordAnalyzerTool } from "./KeywordAnalyzerTool"
 
 export const metadata: Metadata = {
-  title: "무료 키워드 분석기 — 네이버 검색량·경쟁도 즉시 확인 | 옵티써치",
+  title: "무료 키워드 분석기 — 네이버 검색량·경쟁도 즉시 확인",
   description:
     "네이버 키워드 검색량, 경쟁도, S+~D- 등급을 무료로 분석하세요. 로그인 없이 바로 사용 가능한 키워드 분석 도구. PC·모바일 검색량을 분리해서 확인할 수 있습니다.",
   keywords: ["키워드 분석", "키워드 분석기", "무료 키워드 분석", "네이버 키워드 분석", "키워드 검색량", "키워드 검색량 조회", "블로그 키워드 분석"],

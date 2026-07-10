@@ -3,7 +3,7 @@ import { LandingHeader } from "@/components/landing/LandingHeader";
 import { LandingFooter } from "@/components/landing/LandingFooter";
 
 export const metadata: Metadata = {
-  title: "요금제 비교 — 무료·베이직·프로 | 옵티써치",
+  title: "요금제 비교 — 무료·베이직·프로",
   description:
     "옵티써치 요금제 비교. 무료 플랜으로 키워드 분석 10회/일 제공, 베이직(₩9,900/월)으로 AI 경쟁분석·초안생성 해금. 14일 Pro 무료 체험 가능.",
   openGraph: {

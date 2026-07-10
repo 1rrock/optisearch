@@ -3,7 +3,7 @@ import Link from "next/link"
 import { guides } from "./_content"
 
 export const metadata: Metadata = {
-  title: "SEO & 블로그 가이드 | 옵티써치",
+  title: "SEO & 블로그 가이드",
   description: "키워드 분석, 블로그 SEO, 콘텐츠 마케팅, 실전 활용 등 블로거/마케터를 위한 무료 SEO 가이드 모음.",
 }
 

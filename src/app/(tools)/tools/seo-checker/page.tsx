@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { SeoCheckerTool } from "./SeoCheckerTool"
 
 export const metadata: Metadata = {
-  title: "무료 블로그 SEO 점수 분석기 — 상위노출 체크리스트 | 옵티써치",
+  title: "무료 블로그 SEO 점수 분석기 — 상위노출 체크리스트",
   description:
     "블로그 글의 SEO 점수를 0~100점으로 즉시 분석합니다. 제목 길이, 키워드 포함 여부, 본문 분량을 자동 체크하여 A~D 등급과 개선 방법을 제공합니다. 로그인 없이 무료.",
   keywords: ["블로그 SEO", "SEO 점수", "블로그 SEO 체크", "네이버 블로그 SEO", "블로그 상위노출 체크"],
