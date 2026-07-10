@@ -5,7 +5,8 @@ const globalForOpenAI = globalThis as unknown as { __openai?: OpenAI };
 
 // Model id for whichever provider OPENAI_BASE_URL points at.
 // Must be set together with OPENAI_BASE_URL — a Gemini endpoint rejects "gpt-4o-mini".
-export const AI_MODEL = process.env.AI_MODEL ?? "gpt-4o-mini";
+// `||` not `??`: an env var declared with an empty value must fall back, not send model: "".
+export const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
 
 export function getOpenAIClient(): OpenAI {
   if (!globalForOpenAI.__openai) {
