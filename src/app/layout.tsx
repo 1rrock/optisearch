@@ -11,6 +11,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist } from "next/font/google";
 import { cn } from "@/shared/lib/utils";
+import { PLAN_LIMITS, PLAN_PRICING } from "@/shared/config/constants";
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
@@ -117,15 +118,38 @@ export default function RootLayout({
                 "@context": "https://schema.org",
                 "@type": "WebApplication",
                 name: "옵티써치 (OptiSearch)",
-                description: "네이버 키워드 검색량, 경쟁도, 포화지수를 무료로 분석하고 AI가 블로그 글 초안까지 생성해주는 올인원 SEO 도구",
+                description: "네이버 지식iN에 실제로 올라온 질문을 읽고 그 각도로 AI 블로그 글 초안을 생성합니다. 키워드 검색량·경쟁도·포화지수 분석은 무료로 제공합니다.",
                 url: "https://www.optisearch.kr",
                 applicationCategory: "BusinessApplication",
                 operatingSystem: "Web",
                 browserRequirements: "Requires JavaScript",
                 inLanguage: "ko",
+                // 가격·한도는 상수에서 파생시킨다. 손으로 적어두면 검색엔진에
+                // 옛 가격이 노출된다 (실제로 9,900원이 계속 나가고 있었다).
                 offers: [
-                  { "@type": "Offer", name: "무료 플랜", price: "0", priceCurrency: "KRW", description: "키워드 분석 10회/일, AI 경쟁분석 3회/일" },
-                  { "@type": "Offer", name: "베이직 플랜", price: "9900", priceCurrency: "KRW", billingIncrement: "P1M", description: "키워드 분석 300회/일, AI 기능 20회/일" },
+                  {
+                    "@type": "Offer",
+                    name: `${PLAN_PRICING.free.label} 플랜`,
+                    price: String(PLAN_PRICING.free.monthly),
+                    priceCurrency: "KRW",
+                    description: `AI 블로그 초안 ${PLAN_LIMITS.free.dailyDraft}회/일, AI 경쟁분석 ${PLAN_LIMITS.free.dailyAnalyze}회/일, 키워드 검색 ${PLAN_LIMITS.free.dailySearch}회/일`,
+                  },
+                  {
+                    "@type": "Offer",
+                    name: `${PLAN_PRICING.basic.label} 플랜`,
+                    price: String(PLAN_PRICING.basic.monthly),
+                    priceCurrency: "KRW",
+                    billingIncrement: "P1M",
+                    description: `AI 블로그 초안 ${PLAN_LIMITS.basic.dailyDraft}회/일, AI 경쟁분석 ${PLAN_LIMITS.basic.dailyAnalyze}회/일, 키워드 검색 무제한`,
+                  },
+                  {
+                    "@type": "Offer",
+                    name: `${PLAN_PRICING.pro.label} 플랜`,
+                    price: String(PLAN_PRICING.pro.monthly),
+                    priceCurrency: "KRW",
+                    billingIncrement: "P1M",
+                    description: `AI 블로그 초안 ${PLAN_LIMITS.pro.dailyDraft}회/일, AI 경쟁분석 ${PLAN_LIMITS.pro.dailyAnalyze}회/일, 키워드 검색 무제한`,
+                  },
                 ],
                 featureList: [
                   "네이버 키워드 검색량 분석",
