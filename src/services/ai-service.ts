@@ -2,6 +2,7 @@ import { getOpenAIClient, AI_MODEL } from "@/shared/lib/openai";
 import type { AIDraftResult, AICompetitiveAnalysis } from "@/entities/analysis/model/types";
 import { cached, CacheTTL } from "@/services/cache-service";
 import { sanitizeForPrompt } from "@/shared/lib/sanitize";
+import { parseAiJson } from "@/shared/lib/ai-json";
 
 const MODEL = AI_MODEL;
 
@@ -216,7 +217,7 @@ JSON으로 응답하세요:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let parsed: any;
   try {
-    parsed = JSON.parse(content);
+    parsed = parseAiJson(content);
   } catch {
     console.error("[ai-service] Failed to parse draft response:", content.slice(0, 200));
     throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
@@ -282,7 +283,7 @@ JSON으로 응답하세요:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let parsed: any;
   try {
-    parsed = JSON.parse(content);
+    parsed = parseAiJson(content);
   } catch {
     console.error("[ai-service] Failed to parse analyze response:", content.slice(0, 200));
     throw new Error("AI 응답 형식 오류가 발생했습니다. 다시 시도해주세요.");
@@ -347,7 +348,7 @@ JSON으로 응답: {"intent": "정보성|구매성|탐색성", "confidence": 0.0
 
     const content = completion.choices[0]?.message?.content ?? "{}";
     try {
-      const parsed = JSON.parse(content);
+      const parsed = parseAiJson<Partial<IntentClassification>>(content);
       return {
         intent: parsed.intent ?? "정보성",
         confidence: parsed.confidence ?? 0.5,
@@ -413,7 +414,7 @@ JSON으로 응답:
 
     const content = completion.choices[0]?.message?.content ?? "{}";
     try {
-      const parsed = JSON.parse(content);
+      const parsed = parseAiJson<Partial<StrategySuggestion>>(content);
       return {
         verdict: parsed.verdict ?? "보류",
         reason: parsed.reason ?? "",
@@ -468,7 +469,7 @@ JSON으로 응답:
 
     const content = completion.choices[0]?.message?.content ?? "{}";
     try {
-      const parsed = JSON.parse(content);
+      const parsed = parseAiJson<{ clusters?: KeywordCluster[] }>(content);
       return (parsed.clusters ?? []).slice(0, 5);
     } catch {
       return [];
