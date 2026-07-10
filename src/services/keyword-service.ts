@@ -16,14 +16,18 @@ import { createServerClient } from "@/shared/lib/supabase";
 import type {
   KeywordSearchResult,
   RelatedKeyword,
-  CompetitionLevel,
-  SaturationIndex,
   AdMetrics,
   EstimateResponse,
 } from "@/entities/keyword/model/types";
 import { getRedis } from "@/shared/lib/redis";
-import { gradeFromScore, getSaturationThreshold, CENSORED_VOLUME_THRESHOLD, ANOMALY_VOLUME_THRESHOLD, ANOMALY_BLOG_THRESHOLD } from "@/shared/config/constants";
+import { gradeFromScore, CENSORED_VOLUME_THRESHOLD, ANOMALY_VOLUME_THRESHOLD, ANOMALY_BLOG_THRESHOLD } from "@/shared/config/constants";
 import { cached, CacheKeys, CacheTTL } from "@/services/cache-service";
+import {
+  toCompetitionLevel,
+  buildSaturationIndex,
+  gradeKeyword,
+  calcCompositeScore,
+} from "@/services/keyword-scoring";
 
 // ---------------------------------------------------------------------------
 // Shared volume lookup helper (corpus-first, SearchAd fallback)
@@ -67,20 +71,6 @@ export async function getVolumeMapFromCorpusOrSearchAd(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-function toCompetitionLevel(raw: string): CompetitionLevel {
-  if (raw === "낮음" || raw === "중간" || raw === "높음") return raw;
-  return "높음";
-}
-
-function buildSaturationIndex(ratio: number): SaturationIndex {
-  const threshold = getSaturationThreshold(ratio);
-  return {
-    value: ratio,
-    label: threshold.label,
-    score: threshold.score,
-  };
-}
-
 /**
  * Estimate CTR for censored keywords using non-censored peers from the same
  * SearchAd batch response. Falls back through 3 tiers:
@@ -115,32 +105,6 @@ export function estimateCtrFromPeers(
 
   // Tier 3: hardcoded conservative defaults
   return { pcCtr: 0.02, mobileCtr: 0.03 };
-}
-
-/**
- * Composite score (0–100):
- *   - Search volume score (0–35): log-scaled
- *   - Saturation score   (0–35): from getSaturationThreshold
- *   - Competition inverse (0–30): 낮음=30, 중간=15, 높음=5
- */
-function calcCompositeScore(
-  totalSearchVolume: number,
-  saturationScore: number,
-  competition: CompetitionLevel
-): number {
-  // Volume score: log10(volume+1) normalised to [0, 35] assuming max ~1,000,000
-  const maxLogVolume = Math.log10(1_000_000 + 1);
-  const logVolume = Math.log10(totalSearchVolume + 1);
-  const volumeScore = Math.min(35, (logVolume / maxLogVolume) * 35);
-
-  // Saturation score: threshold.score is 0–100, scale to 0–35
-  const satScore = (saturationScore / 100) * 35;
-
-  // Competition inverse score
-  const compScore =
-    competition === "낮음" ? 30 : competition === "중간" ? 15 : 5;
-
-  return Math.round(Math.min(100, volumeScore + satScore + compScore));
 }
 
 function sleep(ms: number): Promise<void> {
@@ -297,16 +261,11 @@ export async function analyzeKeyword(
       pcSearchVolume * pcCtr + mobileSearchVolume * mobileCtr
     );
 
-    const saturationRatio =
-      blogPostCount > 0 ? totalSearchVolume / blogPostCount : totalSearchVolume;
-    const saturationIndex = buildSaturationIndex(saturationRatio);
-
-    const compositeScore = calcCompositeScore(
+    const { saturationIndex, keywordGrade } = gradeKeyword(
       totalSearchVolume,
-      saturationIndex.score,
+      blogPostCount,
       competition
     );
-    const keywordGrade = gradeFromScore(compositeScore);
 
     const topPosts = blogResponse.items.map((item) => ({
       title: item.title,

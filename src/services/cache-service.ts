@@ -100,6 +100,7 @@ export const CacheKeys = {
   relatedKeywords: (keyword: string) => `rel:${keyword.toLowerCase()}`,
   topPosts: (keyword: string) => `top:${keyword.toLowerCase()}`,
   sectionAnalysis: (keyword: string) => `sec:${keyword.toLowerCase()}`,
+  blogCount: (keyword: string) => `blogcnt:${keyword.toLowerCase()}`,
 } as const;
 
 // ---------------------------------------------------------------------------

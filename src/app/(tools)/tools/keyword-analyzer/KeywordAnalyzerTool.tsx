@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/shared/ui/button"
 import { BlurOverlay } from "@/components/tools/BlurOverlay"
+import { useTurnstile } from "@/shared/ui/use-turnstile"
 
 interface AnalyzeResponse {
   keyword: string
@@ -10,7 +11,7 @@ interface AnalyzeResponse {
   pcSearchVolume: number
   mobileSearchVolume: number
   competition: "낮음" | "중간" | "높음"
-  keywordGrade: string
+  keywordGrade: string | null
   remaining: number
   limit: number
 }
@@ -20,10 +21,15 @@ export function KeywordAnalyzerTool() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<AnalyzeResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const turnstile = useTurnstile()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!keyword.trim() || loading) return
+    if (!turnstile.ready) {
+      setError("CAPTCHA를 완료해주세요.")
+      return
+    }
 
     setLoading(true)
     setError(null)
@@ -32,7 +38,10 @@ export function KeywordAnalyzerTool() {
       const res = await fetch("/api/public/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword: keyword.trim() }),
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          turnstileToken: turnstile.submitToken,
+        }),
       })
 
       const data = await res.json()
@@ -46,25 +55,30 @@ export function KeywordAnalyzerTool() {
     } catch {
       setError("네트워크 오류가 발생했습니다.")
     } finally {
+      // 토큰은 1회용이다.
+      turnstile.reset()
       setLoading(false)
     }
   }
 
   return (
     <div className="space-y-6">
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          placeholder="분석할 키워드를 입력하세요 (예: 아이폰 17)"
-          className="flex-1 h-12 px-4 rounded-lg border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          maxLength={50}
-          disabled={loading}
-        />
-        <Button type="submit" disabled={loading || !keyword.trim()} size="lg">
-          {loading ? "분석 중..." : "분석하기"}
-        </Button>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="분석할 키워드를 입력하세요 (예: 아이폰 17)"
+            className="flex-1 h-12 px-4 rounded-lg border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            maxLength={50}
+            disabled={loading}
+          />
+          <Button type="submit" disabled={loading || !keyword.trim() || !turnstile.ready} size="lg">
+            {loading ? "분석 중..." : "분석하기"}
+          </Button>
+        </div>
+        {turnstile.enabled && <div ref={turnstile.containerRef} />}
       </form>
 
       {error && (
@@ -97,7 +111,12 @@ export function KeywordAnalyzerTool() {
             </div>
             <div className="p-6 rounded-xl border bg-card">
               <div className="text-sm text-muted-foreground mb-2">키워드 등급</div>
-              <div className="text-3xl font-bold">{result.keywordGrade}</div>
+              <div className="text-3xl font-bold">{result.keywordGrade ?? "—"}</div>
+              {result.keywordGrade === null && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  등급을 계산할 수 없습니다
+                </div>
+              )}
             </div>
           </div>
 
