@@ -1,8 +1,12 @@
 import { z } from "zod";
 import { getKeywordStats } from "@/shared/lib/naver-searchad";
-import { checkPublicRateLimit, getClientIp } from "@/shared/lib/public-rate-limit";
+import {
+  checkGlobalPublicAiLimit,
+  checkPublicRateLimit,
+  getClientIp,
+} from "@/shared/lib/public-rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
-import { getOpenAIClient } from "@/shared/lib/openai";
+import { getOpenAIClient, AI_MODEL } from "@/shared/lib/openai";
 
 const bodySchema = z.object({
   keyword: z.string().min(1).max(50),
@@ -59,7 +63,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // 5. Fetch keyword stats and generate GPT analysis
+  // 5. Global daily cap — AI 제공자 무료 티어 쿼터 보호.
+  // AI를 실제로 부르기 직전에 마지막으로 확인한다. 앞의 관문에서 거부될 요청이
+  // 전역 카운터를 미리 소진시키면, 남용자가 정상 사용자 몫까지 태울 수 있다.
+  const globalLimit = await checkGlobalPublicAiLimit();
+  if (!globalLimit.allowed) {
+    return Response.json(
+      { error: "오늘의 무료 체험 한도가 모두 소진되었습니다. 내일 다시 시도해주세요.", remaining: 0, limit: DAILY_LIMIT },
+      { status: 429 }
+    );
+  }
+
+  // 6. Fetch keyword stats and generate AI analysis
   try {
     const stats = await getKeywordStats([keyword]);
     const stat =
@@ -77,7 +92,7 @@ export async function POST(request: Request) {
     // GPT-4o-mini: 해석 + 제목 3개 (JSON 모드)
     const openai = getOpenAIClient();
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: AI_MODEL,
       max_tokens: 500,
       response_format: { type: "json_object" },
       messages: [

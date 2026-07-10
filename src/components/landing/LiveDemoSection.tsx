@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Search, Sparkles, ArrowRight, Loader2, BarChart3 } from "lucide-react";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 import { useRouter } from "next/navigation";
-
-const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+import { useTurnstile } from "@/shared/ui/use-turnstile";
 
 const EXAMPLE_KEYWORDS = ["강아지 사료", "다이어트 식단", "재테크 입문"];
 
@@ -21,76 +20,20 @@ interface DemoResult {
   titles: string[];
 }
 
-declare global {
-  interface Window {
-    turnstile?: {
-      render: (
-        container: string | HTMLElement,
-        params: {
-          sitekey: string;
-          callback?: (token: string) => void;
-          theme?: "light" | "dark" | "auto";
-          size?: "normal" | "compact" | "flexible";
-        }
-      ) => string | undefined;
-      reset: (id?: string) => void;
-    };
-  }
-}
-
 export function LiveDemoSection() {
   const router = useRouter();
   const [keyword, setKeyword] = useState("");
-  const [turnstileToken, setTurnstileToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DemoResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rateLimited, setRateLimited] = useState(false);
-  const turnstileContainerRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<string | null>(null);
-
-  // Turnstile script 로드 + 명시 렌더링
-  useEffect(() => {
-    if (!TURNSTILE_SITE_KEY) return;
-
-    const renderWidget = () => {
-      if (!window.turnstile || !turnstileContainerRef.current) return;
-      if (widgetIdRef.current) return;
-      const id = window.turnstile.render(turnstileContainerRef.current, {
-        sitekey: TURNSTILE_SITE_KEY,
-        callback: (token: string) => setTurnstileToken(token),
-        theme: "dark",
-      });
-      widgetIdRef.current = id ?? null;
-    };
-
-    // 이미 script가 로드돼 있으면 바로 렌더
-    if (window.turnstile) {
-      renderWidget();
-      return;
-    }
-
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[src*="challenges.cloudflare.com/turnstile"]'
-    );
-    if (existing) {
-      existing.addEventListener("load", renderWidget, { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-    script.async = true;
-    script.defer = true;
-    script.addEventListener("load", renderWidget, { once: true });
-    document.head.appendChild(script);
-  }, []);
+  const turnstile = useTurnstile("dark");
 
   async function handleSubmit(kw?: string) {
     const target = (kw ?? keyword).trim();
     if (!target) return;
 
-    if (TURNSTILE_SITE_KEY && !turnstileToken) {
+    if (!turnstile.ready) {
       setError("CAPTCHA를 완료해주세요.");
       return;
     }
@@ -106,7 +49,7 @@ export function LiveDemoSection() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           keyword: target,
-          turnstileToken: turnstileToken || "dev-bypass",
+          turnstileToken: turnstile.submitToken,
         }),
       });
 
@@ -128,6 +71,8 @@ export function LiveDemoSection() {
     } catch {
       setError("네트워크 오류가 발생했어요. 잠시 후 다시 시도해주세요.");
     } finally {
+      // 토큰은 1회용이므로 성공/실패와 무관하게 새로 발급받아야 한다.
+      turnstile.reset();
       setLoading(false);
     }
   }
@@ -241,8 +186,8 @@ export function LiveDemoSection() {
             </div>
 
             {/* Turnstile 위젯 */}
-            {TURNSTILE_SITE_KEY && (
-              <div ref={turnstileContainerRef} className="pt-2" />
+            {turnstile.enabled && (
+              <div ref={turnstile.containerRef} className="pt-2" />
             )}
           </div>
 

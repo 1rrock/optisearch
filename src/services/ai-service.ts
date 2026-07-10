@@ -1,9 +1,9 @@
-import { getOpenAIClient } from "@/shared/lib/openai";
+import { getOpenAIClient, AI_MODEL } from "@/shared/lib/openai";
 import type { AIDraftResult, AICompetitiveAnalysis } from "@/entities/analysis/model/types";
 import { cached, CacheTTL } from "@/services/cache-service";
 import { sanitizeForPrompt } from "@/shared/lib/sanitize";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = AI_MODEL;
 
 /**
  * Refine an existing draft based on a user instruction (streaming).

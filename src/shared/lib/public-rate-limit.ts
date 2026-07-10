@@ -111,16 +111,45 @@ export async function checkPublicRateLimit(
 }
 
 /**
+ * 공개 AI 라우트 전체의 하루 총 호출 상한.
+ *
+ * IP 단위 한도만으로는 IP를 바꿔가며 호출하는 남용을 막을 수 없습니다.
+ * AI 제공자 무료 티어의 일일 쿼터가 하루아침에 소진되는 것을 막는 마지막 방어선입니다.
+ */
+const GLOBAL_DAILY_AI_LIMIT = Number(process.env.PUBLIC_AI_DAILY_LIMIT ?? 300);
+
+export async function checkGlobalPublicAiLimit(): Promise<{
+  allowed: boolean;
+  remaining: number;
+  limit: number;
+}> {
+  const date = new Date().toISOString().slice(0, 10);
+  return checkRedis(`pub-rl:global-ai:${date}`, GLOBAL_DAILY_AI_LIMIT);
+}
+
+/**
  * Next.js Request 객체에서 클라이언트 IP 주소를 추출합니다.
- * Vercel/프록시 환경의 x-forwarded-for 및 x-real-ip 헤더를 우선 확인합니다.
+ *
+ * x-forwarded-for의 맨 앞 값은 클라이언트가 임의로 채워 보낼 수 있어 신뢰하지 않습니다.
+ * (예전 구현이 그 값을 썼고, 헤더 하나만 바꾸면 일일 한도가 무한이 됐습니다.)
+ * Vercel이 직접 세팅하는 헤더를 우선하고, 마지막 수단으로 프록시가 덧붙인
+ * x-forwarded-for의 맨 뒤 값(= 직전 홉의 실제 주소)을 씁니다.
  *
  * @param request - Next.js Route Handler의 Request 객체
  * @returns 클라이언트 IP 문자열, 판별 불가 시 "unknown"
  */
 export function getClientIp(request: Request): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
+  const vercelIp = request.headers.get("x-vercel-forwarded-for");
+  if (vercelIp) return vercelIp.split(",")[0].trim();
+
   const xri = request.headers.get("x-real-ip");
   if (xri) return xri.trim();
+
+  const xff = request.headers.get("x-forwarded-for");
+  if (xff) {
+    const hops = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (hops.length > 0) return hops[hops.length - 1];
+  }
+
   return "unknown";
 }

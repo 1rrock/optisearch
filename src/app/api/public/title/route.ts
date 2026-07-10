@@ -1,15 +1,19 @@
 import { z } from "zod";
-import { getOpenAIClient } from "@/shared/lib/openai";
-import { checkPublicRateLimit, getClientIp } from "@/shared/lib/public-rate-limit";
+import { getOpenAIClient, AI_MODEL } from "@/shared/lib/openai";
+import {
+  checkGlobalPublicAiLimit,
+  checkPublicRateLimit,
+  getClientIp,
+} from "@/shared/lib/public-rate-limit";
 import { verifyTurnstileToken } from "@/shared/lib/turnstile";
 import { sanitizeForPrompt } from "@/shared/lib/sanitize";
 
-const MODEL = "gpt-4o-mini";
+const MODEL = AI_MODEL;
 
 const bodySchema = z.object({
   keyword: z.string().min(1).max(50),
   postType: z.enum(["정보성", "리뷰", "리스트형", "비교분석"]).optional().default("정보성"),
-  turnstileToken: z.string().optional(),
+  turnstileToken: z.string().min(1),
 });
 
 async function generateTitles(keyword: string, postType: string): Promise<string[]> {
@@ -75,6 +79,12 @@ export async function POST(request: Request) {
 
   const { keyword, postType, turnstileToken } = parsed.data;
 
+  // CAPTCHA를 먼저 검증한다. 통과하지 못한 요청이 레이트리밋 카운터나 AI 호출에 닿지 않도록.
+  const valid = await verifyTurnstileToken(turnstileToken);
+  if (!valid) {
+    return Response.json({ error: "보안 검증에 실패했습니다. 다시 시도해주세요." }, { status: 403 });
+  }
+
   const ip = getClientIp(request);
   const rateLimit = await checkPublicRateLimit(ip, "title", 3);
   if (!rateLimit.allowed) {
@@ -84,11 +94,14 @@ export async function POST(request: Request) {
     );
   }
 
-  if (turnstileToken) {
-    const valid = await verifyTurnstileToken(turnstileToken);
-    if (!valid) {
-      return Response.json({ error: "보안 검증에 실패했습니다. 다시 시도해주세요." }, { status: 403 });
-    }
+  // 전역 상한은 AI를 실제로 부르기 직전에 마지막으로 확인한다. 앞의 관문에서 거부될
+  // 요청이 전역 카운터를 미리 소진시키면, 남용자가 정상 사용자 몫까지 태울 수 있다.
+  const globalLimit = await checkGlobalPublicAiLimit();
+  if (!globalLimit.allowed) {
+    return Response.json(
+      { error: "오늘의 무료 체험 한도가 모두 소진되었습니다. 내일 다시 시도해주세요." },
+      { status: 429 }
+    );
   }
 
   try {

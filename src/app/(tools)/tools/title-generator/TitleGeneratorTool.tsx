@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/shared/ui/button"
 import { BlurOverlay } from "@/components/tools/BlurOverlay"
+import { useTurnstile } from "@/shared/ui/use-turnstile"
 
 interface TitleResponse {
   titles: string[]
@@ -18,17 +19,26 @@ export function TitleGeneratorTool() {
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<TitleResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const turnstile = useTurnstile()
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!keyword.trim() || loading) return
+    if (!turnstile.ready) {
+      setError("CAPTCHA를 완료해주세요.")
+      return
+    }
     setLoading(true)
     setError(null)
     try {
       const res = await fetch("/api/public/title", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ keyword: keyword.trim(), postType }),
+        body: JSON.stringify({
+          keyword: keyword.trim(),
+          postType,
+          turnstileToken: turnstile.submitToken,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -40,6 +50,8 @@ export function TitleGeneratorTool() {
     } catch {
       setError("네트워크 오류가 발생했습니다.")
     } finally {
+      // 토큰은 1회용이므로 성공/실패와 무관하게 새로 발급받아야 한다.
+      turnstile.reset()
       setLoading(false)
     }
   }
@@ -65,10 +77,15 @@ export function TitleGeneratorTool() {
           >
             {POST_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
-          <Button type="submit" disabled={loading || !keyword.trim()} className="flex-1 h-12">
+          <Button
+            type="submit"
+            disabled={loading || !keyword.trim() || !turnstile.ready}
+            className="flex-1 h-12"
+          >
             {loading ? "생성 중..." : "AI 제목 생성"}
           </Button>
         </div>
+        {turnstile.enabled && <div ref={turnstile.containerRef} />}
       </form>
 
       {error && (
