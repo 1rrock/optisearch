@@ -99,11 +99,21 @@ export interface PlanLimit {
   historyLimit: number;
 }
 
+// 주의: `-1`의 의미가 필드마다 다르다.
+//   dailySearch / dailyAnalyze / dailyDraft / savedKeywordLimit / historyLimit
+//     → usage-service.ts:30 에서 "무제한"
+//   bulkKeywordsPerRun
+//     → keywords/batch/route.ts:24 에서 "이 플랜은 대량분석 불가"
+// 새 값을 넣을 때 반드시 확인할 것.
 export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
   free: {
-    dailySearch: 10,
-    dailyAnalyze: 3,
-    dailyDraft: 1,
+    // 검색량 조회는 네이버 공개 API 데이터이고 경쟁사가 무료로 푼다.
+    // 여기에 한도를 걸어 파는 건 이길 수 없는 싸움이라, 사실상 열어둔다.
+    // (완전 무제한 대신 유한값 — 네이버 API 쿼터를 지키는 상한선)
+    dailySearch: 100,
+    dailyAnalyze: 10,
+    // 초안 2회는 "품질을 판단할 수 있는 최소치"다. 1회로는 비교가 안 된다.
+    dailyDraft: 2,
     maxTrackTargets: 3,
     bulkKeywordsPerRun: -1,
     trendPeriodMonths: 3,
@@ -116,9 +126,10 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
     historyLimit: 10,
   },
   basic: {
-    dailySearch: 300,
-    dailyAnalyze: 20,
-    dailyDraft: 5,
+    dailySearch: -1,
+    dailyAnalyze: 50,
+    // 유료의 이유는 검색 횟수가 아니라 AI 초안이다.
+    dailyDraft: 10,
     maxTrackTargets: 20,
     bulkKeywordsPerRun: 50,
     trendPeriodMonths: 12,
@@ -151,10 +162,21 @@ export const PLAN_LIMITS: Record<PlanId, PlanLimit> = {
 // Plan pricing (KRW)
 // ---------------------------------------------------------------------------
 
-export const PLAN_PRICING: Record<PlanId, { monthly: number; label: string }> = {
+/**
+ * `monthly` 는 결제 금액이다. create-rebill/route.ts:65 에서 그대로 PayApp
+ * `goodprice` 로 넘어간다. 표시용 숫자가 아니므로 UI만 보고 고치지 말 것.
+ *
+ * `originalMonthly` 는 취소선으로 보여줄 정가. 없으면 할인 표기를 하지 않는다.
+ * 얼리버드 할인을 끝낼 때는 monthly 를 originalMonthly 로 되돌리고
+ * originalMonthly 를 지우면 된다.
+ */
+export const PLAN_PRICING: Record<
+  PlanId,
+  { monthly: number; label: string; originalMonthly?: number }
+> = {
   free: { monthly: 0, label: "무료" },
-  basic: { monthly: 9900, label: "베이직" },
-  pro: { monthly: 29900, label: "프로" },
+  basic: { monthly: 4900, label: "베이직", originalMonthly: 9900 },
+  pro: { monthly: 14900, label: "프로", originalMonthly: 29900 },
 } as const;
 
 // ---------------------------------------------------------------------------

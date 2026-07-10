@@ -1,7 +1,7 @@
 
 import { CheckCircle2, X, ArrowRight } from "lucide-react";
 import { Button } from "@/shared/ui/button";
-import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 
 type FeatureValue = string | boolean;
 
@@ -12,12 +12,33 @@ interface HighlightFeature {
   pro: FeatureValue;
 }
 
+/** 한도는 반드시 PLAN_LIMITS 에서 읽는다. 손으로 적으면 상수가 바뀔 때 거짓말이 된다. */
+function perDay(n: number): string {
+  return n === -1 ? "무제한" : `${n}회/일`;
+}
+
 const HIGHLIGHT_FEATURES: HighlightFeature[] = [
-  { label: "키워드 검색", free: "10회/일", basic: "300회/일", pro: "무제한" },
-  { label: "AI 제목 추천", free: "3회/일", basic: "20회/일", pro: "100회/일" },
-  { label: "쇼핑 인사이트", free: false, basic: true, pro: true },
+  // 유료의 이유는 검색 횟수가 아니라 AI 초안이다. 그 순서로 보여준다.
+  {
+    label: "AI 블로그 초안",
+    free: perDay(PLAN_LIMITS.free.dailyDraft),
+    basic: perDay(PLAN_LIMITS.basic.dailyDraft),
+    pro: perDay(PLAN_LIMITS.pro.dailyDraft),
+  },
+  {
+    label: "AI 경쟁 분석",
+    free: perDay(PLAN_LIMITS.free.dailyAnalyze),
+    basic: perDay(PLAN_LIMITS.basic.dailyAnalyze),
+    pro: perDay(PLAN_LIMITS.pro.dailyAnalyze),
+  },
+  {
+    label: "키워드 검색",
+    free: perDay(PLAN_LIMITS.free.dailySearch),
+    basic: perDay(PLAN_LIMITS.basic.dailySearch),
+    pro: perDay(PLAN_LIMITS.pro.dailySearch),
+  },
   { label: "대량 키워드 분석", free: false, basic: "50개/회", pro: "500개/회" },
-  { label: "트렌드 분석", free: "3개월", basic: "1년", pro: "전체" },
+  { label: "쇼핑 인사이트", free: false, basic: true, pro: true },
 ];
 
 const PLAN_ORDER: { id: PlanId; isPopular?: boolean }[] = [
@@ -51,6 +72,8 @@ export function PricingSection() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 max-w-5xl mx-auto">
           {PLAN_ORDER.map(({ id, isPopular }) => {
             const pricing = PLAN_PRICING[id];
+            const originalMonthly = pricing.originalMonthly;
+            const hasDiscount = typeof originalMonthly === "number" && originalMonthly > pricing.monthly;
             return (
               <div
                 key={id}
@@ -72,7 +95,12 @@ export function PricingSection() {
                   <span className={`text-lg font-bold ${isPopular ? "text-primary" : "text-muted-foreground"}`}>
                     {pricing.label}
                   </span>
-                  <div className="flex items-baseline gap-1 mt-1">
+                  <div className="flex items-baseline gap-2 mt-1 flex-wrap">
+                    {hasDiscount && (
+                      <span className="text-lg font-bold text-muted-foreground/50 line-through">
+                        ₩{originalMonthly!.toLocaleString()}
+                      </span>
+                    )}
                     <span className="text-4xl font-black text-foreground">
                       ₩{pricing.monthly.toLocaleString()}
                     </span>

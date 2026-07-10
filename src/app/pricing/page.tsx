@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/shared/ui/card";
 import { Badge } from "@/shared/ui/badge";
 import { Button } from "@/shared/ui/button";
-import { PLAN_PRICING, type PlanId } from "@/shared/config/constants";
+import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
 
 type FeatureValue = string | boolean;
 
@@ -18,23 +18,75 @@ interface Feature {
   pro: FeatureValue;
 }
 
+/**
+ * 수치는 전부 PLAN_LIMITS 에서 파생시킨다. 손으로 적어두면 상수가 바뀔 때
+ * 조용히 거짓말이 된다. (예전 표에는 대응하는 상수가 아예 없는
+ * "AI 콘텐츠 점수 1/10/50회" 행이 있었다.)
+ */
+const perDay = (n: number): string => (n === -1 ? "무제한" : `${n}회/일`);
+const count = (n: number): string => (n === -1 ? "무제한" : `${n}개`);
+const perRun = (n: number): FeatureValue => (n === -1 ? false : `${n}개/회`);
+const months = (n: number): string => (n === -1 ? "전체" : n >= 12 ? `${n / 12}년` : `${n}개월`);
+
 const FEATURES: Feature[] = [
-  { label: "키워드 검색", free: "10회/일", basic: "300회/일", pro: "무제한" },
+  // 돈을 내는 이유부터 보여준다.
+  {
+    label: "AI 글 초안",
+    free: perDay(PLAN_LIMITS.free.dailyDraft),
+    basic: perDay(PLAN_LIMITS.basic.dailyDraft),
+    pro: perDay(PLAN_LIMITS.pro.dailyDraft),
+  },
+  {
+    label: "AI 경쟁 분석",
+    free: perDay(PLAN_LIMITS.free.dailyAnalyze),
+    basic: perDay(PLAN_LIMITS.basic.dailyAnalyze),
+    pro: perDay(PLAN_LIMITS.pro.dailyAnalyze),
+  },
+  {
+    label: "키워드 검색",
+    free: perDay(PLAN_LIMITS.free.dailySearch),
+    basic: perDay(PLAN_LIMITS.basic.dailySearch),
+    pro: perDay(PLAN_LIMITS.pro.dailySearch),
+  },
   { label: "연관 키워드", free: true, basic: true, pro: true },
   { label: "콘텐츠 포화 지수", free: true, basic: true, pro: true },
   { label: "키워드 등급", free: true, basic: true, pro: true },
-  { label: "인기글", free: "TOP3", basic: "TOP7", pro: "TOP7" },
+  {
+    label: "인기글",
+    free: `TOP${PLAN_LIMITS.free.topPostsLimit}`,
+    basic: `TOP${PLAN_LIMITS.basic.topPostsLimit}`,
+    pro: `TOP${PLAN_LIMITS.pro.topPostsLimit}`,
+  },
   { label: "섹션 분석", free: false, basic: true, pro: true },
   { label: "쇼핑 인사이트", free: false, basic: true, pro: true },
-  { label: "트렌드", free: "3개월", basic: "1년", pro: "전체" },
+  {
+    label: "트렌드",
+    free: months(PLAN_LIMITS.free.trendPeriodMonths),
+    basic: months(PLAN_LIMITS.basic.trendPeriodMonths),
+    pro: months(PLAN_LIMITS.pro.trendPeriodMonths),
+  },
   { label: "성별/연령 필터", free: false, basic: true, pro: true },
-  { label: "대량 키워드", free: false, basic: "50개/회", pro: "500개/회" },
+  {
+    // bulkKeywordsPerRun 의 -1 은 "무제한"이 아니라 "이 플랜은 불가"다.
+    // (keywords/batch/route.ts:24)
+    label: "대량 키워드",
+    free: perRun(PLAN_LIMITS.free.bulkKeywordsPerRun),
+    basic: perRun(PLAN_LIMITS.basic.bulkKeywordsPerRun),
+    pro: perRun(PLAN_LIMITS.pro.bulkKeywordsPerRun),
+  },
   { label: "태그 복사", free: true, basic: true, pro: true },
-  { label: "검색 기록/엑셀", free: "최근 10개", basic: "무제한+엑셀", pro: "무제한+엑셀" },
-  { label: "AI 제목 추천", free: "3회/일", basic: "20회/일", pro: "100회/일" },
-  { label: "AI 글 초안", free: "1회/일", basic: "5회/일", pro: "30회/일" },
-  { label: "AI 콘텐츠 점수", free: "1회/일", basic: "10회/일", pro: "50회/일" },
-  { label: "순위 추적", free: "3개", basic: "20개", pro: "무제한" },
+  {
+    label: "검색 기록",
+    free: `최근 ${PLAN_LIMITS.free.historyLimit}개`,
+    basic: PLAN_LIMITS.basic.historyExcelEnabled ? "무제한+엑셀" : "무제한",
+    pro: PLAN_LIMITS.pro.historyExcelEnabled ? "무제한+엑셀" : "무제한",
+  },
+  {
+    label: "순위 추적",
+    free: count(PLAN_LIMITS.free.maxTrackTargets),
+    basic: count(PLAN_LIMITS.basic.maxTrackTargets),
+    pro: count(PLAN_LIMITS.pro.maxTrackTargets),
+  },
   { label: "오타 교정", free: true, basic: true, pro: true },
 ];
 
@@ -77,6 +129,8 @@ interface PlanCardProps {
 
 function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus, currentPeriodEnd, onUpgrade, upgradeLoading }: PlanCardProps) {
   const pricing = PLAN_PRICING[planId];
+  const originalMonthly = pricing.originalMonthly;
+  const hasDiscount = typeof originalMonthly === "number" && originalMonthly > pricing.monthly;
   const hasGracePeriod =
     !!currentPeriodEnd &&
     (currentStatus === "pending_cancel" || currentStatus === "stopped") &&
@@ -147,7 +201,12 @@ function PlanCard({ planId, currentPlan, isPopular, checkoutHref, currentStatus,
               </Badge>
             )}
           </div>
-          <div className="flex items-baseline gap-1">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            {hasDiscount && (
+              <span className="text-lg sm:text-xl font-bold text-muted-foreground/50 line-through">
+                ₩{originalMonthly!.toLocaleString()}
+              </span>
+            )}
             <span className="text-3xl sm:text-4xl font-black text-foreground">
               ₩{pricing.monthly.toLocaleString()}
             </span>
