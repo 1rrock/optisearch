@@ -19,19 +19,39 @@ export interface EnrichmentAnalysisData {
 
 const ENRICHMENT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
+/**
+ * 엔리치먼트(지식iN 실제 질문 + 자동완성 + 검색량·포화도)는 이 제품의 유일한
+ * 차별점이다. 이게 빠지면 초안은 ChatGPT가 그냥 써준 글과 구별되지 않는다.
+ * 실측: 없으면 본문 1,496자·H2 0개, 있으면 2,199자·H2 3개.
+ *
+ * 예전 한도는 2초였다. 로컬 콜드 캐시에서 실측 1,910ms — 한도의 95%다.
+ * Vercel 콜드 스타트와 네이버 API 지연이 겹치면 그대로 넘어간다.
+ * 넘어가도 예외가 아니라 undefined 라서, 사용자는 아무 경고 없이 열등한
+ * 초안을 받는다. 한도를 늘리고, 폴백이 실제로 얼마나 일어나는지 남긴다.
+ */
+const ENRICHMENT_TIMEOUT_MS = 6000;
+
 export async function resolveEnrichment(
   userId: string,
   keyword: string,
   purpose: "analyze" | "draft" = "draft"
 ): Promise<string | undefined> {
+  const startedAt = Date.now();
   try {
-    // Wrap entire enrichment resolution in a 2-second timeout
     const result = await Promise.race([
       _resolveEnrichmentInner(userId, keyword, purpose),
-      new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 2000)),
+      new Promise<undefined>((resolve) =>
+        setTimeout(() => resolve(undefined), ENRICHMENT_TIMEOUT_MS)
+      ),
     ]);
+    if (result === undefined) {
+      console.warn(
+        `[enrichment] fallback keyword="${keyword}" purpose=${purpose} ms=${Date.now() - startedAt}`
+      );
+    }
     return result;
-  } catch {
+  } catch (err) {
+    console.warn(`[enrichment] error keyword="${keyword}" ms=${Date.now() - startedAt}`, err);
     return undefined;
   }
 }
