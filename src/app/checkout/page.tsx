@@ -5,6 +5,7 @@ import { Badge } from "@/shared/ui/badge";
 import { Card, CardContent } from "@/shared/ui/card";
 import { PLAN_PRICING } from "@/shared/config/constants";
 import CheckoutForm from "./_components/CheckoutForm";
+import { BusinessInfo } from "@/components/layout/BusinessInfo";
 
 type Plan = "basic" | "pro";
 
@@ -144,6 +145,11 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
               <CheckoutForm plan={plan} />
             </CardContent>
           </Card>
+        </div>
+
+        {/* 결제 직전 화면에도 판매자 정보가 보여야 한다 (전자상거래법). */}
+        <div className="mt-12 pt-8 border-t border-border">
+          <BusinessInfo />
         </div>
       </div>
     </div>

@@ -18,7 +18,7 @@ import {
   AlertDialogAction,
 } from "@/shared/ui/alert-dialog";
 import { PLAN_LIMITS, PLAN_PRICING, type PlanId } from "@/shared/config/constants";
-import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, LogOut, ArrowUpCircle, ArrowDownCircle, XCircle, AlertTriangle } from "lucide-react";
+import { CreditCard, ShieldAlert, Search, Flame, Zap, Star, LogOut, ArrowUpCircle, ArrowDownCircle, XCircle, AlertTriangle, Mail } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
@@ -103,6 +103,7 @@ function SettingsPageContent() {
 
   const dashboardStore = useDashboardData();
   const refreshDashboard = useUserStore((s) => s.refresh);
+  const userEmail = useUserStore((s) => s.email);
   const data = dashboardStore.initialized ? { plan: dashboardStore.plan, usage: dashboardStore.usage } : null;
   const isLoading = !dashboardStore.initialized || dashboardStore.loading;
 
@@ -293,6 +294,25 @@ function SettingsPageContent() {
 
         {/* Setting Content */}
         <div className="flex-1 flex flex-col gap-6 w-full max-w-full overflow-hidden">
+
+          {/* Account Section */}
+          {activeSection === "subscription" && (
+            <Card className="rounded-2xl border-muted shadow-sm mb-6">
+              <CardHeader className="pb-4 border-b">
+                <CardTitle className="text-lg">계정 정보</CardTitle>
+                <CardDescription>순위 변동 알림이 발송되는 주소입니다.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex items-center gap-3 pt-6">
+                <Mail className="size-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">알림 수신 이메일</p>
+                  <p className="text-sm font-medium truncate">
+                    {userEmail ?? "연동된 이메일이 없어 알림을 받을 수 없습니다."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Subscription Section */}
           {activeSection === "subscription" && (
