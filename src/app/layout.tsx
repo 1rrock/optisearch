@@ -17,11 +17,11 @@ const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 export const metadata: Metadata = {
   metadataBase: new URL("https://www.optisearch.kr"),
   title: {
-    default: "옵티써치 — 무료 키워드 분석 도구 + AI 블로그 최적화",
+    default: "옵티써치 — 지식iN 질문으로 쓰는 AI 블로그 글 초안",
     template: "%s | 옵티써치",
   },
   description:
-    "네이버 키워드 검색량, 경쟁도, 포화지수를 무료로 분석하고 AI가 블로그 상위노출 전략과 글 초안까지 자동 생성합니다. 키워드 분석부터 블로그 SEO 최적화까지 올인원.",
+    "네이버 지식iN에 실제로 올라온 질문을 읽고 그 각도로 AI 블로그 글 초안을 생성합니다. 키워드 검색량·경쟁도 분석은 기본으로 무료 제공.",
   keywords: [
     "키워드 분석",
     "키워드 분석 도구",
@@ -44,9 +44,9 @@ export const metadata: Metadata = {
     "블로그 수익화",
   ],
   openGraph: {
-    title: "옵티써치 — 무료 키워드 분석 + AI 블로그 최적화",
+    title: "옵티써치 — 지식iN 질문으로 쓰는 AI 블로그 글 초안",
     description:
-      "네이버 키워드 검색량·경쟁도·포화지수 분석부터 AI 블로그 초안 생성까지. 무료로 시작하세요.",
+      "네이버 지식iN 실제 질문을 읽고 그 각도로 AI 블로그 초안을 씁니다. 키워드 검색량·경쟁도 분석은 무료로 시작하세요.",
     url: "https://www.optisearch.kr",
     siteName: "옵티써치",
     locale: "ko_KR",
@@ -55,8 +55,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "옵티써치 — 무료 키워드 분석 + AI 블로그 최적화",
-    description: "키워드 분석부터 AI 블로그 초안 생성까지 올인원. 무료로 시작하세요.",
+    title: "옵티써치 — 지식iN 질문으로 쓰는 AI 블로그 글 초안",
+    description: "네이버 지식iN 실제 질문을 읽고 그 각도로 AI 블로그 초안을 씁니다. 무료로 시작하세요.",
     images: ["/og-image.png"],
   },
   robots: {

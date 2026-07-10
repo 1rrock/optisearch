@@ -7,7 +7,6 @@ import { SocialProof } from "@/components/landing/SocialProof";
 import { LiveDemoSection } from "@/components/landing/LiveDemoSection";
 import { ProblemPivot } from "@/components/landing/ProblemPivot";
 import { ProfitScoringFeature } from "@/components/landing/ProfitScoringFeature";
-import { RankTrackingFeature } from "@/components/landing/RankTrackingFeature";
 import { Workflow } from "@/components/landing/Workflow";
 import { PricingSection } from "@/components/landing/PricingSection";
 import { FAQSection } from "@/components/landing/FAQSection";
@@ -28,7 +27,6 @@ export default function LandingPage() {
         <LiveDemoSection />
         <ProblemPivot />
         <ProfitScoringFeature />
-        <RankTrackingFeature />
         <Workflow />
         <PricingSection />
         <FAQSection />
