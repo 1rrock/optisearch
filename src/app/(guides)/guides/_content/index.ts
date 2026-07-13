@@ -94,6 +94,8 @@ export const guides: GuideMeta[] = [
   { slug: "naver-blog-indexing-acceleration", title: "네이버 블로그 인덱싱 빠르게 하는 법: 새 글을 검색에 빨리 잡히게 하는 4가지 방법", description: "블로그 글을 발행해도 검색에 바로 잡히지 않는다면 인덱싱 속도를 높여야 합니다. 서치어드바이저 수집 요청부터 RSS 등록, 내부 링크 연결까지 네이버 인덱싱을 가속하는 4가지 실전 방법을 정리합니다.", category: "블로그 SEO", date: "2026-07-07", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-first-post-writing", title: "블로그 첫 글 쓰는 법: 처음 발행하는 사람이 알아야 할 5가지 원칙", description: "블로그 첫 글을 어떻게 시작해야 할지 막막한 초보 블로거를 위해 주제 선정, 키워드 설정, 글 구조, 제목 작성, 발행 후 점검까지 처음부터 올바르게 시작하는 5가지 원칙을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-07-08", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-keyword-placement-tips", title: "블로그 키워드 넣는 위치: 제목·본문·태그까지 SEO 효과를 높이는 5가지 원칙", description: "블로그 글에서 키워드를 어디에, 몇 번 넣어야 SEO에 효과적인지 정리합니다. 제목, 도입부, 소제목, 본문, 메타태그까지 키워드 배치 원칙 5가지를 초보 블로거 기준으로 안내합니다.", category: "키워드 분석", date: "2026-07-10", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-follower-growth-tips", title: "블로그 이웃 늘리는 법: 처음 1000명까지 빠르게 모으는 5가지 방법", description: "블로그 이웃이 늘수록 초기 유입과 댓글 반응이 쌓이고 검색 노출에도 긍정적인 신호가 됩니다. 신규 블로거가 처음 이웃 1000명을 만드는 5가지 실전 방법을 정리합니다.", category: "실전 활용", date: "2026-07-11", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-internal-link-strategy", title: "블로그 내부 링크 전략: SEO 점수를 높이는 4가지 연결 방법", description: "블로그 내부 링크가 검색 노출과 체류시간에 미치는 영향과 링크 구조를 올바르게 설계하는 4가지 실전 방법을 정리합니다.", category: "블로그 SEO", date: "2026-07-12", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

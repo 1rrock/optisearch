@@ -25,6 +25,8 @@
 
 ## 사용 완료
 
+- [2026-07-12] 블로그 내부 링크 전략 → /guides/blog-internal-link-strategy (풀 소진으로 자동 생성)
+- [2026-07-11] 블로그 이웃 늘리는 법 → /guides/blog-follower-growth-tips
 - [2026-07-10] 블로그 키워드 넣는 위치 → /guides/blog-keyword-placement-tips
 - [2026-04-29] 블로그 부업 시작 가이드 → /guides/blog-side-job-guide
 - [2026-04-30] 블로그 키워드 찾는 법 무료 → /guides/find-blog-keywords-free

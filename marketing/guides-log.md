@@ -445,3 +445,17 @@
 - 카테고리: 키워드 분석
 - 제목: 블로그 키워드 넣는 위치: 제목·본문·태그까지 SEO 효과를 높이는 5가지 원칙
 - guides URL: https://www.optisearch.kr/guides/blog-keyword-placement-tips (배포 후)
+
+## 2026-07-11
+- 키워드: 블로그 이웃 늘리는 법
+- slug: blog-follower-growth-tips
+- 카테고리: 실전 활용
+- 제목: 블로그 이웃 늘리는 법: 처음 1000명까지 빠르게 모으는 5가지 방법
+- guides URL: https://www.optisearch.kr/guides/blog-follower-growth-tips (배포 후)
+
+## 2026-07-12
+- 키워드: 블로그 내부 링크 전략
+- slug: blog-internal-link-strategy
+- 카테고리: 블로그 SEO
+- 제목: 블로그 내부 링크 전략: SEO 점수를 높이는 4가지 연결 방법
+- guides URL: https://www.optisearch.kr/guides/blog-internal-link-strategy (배포 후)
