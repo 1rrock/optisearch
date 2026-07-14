@@ -459,3 +459,17 @@
 - 카테고리: 블로그 SEO
 - 제목: 블로그 내부 링크 전략: SEO 점수를 높이는 4가지 연결 방법
 - guides URL: https://www.optisearch.kr/guides/blog-internal-link-strategy (배포 후)
+
+## 2026-07-13
+- 키워드: 블로그 독자 타겟 정하는 법
+- slug: blog-target-audience-guide
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 독자 타겟 정하는 법: 글이 읽히는 대상을 먼저 결정하는 4가지 기준
+- guides URL: https://www.optisearch.kr/guides/blog-target-audience-guide (배포 후)
+
+## 2026-07-14
+- 키워드: 블로그 이미지 SEO 최적화
+- slug: blog-image-seo-tips
+- 카테고리: 블로그 SEO
+- 제목: 블로그 이미지 SEO 최적화: 검색 노출을 높이는 5가지 이미지 설정법
+- guides URL: https://www.optisearch.kr/guides/blog-image-seo-tips (배포 후)

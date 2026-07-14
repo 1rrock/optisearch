@@ -96,6 +96,8 @@ export const guides: GuideMeta[] = [
   { slug: "blog-keyword-placement-tips", title: "블로그 키워드 넣는 위치: 제목·본문·태그까지 SEO 효과를 높이는 5가지 원칙", description: "블로그 글에서 키워드를 어디에, 몇 번 넣어야 SEO에 효과적인지 정리합니다. 제목, 도입부, 소제목, 본문, 메타태그까지 키워드 배치 원칙 5가지를 초보 블로거 기준으로 안내합니다.", category: "키워드 분석", date: "2026-07-10", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-follower-growth-tips", title: "블로그 이웃 늘리는 법: 처음 1000명까지 빠르게 모으는 5가지 방법", description: "블로그 이웃이 늘수록 초기 유입과 댓글 반응이 쌓이고 검색 노출에도 긍정적인 신호가 됩니다. 신규 블로거가 처음 이웃 1000명을 만드는 5가지 실전 방법을 정리합니다.", category: "실전 활용", date: "2026-07-11", author: "옵티써치 팀", readingMinutes: 5 },
   { slug: "blog-internal-link-strategy", title: "블로그 내부 링크 전략: SEO 점수를 높이는 4가지 연결 방법", description: "블로그 내부 링크가 검색 노출과 체류시간에 미치는 영향과 링크 구조를 올바르게 설계하는 4가지 실전 방법을 정리합니다.", category: "블로그 SEO", date: "2026-07-12", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-target-audience-guide", title: "블로그 독자 타겟 정하는 법: 글이 읽히는 대상을 먼저 결정하는 4가지 기준", description: "블로그 타겟 독자를 명확히 정하면 주제 선정부터 글 톤까지 훨씬 쉬워집니다. 독자 설정이 흐릿할 때 생기는 문제와 타겟을 구체화하는 4가지 실전 기준을 정리합니다.", category: "콘텐츠 마케팅", date: "2026-07-13", author: "옵티써치 팀", readingMinutes: 5 },
+  { slug: "blog-image-seo-tips", title: "블로그 이미지 SEO 최적화: 검색 노출을 높이는 5가지 이미지 설정법", description: "블로그 이미지를 올바르게 최적화하면 검색 노출에 긍정적인 영향을 줍니다. 파일명, alt 텍스트, 이미지 크기, 대표 이미지까지 초보 블로거가 바로 적용할 수 있는 5가지 이미지 SEO 설정 방법을 정리합니다.", category: "블로그 SEO", date: "2026-07-14", author: "옵티써치 팀", readingMinutes: 5 },
 ]
 
 export const guideMap = new Map(guides.map(g => [g.slug, g]))

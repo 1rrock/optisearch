@@ -25,6 +25,8 @@
 
 ## 사용 완료
 
+- [2026-07-14] 블로그 이미지 SEO 최적화 → /guides/blog-image-seo-tips (풀 소진으로 자동 생성)
+- [2026-07-13] 블로그 독자 타겟 정하는 법 → /guides/blog-target-audience-guide (풀 소진으로 자동 생성)
 - [2026-07-12] 블로그 내부 링크 전략 → /guides/blog-internal-link-strategy (풀 소진으로 자동 생성)
 - [2026-07-11] 블로그 이웃 늘리는 법 → /guides/blog-follower-growth-tips
 - [2026-07-10] 블로그 키워드 넣는 위치 → /guides/blog-keyword-placement-tips
