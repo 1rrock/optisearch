@@ -73,7 +73,8 @@ export default function ContactPage() {
           <p><span className="font-semibold text-foreground">사업자명:</span> 알에이케이랩스</p>
           <p><span className="font-semibold text-foreground">사업자등록번호:</span> 570-01-03731</p>
           <p><span className="font-semibold text-foreground">대표자:</span> 최원락</p>
-          <p><span className="font-semibold text-foreground">소재지:</span> 대한민국</p>
+          <p><span className="font-semibold text-foreground">통신판매업 신고번호:</span> 2026-화성효행-0319</p>
+          <p><span className="font-semibold text-foreground">소재지:</span> 경기도 화성시 효행구 비봉면 새비봉남로 39, 106동 904호</p>
         </div>
       </section>
     </article>

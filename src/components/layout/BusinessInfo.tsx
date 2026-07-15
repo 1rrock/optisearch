@@ -8,10 +8,10 @@
 export function BusinessInfo({ className = "" }: { className?: string }) {
   return (
     <div className={`text-xs text-muted-foreground font-mono space-y-1 ${className}`}>
-      <p>OptiSearch Inc. | 사업자등록번호: 570-01-03731 | 대표: 최원락</p>
-      <p>소재지: 경기도 화성시 새비봉남로 39</p>
-      <p>고객센터: 070-8065-7571</p>
-      <p>이메일: zxcv1685@gmail.com</p>
+      <p>알에이케이랩스(OptiSearch) | 대표: 최원락</p>
+      <p>사업자등록번호: 570-01-03731 | 통신판매업 신고번호: 2026-화성효행-0319</p>
+      <p>소재지: 경기도 화성시 효행구 비봉면 새비봉남로 39, 106동 904호</p>
+      <p>고객센터: 070-8065-7571 | 이메일: zxcv1685@gmail.com</p>
     </div>
   );
 }

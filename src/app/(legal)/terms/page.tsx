@@ -190,6 +190,7 @@ export default function TermsPage() {
         </p>
         <div className="text-xs text-muted-foreground space-y-0.5">
           <p>상호: 알에이케이랩스 (OptiSearch) | 사업자등록번호: 570-01-03731 | 대표자: 최원락</p>
+          <p>통신판매업 신고번호: 2026-화성효행-0319 | 소재지: 경기도 화성시 효행구 비봉면 새비봉남로 39, 106동 904호</p>
         </div>
       </div>
     </article>

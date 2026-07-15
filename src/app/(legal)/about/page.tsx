@@ -145,7 +145,8 @@ export default function AboutPage() {
           <p><span className="font-semibold text-foreground">대표자:</span> 최원락</p>
           <p><span className="font-semibold text-foreground">이메일:</span> zxcv1685@gmail.com</p>
           <p><span className="font-semibold text-foreground">전화:</span> 070-8065-7571</p>
-          <p><span className="font-semibold text-foreground">소재지:</span> 경기도 화성시 새비봉남로 39</p>
+          <p><span className="font-semibold text-foreground">통신판매업 신고번호:</span> 2026-화성효행-0319</p>
+          <p><span className="font-semibold text-foreground">소재지:</span> 경기도 화성시 효행구 비봉면 새비봉남로 39, 106동 904호</p>
           <p><span className="font-semibold text-foreground">고객문의:</span>{" "}
             <a href="http://pf.kakao.com/_CupuX" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">카카오톡 채널</a>
           </p>
