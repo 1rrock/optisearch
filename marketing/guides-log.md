@@ -473,3 +473,45 @@
 - 카테고리: 블로그 SEO
 - 제목: 블로그 이미지 SEO 최적화: 검색 노출을 높이는 5가지 이미지 설정법
 - guides URL: https://www.optisearch.kr/guides/blog-image-seo-tips (배포 후)
+
+## 2026-07-15
+- 키워드: 블로그 글 1편에 키워드 몇 개가 적당할까
+- slug: blog-keyword-count-per-post
+- 카테고리: 키워드 분석
+- 제목: 블로그 글 1편에 키워드 몇 개가 적당할까: 메인·보조 키워드 설정 실전 가이드
+- guides URL: https://www.optisearch.kr/guides/blog-keyword-count-per-post (배포 후)
+
+## 2026-07-16
+- 키워드: 블로그 SNS 연동 방법
+- slug: blog-sns-integration-guide
+- 카테고리: 실전 활용
+- 제목: 블로그 SNS 연동 방법: 방문자를 늘리는 4가지 채널 활용법
+- guides URL: https://www.optisearch.kr/guides/blog-sns-integration-guide (배포 후)
+
+## 2026-07-17
+- 키워드: 블로그 콘텐츠 재활용 방법
+- slug: blog-content-repurposing
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 콘텐츠 재활용 방법: 글 1편으로 5가지 채널에 쓰는 실전 전략
+- guides URL: https://www.optisearch.kr/guides/blog-content-repurposing (배포 후)
+
+## 2026-07-20
+- 키워드: 네이버 자동완성 키워드 활용법
+- slug: naver-autocomplete-keyword-tips
+- 카테고리: 키워드 분석
+- 제목: 네이버 자동완성으로 키워드 찾는 법: 무료로 쓰는 숨겨진 키워드 발굴 도구
+- guides URL: https://www.optisearch.kr/guides/naver-autocomplete-keyword-tips (배포 후)
+
+## 2026-07-21
+- 키워드: 블로그 모바일 최적화 방법
+- slug: blog-mobile-seo-tips
+- 카테고리: 블로그 SEO
+- 제목: 블로그 모바일 최적화 방법: 스마트폰 방문자를 잡는 5가지 설정법
+- guides URL: https://www.optisearch.kr/guides/blog-mobile-seo-tips (배포 후)
+
+## 2026-07-22
+- 키워드: 블로그 시리즈 글 쓰는 법
+- slug: blog-series-writing-strategy
+- 카테고리: 콘텐츠 마케팅
+- 제목: 블로그 시리즈 글 쓰는 법: 연재 포스팅으로 충성 독자를 만드는 4가지 전략
+- guides URL: https://www.optisearch.kr/guides/blog-series-writing-strategy (배포 후)

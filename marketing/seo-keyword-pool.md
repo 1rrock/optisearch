@@ -25,6 +25,10 @@
 
 ## 사용 완료
 
+- [2026-07-22] 블로그 시리즈 글 쓰는 법 → /guides/blog-series-writing-strategy (풀 소진으로 자동 생성)
+- [2026-07-17] 블로그 콘텐츠 재활용 방법 → /guides/blog-content-repurposing (풀 소진으로 자동 생성)
+- [2026-07-15] 블로그 글 1편에 키워드 몇 개가 적당할까 → /guides/blog-keyword-count-per-post (풀 소진으로 자동 생성)
+- [2026-07-16] 블로그 SNS 연동 방법 → /guides/blog-sns-integration-guide (풀 소진으로 자동 생성)
 - [2026-07-14] 블로그 이미지 SEO 최적화 → /guides/blog-image-seo-tips (풀 소진으로 자동 생성)
 - [2026-07-13] 블로그 독자 타겟 정하는 법 → /guides/blog-target-audience-guide (풀 소진으로 자동 생성)
 - [2026-07-12] 블로그 내부 링크 전략 → /guides/blog-internal-link-strategy (풀 소진으로 자동 생성)
@@ -91,3 +95,5 @@
 - [2026-07-06] 블로그 수익 신고 방법 → /guides/blog-income-reporting-guide
 - [2026-07-07] 네이버 블로그 인덱싱 가속 → /guides/naver-blog-indexing-acceleration
 - [2026-07-08] 블로그 첫 글 쓰는 법 → /guides/blog-first-post-writing
+- [2026-07-20] 네이버 자동완성 키워드 활용법 → /guides/naver-autocomplete-keyword-tips (풀 소진으로 자동 생성)
+- [2026-07-21] 블로그 모바일 최적화 방법 → /guides/blog-mobile-seo-tips (풀 소진으로 자동 생성)
